@@ -151,8 +151,8 @@ def main():
     module = AnsibleModule(
         argument_spec = dict(
             hostname      = dict(default='localhost'),
-            port          = dict(default=1521),
-            service_name  = dict(required=True),
+            port          = dict(default=1521, type='int'),
+            service_name  = dict(required=False),
             user          = dict(required=False),
             password      = dict(required=False, no_log=True),
             mode          = dict(default='normal', choices=["normal","sysdba"]),
@@ -164,50 +164,15 @@ def main():
         )
     )
 
-    hostname = module.params["hostname"]
-    port = module.params["port"]
-    service_name = module.params["service_name"]
-    user = module.params["user"]
-    password = module.params["password"]
-    mode = module.params["mode"]
     directory_name = module.params["directory_name"]
     directory_path = module.params["directory_path"]
     directory_mode = module.params["directory_mode"]
     state = module.params["state"]
 
-
-
     if not cx_oracle_exists:
         module.fail_json(msg="The cx_Oracle module is required. 'pip install cx_Oracle' should do the trick. If cx_Oracle is installed, make sure ORACLE_HOME & LD_LIBRARY_PATH is set")
 
-    wallet_connect = '/@%s' % service_name
-    try:
-        if (not user and not password ): # If neither user or password is supplied, the use of an oracle wallet is assumed
-            if mode == 'sysdba':
-                connect = wallet_connect
-                conn = cx_Oracle.connect(wallet_connect, mode=cx_Oracle.SYSDBA)
-            else:
-                connect = wallet_connect
-                conn = cx_Oracle.connect(wallet_connect)
-
-        elif (user and password ):
-            if mode == 'sysdba':
-                dsn = cx_Oracle.makedsn(host=hostname, port=port, service_name=service_name)
-                connect = dsn
-                conn = cx_Oracle.connect(user, password, dsn, mode=cx_Oracle.SYSDBA)
-            else:
-                dsn = cx_Oracle.makedsn(host=hostname, port=port, service_name=service_name)
-                connect = dsn
-                conn = cx_Oracle.connect(user, password, dsn)
-
-        elif (not(user) or not(password)):
-            module.fail_json(msg='Missing username or password for cx_Oracle')
-
-    except cx_Oracle.DatabaseError as exc:
-        error, = exc.args
-        msg = 'Could not connect to database - %s, connect descriptor: %s' % (error.message, connect)
-        module.fail_json(msg=msg, changed=False)
-
+    conn = oracle_connect(module)
     cursor = conn.cursor()
 
     if state == 'present':
@@ -215,7 +180,6 @@ def main():
     elif state == 'absent':
         if check_directory_exists(module, msg, cursor, directory_name):
             drop_directory(module, msg, cursor, directory_name)
-
         else:
             msg = 'Directory %s doesn\'t exist' % (directory_name)
             module.exit_json(msg=msg, changed=False)

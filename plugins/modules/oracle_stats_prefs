@@ -107,11 +107,11 @@ def main():
         argument_spec = dict(
             hostname      = dict(default='localhost'),
             port          = dict(default=1521, type='int'),
-            service_name  = dict(required=True),
+            service_name  = dict(required=False),
             user          = dict(required=False),
             password      = dict(required=False, no_log=True),
             mode          = dict(default='normal', choices=["normal","sysdba"]),
-            preference_name = dict(required=True, aliases=['pname']),
+            preference_name  = dict(required=True, aliases=['pname']),
             preference_value = dict(aliases=['pvalue']),
             state         = dict(default='present', choices=["present","absent"])
         ),
@@ -121,39 +121,8 @@ def main():
     if not cx_oracle_exists:
         module.fail_json(msg="The cx_Oracle module is required. 'pip install cx_Oracle' should do the trick. If cx_Oracle is installed, make sure ORACLE_HOME & LD_LIBRARY_PATH is set")
     # Connect to database
-    hostname = module.params["hostname"]
-    port = module.params["port"]
-    service_name = module.params["service_name"]
-    user = module.params["user"]
-    password = module.params["password"]
-    mode = module.params["mode"]
-    wallet_connect = '/@%s' % service_name
-    try:
-        if (not user and not password ): # If neither user or password is supplied, the use of an oracle wallet is assumed
-            if mode == 'sysdba':
-                connect = wallet_connect
-                conn = cx_Oracle.connect(wallet_connect, mode=cx_Oracle.SYSDBA)
-            else:
-                connect = wallet_connect
-                conn = cx_Oracle.connect(wallet_connect)
-
-        elif (user and password ):
-            if mode == 'sysdba':
-                dsn = cx_Oracle.makedsn(host=hostname, port=port, service_name=service_name)
-                connect = dsn
-                conn = cx_Oracle.connect(user, password, dsn, mode=cx_Oracle.SYSDBA)
-            else:
-                dsn = cx_Oracle.makedsn(host=hostname, port=port, service_name=service_name)
-                connect = dsn
-                conn = cx_Oracle.connect(user, password, dsn)
-
-        elif (not(user) or not(password)):
-            module.fail_json(msg='Missing username or password for cx_Oracle')
-
-    except cx_Oracle.DatabaseError as exc:
-        error, = exc.args
-        msg[0] = 'Could not connect to database - %s, connect descriptor: %s' % (error.message, connect)
-        module.fail_json(msg=msg[0], changed=False)
+    conn = oracle_connect(module)
+    
     if conn.version < "10.2":
         module.fail_json(msg="Database version must be 10gR2 or greater", changed=False)
     #
@@ -191,13 +160,32 @@ def main():
         :changed:= v_changed;
         :msg:= v_msg;
     END;
-    """, {'pname': module.params['preference_name'], 'pvalue': module.params['preference_value'], 'state': module.params['state'],
-          'changed': var_changed, 'msg': var_msg})
+    """, {'pname': module.params['preference_name'],
+          'pvalue': module.params['preference_value'],
+          'state': module.params['state'],
+          'changed': var_changed, 'msg': var_msg}
+    )
     result_changed = var_changed.getvalue() > 0
     msg[0] = var_msg.getvalue()
     module.exit_json(msg=", ".join(msg), changed=result_changed)
 
 
 from ansible.module_utils.basic import *
+
+# In thise we do import from local project project sub-directory <project-dir>/module_utils
+# While this file is placed in <project-dir>/library
+# No colletions are used
+try:
+    from ansible.module_utils.oracle_utils import oracle_connect
+except:
+    pass
+
+# In thise we do import from collections
+try:
+    from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_utils import oracle_connect
+except:
+    pass
+
+
 if __name__ == '__main__':
     main()
