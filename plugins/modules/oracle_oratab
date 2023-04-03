@@ -1,21 +1,27 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
-import fcntl
 
 DOCUMENTATION = '''
 ---
 module: oracle_oratab
 short_description: Reads oratab to ansible_facts
 description:
-    - Reads SID and ORACLE_HOME path from oratab to ansible_facts
+    - Reads SID and ORACLE_HOME path from oratab, crs and running processes to ansible_facts
 version_added: "1.0.0.0"
-author: -------
+author: Ivan Brezina
 '''
 
 EXAMPLES = '''
 # Read oratab
-- oracle_oratab
+    - oracle_oratab:
+        writable_only: true
+      register: sid_list
+
+    - debug:
+        var: sid_list
 '''
+
+import fcntl
 import os
 from pathlib import Path
 import pwd
@@ -28,11 +34,9 @@ from pwd import getpwuid
 
 from ansible.module_utils.basic import AnsibleModule
 
-module = None
+class oracle_homes():
 
-class homes():
-
-    def __init__(self):
+    def __init__(self, module = None):
         self.facts_item = {}
         self.running_only = False
         self.open_only = False
@@ -46,6 +50,7 @@ class homes():
         self.ora_inventory = None
         self.orabase = None
         self.crsctl = None
+        self.module = module      # possible reference onto AnsibleModule
 
         # Check whether CRS/HAS is installed
         try:
@@ -91,6 +96,19 @@ class homes():
         except:
             pass
 
+        
+    def module_warn(msg):
+        if self.module:
+            module.warn(msg)
+
+
+    def module_fail_json(msg='', changed=False):
+        if self.module:
+            module.fail_json(msg=msg, changed=changed)
+        else:
+            os.exit(1)
+
+        
     def parse_oratab(self):
         # Reads SID and ORACLE_HOME from oratab
         with open('/etc/oratab', 'r') as oratab:
@@ -105,7 +123,6 @@ class homes():
                 self.add_sid(ORACLE_SID=ORACLE_SID, ORACLE_HOME=ORACLE_HOME)
 
     def list_processes(self):
-        global module
         """
         # Emulate trick form tanelpoder
         # https://tanelpoder.com/2011/02/28/finding-oracle-homes-with/
@@ -174,7 +191,7 @@ class homes():
                         else:
                             crs_uid = None
                         if own_uid != 0 and own_uid != ora_uid:
-                            module.fail_json(msg='I(uid={}) am not oracle process owner(uid={}) and I am not root'.format(own_uid, ora_uid), changed=False)
+                            module_fail_json(msg='I(uid={}) am not oracle process owner(uid={}) and I am not root'.format(own_uid, ora_uid), changed=False)
 
                     self.add_sid(ORACLE_SID=ORACLE_SID, ORACLE_HOME=ORACLE_HOME, running=True)
 
@@ -243,96 +260,94 @@ class homes():
                 , 'ORACLE_HOME': ORACLE_HOME
                 , 'ORACLE_BASE': ORACLE_BASE
                 , 'running': running}
+            
+    def query_db_status(self, oracle_owner, oracle_home, oracle_sid):
+        sqlplus_path = Path(oracle_home, 'bin', 'sqlplus')
+        args = [str(sqlplus_path), '-S', '/', 'as', 'sysdba']
+        pw_record = pwd.getpwnam(oracle_owner)
+        user_name      = pw_record.pw_name
+        user_home_dir  = pw_record.pw_dir
+        user_uid       = pw_record.pw_uid
+        user_gid       = pw_record.pw_gid
+        user_gids      = os.getgrouplist(user_name, user_gid)
+        env = os.environ.copy()
+        env[ 'HOME'     ]   = user_home_dir
+        env[ 'LOGNAME'  ]   = user_name
+        env[ 'PWD'      ]   = '/'
+        env[ 'USER'     ]   = user_name
+        env[ 'ORACLE_HOME'] = oracle_home
+        env[ 'ORACLE_SID']  = oracle_sid
 
+        if os.getuid() == 0:
+            process = subprocess.Popen(args,
+                                       preexec_fn=self.demote(user_uid, user_gid, user_gids),
+                                       cwd='/', env=env, stdout=subprocess.PIPE, stdin=subprocess.PIPE)
+        elif os.getuid() == user_uid:        
+            process = subprocess.Popen(args,
+                                       cwd='/', env=env, stdout=subprocess.PIPE, stdin=subprocess.PIPE)
+        else:
+            self.module_fail_json(msg='Can not execute sqlplus(uid={})'.format(user_uid), changed=False)
+            return []
 
-def query_db_status(oracle_owner, oracle_home, oracle_sid):
-    global module
-    sqlplus_path = Path(oracle_home, 'bin', 'sqlplus')
-    args = [str(sqlplus_path), '-S', '/', 'as', 'sysdba']
-    pw_record = pwd.getpwnam(oracle_owner)
-    user_name      = pw_record.pw_name
-    user_home_dir  = pw_record.pw_dir
-    user_uid       = pw_record.pw_uid
-    user_gid       = pw_record.pw_gid
-    user_gids      = os.getgrouplist(user_name, user_gid)
-    env = os.environ.copy()
-    env[ 'HOME'     ]   = user_home_dir
-    env[ 'LOGNAME'  ]   = user_name
-    env[ 'PWD'      ]   = '/'
-    env[ 'USER'     ]   = user_name
-    env[ 'ORACLE_HOME'] = oracle_home
-    env[ 'ORACLE_SID']  = oracle_sid
+        sql = """
+        select status from v$instance;
+        select open_mode from v$database;
+        select count(*) as ora_dg_on from v$archive_dest where status = 'VALID' AND target = 'STANDBY';
+        select database_role from v$database;
+        EXIT
+        """
 
-    if os.getuid() == 0:
-        process = subprocess.Popen(args,
-                                   preexec_fn=demote(user_uid, user_gid, user_gids),
-                                   cwd='/', env=env, stdout=subprocess.PIPE, stdin=subprocess.PIPE)
-    elif os.getuid() == user_uid:        
-        process = subprocess.Popen(args,
-                                   cwd='/', env=env, stdout=subprocess.PIPE, stdin=subprocess.PIPE)
-    else:
-        module.fail_json(msg='Can not execute sqlplus(uid={})'.format(user_uid), changed=False)
-        return []
-        
-    sql = """
-    select status from v$instance;
-    select open_mode from v$database;
-    select count(*) as ora_dg_on from v$archive_dest where status = 'VALID' AND target = 'STANDBY';
-    select database_role from v$database;
-    EXIT
-    """
+        header = None
+        delim  = False
+        value  = None
+        r      = {}
+        out = process.communicate(input=sql.encode(), timeout=5)
+        for l in out[0].decode('utf-8').splitlines():
+            #module_warn("{}:{}".format(oracle_sid,l.rstrip()))
+            if l.strip() in ('STATUS', 'OPEN_MODE', 'ORA_DG_ON', 'DATABASE_ROLE'):
+                header = l.strip()
+                delim  = False
+                value  = None
+            elif l.rstrip().startswith('-------'):
+                delim  = True
+                value = None
+            elif l.rstrip() and header and delim and value is None:
+                value = l.strip()
+                r[header] = value
+                header = None
+                delim  = False
+                value  = False        
+        #module_warn(str(r))
+        #module_warn("Exit code {}".format(process.returncode))
+        if oracle_sid.startswith('+ASM') and r['STATUS'] == 'STARTED':
+            return ['ASM', 'STARTED']
+        elif oracle_sid.startswith('+ASM'):
+            return ['ASM']
 
-    header = None
-    delim  = False
-    value  = None
-    r      = {}
-    out = process.communicate(input=sql.encode(), timeout=5)
-    for l in out[0].decode('utf-8').splitlines():
-        #module.warn("{}:{}".format(oracle_sid,l.rstrip()))
-        if l.strip() in ('STATUS', 'OPEN_MODE', 'ORA_DG_ON', 'DATABASE_ROLE'):
-            header = l.strip()
-            delim  = False
-            value  = None
-        elif l.rstrip().startswith('-------'):
-            delim  = True
-            value = None
-        elif l.rstrip() and header and delim and value is None:
-            value = l.strip()
-            r[header] = value
-            header = None
-            delim  = False
-            value  = False        
-    #module.warn(str(r))
-    #module.warn("Exit code {}".format(process.returncode))
-    if oracle_sid.startswith('+ASM') and r['STATUS'] == 'STARTED':
-        return ['ASM', 'STARTED']
-    elif oracle_sid.startswith('+ASM'):
-        return ['ASM']
+        if r['STATUS'] == 'STARTED':
+            return ['STARTED']
+        elif r['STATUS'] == 'MOUNTED' and int(r['ORA_DG_ON']):
+            return ['MOUNTED', 'STANDBY']
+        elif r['STATUS'] == 'MOUNTED':
+            return ['MOUNTED']    
+        elif r['STATUS'] == 'OPEN' and int(r['ORA_DG_ON']):
+            return ['OPEN', 'PRIMARY', r['OPEN_MODE']]
+        elif r['STATUS'] == 'OPEN':
+            return ['OPEN', r['OPEN_MODE']]
 
-    if r['STATUS'] == 'STARTED':
-        return ['STARTED']
-    elif r['STATUS'] == 'MOUNTED' and int(r['ORA_DG_ON']):
-        return ['MOUNTED', 'STANDBY']
-    elif r['STATUS'] == 'MOUNTED':
-        return ['MOUNTED']    
-    elif r['STATUS'] == 'OPEN' and int(r['ORA_DG_ON']):
-        return ['OPEN', 'PRIMARY', r['OPEN_MODE']]
-    elif r['STATUS'] == 'OPEN':
-        return ['OPEN', r['OPEN_MODE']]
-        
-def demote(user_uid, user_gid, supplementary_groups):
-    def result():
-        os.setgroups(supplementary_groups)
-        os.setgid(user_gid)
-        os.setegid(user_gid)
-        os.setuid(user_uid)
-        os.seteuid(user_uid)
-    return result
+    @staticmethod    
+    def demote(user_uid, user_gid, supplementary_groups):
+        def result():
+            os.setgroups(supplementary_groups)
+            os.setgid(user_gid)
+            os.setegid(user_gid)
+            os.setuid(user_uid)
+            os.seteuid(user_uid)
+        return result
 
 
 # Ansible code
 def main():
-    global module
     oracle_list = []
     module = AnsibleModule(
         argument_spec = dict(
@@ -349,7 +364,7 @@ def main():
     open_only = module.params['open_only']
     writable_only = module.params['writable_only']
 
-    h = homes()
+    h = oracle_homes(module)
     h.list_crs_instances()
     h.list_processes()
     h.parse_oratab()
@@ -363,7 +378,9 @@ def main():
             pass
 
         if h.facts_item[sid]["running"]:
-            status = query_db_status(h.facts_item[sid]['owner'], h.facts_item[sid]['ORACLE_HOME'], h.facts_item[sid]['ORACLE_SID'])
+            status = h.query_db_status(oracle_owner = h.facts_item[sid]['owner']
+                                       , oracle_home = h.facts_item[sid]['ORACLE_HOME']
+                                       , oracle_sid = h.facts_item[sid]['ORACLE_SID'])
             h.facts_item[sid]['status'] = status
         else:
             h.facts_item[sid]['status'] = ['DOWN']
