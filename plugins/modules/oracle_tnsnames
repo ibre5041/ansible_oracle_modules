@@ -64,6 +64,7 @@ def main():
     module = AnsibleModule(
         argument_spec = dict(
             path        = dict(required=True),
+            follow      = dict(default=True, required=False),
             backup      = dict(type='bool', default=False), # inherited from add_file_common_args
             state       = dict(default="present", choices=["present", "absent"]),
             alias       = dict(required=False),
@@ -78,7 +79,7 @@ def main():
         supports_check_mode=True,
         mutually_exclusive=[['alias', 'aliases'],['whole_value', 'cs_simple', 'cs_dg', 'attribute_path']]
     )
-
+    
     #if module._verbosity >= 3:
     #    module.exit_json(changed=True, debug=module.params)
         
@@ -86,8 +87,18 @@ def main():
     facts = {}
 
     filename = module.params["path"]
+
+    if module.params["follow"]:
+        while os.path.islink(filename):
+            filename = os.readlink(filename)
+    
     orafile = DotOraFile(filename)
 
+    if module.params['alias'] and module.params['whole_value']:
+        orafile.upsertalias(module.params['alias'], module.params['whole_value'])
+        backup_file = module.backup_local(filename)
+        module.warn(str(backup_file))
+        
     if module.params['alias']:
         alias = module.params['alias']
         param = next(p for p in orafile.params if p.name.casefold() == alias.casefold())
