@@ -118,7 +118,7 @@ def main():
             mode          = dict(default='normal', choices=["normal","sysdba"]),
             size          = dict(required=True),
             groups        = dict(required=True),
-            log_type      = dict(default='redo', choices["redo", "standby"])
+            log_type      = dict(default='redo', choices=["redo", "standby"])
             # threads       = dict(default=1)
         ),
     )
