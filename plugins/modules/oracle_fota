@@ -371,8 +371,17 @@ def main():
 
 
 from ansible.module_utils.basic import *
-from ansible.module_utils.oracle_utils import oracle_connect
-from ansible.module_utils.oracle_homes import oracle_homes
+
+try:
+    from ansible.module_utils.oracle_utils import oracle_connect
+except:
+    from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_utils import oracle_connect
+
+try:
+    from ansible.module_utils.oracle_home import oracle_homes
+except:    
+    from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_homes import oracle_homes
+
 
 if __name__ == '__main__':
     main()
