@@ -44,7 +44,11 @@ EXAMPLES = '''
         path: "{{ oracle_env.ORACLE_HOME }}/network/admin/tnsnames.ora"
 '''
 
-from ansible.module_utils.dotora import *
+try:
+    from ansible.module_utils.dotora import *
+except:
+    from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.dotora import *
+
 from ansible.module_utils.basic import *
 
 import sys
