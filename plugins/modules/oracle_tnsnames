@@ -54,8 +54,18 @@ from ansible.module_utils.basic import *
 import sys
 import os
 import getopt
-
+import tempfile
 import unittest
+
+def write_changes(module, content, dest):
+    tmpfd, tmpfile = tempfile.mkstemp(dir=module.tmpdir)
+    with os.fdopen(tmpfd, 'wb') as f:
+        f.write(to_bytes(content))
+
+    module.atomic_move(tmpfile,
+                       to_native(os.path.realpath(to_bytes(dest, errors='surrogate_or_strict')), errors='surrogate_or_strict'),
+                       unsafe_writes=False) #
+
 
 # Ansible code
 def main():
@@ -82,7 +92,12 @@ def main():
     
     #if module._verbosity >= 3:
     #    module.exit_json(changed=True, debug=module.params)
-        
+
+    whole_value     = module.params['whole_value']
+    cs_simple       = module.params['cs_simple']
+    cs_dg           = module.params['cs_dg']
+    attribute_value = module.params['attribute_value']
+    
     # Preparation
     facts = {}
 
@@ -91,26 +106,40 @@ def main():
     if module.params["follow"]:
         while os.path.islink(filename):
             filename = os.readlink(filename)
-    
+
+    with open(filename, "r") as file:
+        old_content = file.read()
+        
     orafile = DotOraFile(filename)
 
     if module.params['alias'] and module.params['whole_value']:
         orafile.upsertalias(module.params['alias'], module.params['whole_value'])
-        backup_file = module.backup_local(filename)
-        module.warn(str(backup_file))
         
     if module.params['alias']:
         alias = module.params['alias']
-        param = next(p for p in orafile.params if p.name.casefold() == alias.casefold())
-        facts.update({alias: str(param)})
+        try:
+            param = next(p for p in orafile.params if p.name.casefold() == alias.casefold())
+            facts.update({alias: str(param.valuesstr())})
+        except StopIteration:
+            facts.update({alias: None})
+
 
     if module.params['aliases']:
         for alias in module.params['aliases']:
-            param = next(p for p in orafile.params if p.name.casefold() == alias.casefold())
-            facts.update({alias: str(param)})
+            try:
+                param = next(p for p in orafile.params if p.name.casefold() == alias.casefold())
+                facts.update({alias: str(param.valuesstr())})
+            except StopIteration:
+                facts.update({alias: None})
+
+    new_content = str(orafile)
+    changed = bool((old_content != new_content) and (whole_value or attribute_value or cs_simple or cs_dg))
+    if changed:
+        backup_file = module.backup_local(filename)
+        write_changes(module, new_content, filename)
         
     # Output
-    module.exit_json(msg=", ".join(msg), changed=False, ansible_facts=facts)
+    module.exit_json(msg=", ".join(msg), changed=changed, ansible_facts=facts)
 
 
 if __name__ == '__main__':
