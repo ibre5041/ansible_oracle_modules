@@ -252,10 +252,12 @@ class oracle_homes():
                 sid['running'] = running
         else:
             self.add_home(ORACLE_HOME)
-            if ORACLE_HOME and ORACLE_HOME in self.homes[ORACLE_HOME]:
+            if ORACLE_HOME and ORACLE_HOME in self.homes:
                 ORACLE_BASE = self.homes[ORACLE_HOME]['ORACLE_BASE']
+            elif ORACLE_HOME:
+                ORACLE_BASE = self.base_from_home(ORACLE_HOME)
             else:
-                ORACLE_BASE = None            
+                ORACLE_BASE = None
             self.facts_item[ORACLE_SID] = {'ORACLE_SID': ORACLE_SID
                 , 'ORACLE_HOME': ORACLE_HOME
                 , 'ORACLE_BASE': ORACLE_BASE
