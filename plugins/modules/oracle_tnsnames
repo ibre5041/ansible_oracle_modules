@@ -88,6 +88,16 @@ def main():
     filename = module.params["path"]
     orafile = DotOraFile(filename)
 
+    if module.params['alias']:
+        alias = module.params['alias']
+        param = next(p for p in orafile.params if p.name.casefold() == alias.casefold())
+        facts.update({alias: str(param)})
+
+    if module.params['aliases']:
+        for alias in module.params['aliases']:
+            param = next(p for p in orafile.params if p.name.casefold() == alias.casefold())
+            facts.update({alias: str(param)})
+        
     # Output
     module.exit_json(msg=", ".join(msg), changed=False, ansible_facts=facts)
 
