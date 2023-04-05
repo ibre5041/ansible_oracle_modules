@@ -19,6 +19,10 @@ EXAMPLES = '''
 
     - debug:
         var: sid_list
+
+# More datailed example is here: 
+# https://github.com/ibre5041/ansible_oracle_modules_example/blob/main/oracle_oratab.yml
+# 
 '''
 
 import fcntl
