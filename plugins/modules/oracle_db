@@ -1001,7 +1001,7 @@ def main():
             listeners           = dict(required=False, aliases=['listener']),
             cdb                 = dict(default=False, type='bool', aliases= ['container']),
             local_undo          = dict(default=True, type='bool'),
-            datafile_dest       = dict(required=True, aliases= ['dfd']),
+            datafile_dest       = dict(required=False, aliases= ['dfd']),
             recoveryfile_dest   = dict(required=False, aliases= ['rfd']),
             storage_type        = dict(default='FS', aliases= ['storage'], choices = ['FS','ASM']),
             omf                 = dict(default=True, type='bool'),
@@ -1031,7 +1031,11 @@ def main():
             port                = dict(required=False, default = 1521, type="int"),
 
         ),
-        mutually_exclusive=[['memory_percentage', 'memory_totalmb']]
+        mutually_exclusive = [['memory_percentage', 'memory_totalmb']],
+        supports_check_mode = False,
+        required_if = [
+            ["state", "present", ["datafile_dest", "recoveryfile_dest"]]
+        ]
     )
 
     oracle_home         = module.params["oracle_home"]
