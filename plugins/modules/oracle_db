@@ -156,8 +156,8 @@ options:
             - List of key=value pairs
             - e.g
               initparams:
-                  - sga_target=1G
-                  - sga_max_size=1G
+                  - sga_target=1GB
+                  - sga_max_size=1GB
         required: False
     customscripts:
         description:
@@ -263,8 +263,8 @@ oracle_db:
       initparams:
                 - memory_target=0
                 - memory_max_target=0
-                - sga_target=1500M
-                - sga_max_size=1500M
+                - sga_target=1500MB
+                - sga_max_size=1500MB
       dfd: +DATA
       rfd: +FRA
       storage: ASM
