@@ -64,7 +64,7 @@ def write_changes(module, content, dest):
 
     module.atomic_move(tmpfile,
                        to_native(os.path.realpath(to_bytes(dest, errors='surrogate_or_strict')), errors='surrogate_or_strict'),
-                       unsafe_writes=False) #
+                       unsafe_writes=True) #
 
 
 # Ansible code
@@ -135,7 +135,8 @@ def main():
     new_content = str(orafile)
     changed = bool((old_content != new_content) and (whole_value or attribute_value or cs_simple or cs_dg))
     if changed:
-        backup_file = module.backup_local(filename)
+        if module.params['backup']:
+            backup_file = module.backup_local(filename)
         write_changes(module, new_content, filename)
         
     # Output
