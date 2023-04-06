@@ -1,4 +1,4 @@
-#!/usr/bin/python
+!/usr/bin/python
 # -*- coding: utf-8 -*-
 
 DOCUMENTATION = '''
@@ -531,7 +531,15 @@ def create_db(module):
     if system_password:
         command += ' -systemPassword \"%s\"' % (system_password)
     else:
-        system_password = sys_password
+        if os.path.exist(rspfile):
+            with open(responsefile) as rspfile:
+	        for line in rspfile:
+		    if re.match('systemPassword=.+', line):
+		        break
+                else:
+                    system_password = sys_password # set system_password to sys_password when system password was not suplied
+        else:
+            system_password = sys_password
         command += ' -systemPassword \"%s\"' % (system_password)
     if dbsnmp_password is not None:
         command += ' -dbsnmpPassword \"%s\"' % (dbsnmp_password)
@@ -1034,7 +1042,7 @@ def main():
         mutually_exclusive = [['memory_percentage', 'memory_totalmb']],
         supports_check_mode = False,
         required_if = [
-            ["state", "present", ["datafile_dest", "recoveryfile_dest"]]
+            ["state", "present", ["datafile_dest", "recoveryfile_dest", "sys_password"]]
         ]
     )
 
