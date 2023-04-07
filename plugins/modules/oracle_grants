@@ -450,7 +450,7 @@ def get_current_role_grants(conn, schema):
         sql = 'select * from v$pwfile_users where USERNAME = upper(\'%s\')' % schema
         try:
             dict_cursor.execute(sql)
-            result = cursor.fetchone()
+            result = dict_cursor.fetchone()
             if result:
                 for role in ['SYSDBA', 'SYSOPER', 'SYSASM', 'SYSBACKUP', 'SYSDG', 'SYSKM']:
                     if role in result and result[role] == 'TRUE':
