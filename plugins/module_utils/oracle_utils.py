@@ -65,3 +65,22 @@ def oracle_connect(module):
 
     return conn
 
+
+class dictcur(object):
+    # need to monkeypatch the built-in execute function to always return a dict
+    def __init__(self, cursor):
+        self._original_cursor = cursor
+
+    def execute(self, *args, **kwargs):
+        # rowfactory needs to be set AFTER EACH execution!
+        self._original_cursor.execute(*args, **kwargs)
+        self._original_cursor.rowfactory = lambda *a: dict(
+            zip([d[0] for d in self._original_cursor.description], a)
+        )
+        # cx_Oracle's cursor's execute method returns a cursor object
+        # -> return the correct cursor in the monkeypatched version as well!
+        return self._original_cursor
+
+    def __getattr__(self, attr):
+        # anything other than the execute method: just go straight to the cursor
+        return getattr(self._original_cursor, attr)
