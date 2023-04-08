@@ -7,8 +7,8 @@ module: oracle_user
 short_description: Manage users/schemas in an Oracle database
 description:
     - Manage users/schemas in an Oracle database
-    - Can be run locally on the controlmachine or on a remote host
-version_added: "1.9.1"
+    - Can be run locally on the control machine or on a remote host
+version_added: "3.0.0"
 options:
     hostname:
         description:
