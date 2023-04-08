@@ -15,7 +15,7 @@ To use the modules do either:
     collections:
       - name: https://github.com/ibre5041/ansible_oracle_modules.git
         type: git
-        version: 0.0.1
+        version: 0.0.3
 
  - Place modules alongside with your playbooks. Create two directories in your project's root   
    - library -> place all modules from plugins/modules/* here
