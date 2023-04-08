@@ -25,7 +25,7 @@ EOF=-1
 QUOTED_STRING=10
 
 
-class OracleNetServicesV3Lexer(Lexer):
+class oraclenetservicesv3lexer(Lexer):
 
     grammarFileName = "OracleNetServicesV3.g"
     antlr_version = version_str_to_tuple("3.1.3 Mar 18, 2009 10:09:25")
@@ -34,7 +34,7 @@ class OracleNetServicesV3Lexer(Lexer):
     def __init__(self, input=None, state=None):
         if state is None:
             state = RecognizerSharedState()
-        super(OracleNetServicesV3Lexer, self).__init__(input, state)
+        super(oraclenetservicesv3lexer, self).__init__(input, state)
 
 
         self.dfa4 = self.DFA4(
@@ -65,7 +65,7 @@ class OracleNetServicesV3Lexer(Lexer):
                                
     #@Override
     def reportError(self, e):
-        super(OracleNetServicesV3Lexer, self).reportError(e)
+        super(oraclenetservicesv3lexer, self).reportError(e)
 
         chp = self._state.tokenStartCharPositionInLine
         chl = self._state.tokenStartLine
@@ -837,7 +837,7 @@ class OracleNetServicesV3Lexer(Lexer):
 
 def main(argv, stdin=sys.stdin, stdout=sys.stdout, stderr=sys.stderr):
     from .antlr3.main import LexerMain
-    main = LexerMain(OracleNetServicesV3Lexer)
+    main = LexerMain(oraclenetservicesv3lexer)
     main.stdin = stdin
     main.stdout = stdout
     main.stderr = stderr

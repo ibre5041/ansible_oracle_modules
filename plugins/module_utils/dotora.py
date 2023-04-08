@@ -1,8 +1,8 @@
 
 from .antlr3 import *
 from .antlr3.tree import *
-from .OracleNetServicesV3Lexer import *
-from .OracleNetServicesV3Parser import *
+from .oraclenetservicesv3lexer import *
+from .oraclenetservicesv3parser import *
 import sys
 import os
 import getopt
@@ -90,9 +90,9 @@ class DotOraFile:
         self.lines = [line.rstrip() for line in open(filename)]
         #
         input = ANTLRFileStream(filename)
-        lexer = OracleNetServicesV3Lexer(input);
+        lexer = oraclenetservicesv3lexer(input);
         tokens = CommonTokenStream(lexer);
-        parser = OracleNetServicesV3Parser(tokens);
+        parser = oraclenetservicesv3parser(tokens);
         r = parser.configuration_file();
         #
         if lexer.getNumberOfSyntaxErrors():

@@ -38,7 +38,7 @@ tokenNames = [
 
 
 
-class OracleNetServicesV3Parser(Parser):
+class oraclenetservicesv3parser(Parser):
     grammarFileName = "OracleNetServicesV3.g"
     antlr_version = version_str_to_tuple("3.1.3 Mar 18, 2009 10:09:25")
     antlr_version_str = "3.1.3 Mar 18, 2009 10:09:25"
@@ -48,7 +48,7 @@ class OracleNetServicesV3Parser(Parser):
         if state is None:
             state = RecognizerSharedState()
 
-        super(OracleNetServicesV3Parser, self).__init__(input, state, *args, **kwargs)
+        super(oraclenetservicesv3parser, self).__init__(input, state, *args, **kwargs)
 
 
 
@@ -72,13 +72,13 @@ class OracleNetServicesV3Parser(Parser):
                       
     #@Override
     def reportError(self, e):
-        super(OracleNetServicesV3Parser, self).reportError(e)
+        super(oraclenetservicesv3parser, self).reportError(e)
         raise ValueError('Parser error: {}, {}'.format(e, e.token))
 
 
     class configuration_file_return(ParserRuleReturnScope):
         def __init__(self):
-            super(OracleNetServicesV3Parser.configuration_file_return, self).__init__()
+            super(oraclenetservicesv3parser.configuration_file_return, self).__init__()
 
             self.tree = None
 
@@ -187,7 +187,7 @@ class OracleNetServicesV3Parser(Parser):
 
     class parameter_return(ParserRuleReturnScope):
         def __init__(self):
-            super(OracleNetServicesV3Parser.parameter_return, self).__init__()
+            super(oraclenetservicesv3parser.parameter_return, self).__init__()
 
             self.tree = None
 
@@ -386,7 +386,7 @@ class OracleNetServicesV3Parser(Parser):
 
     class parameter_list_return(ParserRuleReturnScope):
         def __init__(self):
-            super(OracleNetServicesV3Parser.parameter_list_return, self).__init__()
+            super(oraclenetservicesv3parser.parameter_list_return, self).__init__()
 
             self.tree = None
 
@@ -478,7 +478,7 @@ class OracleNetServicesV3Parser(Parser):
 
     class keyword_return(ParserRuleReturnScope):
         def __init__(self):
-            super(OracleNetServicesV3Parser.keyword_return, self).__init__()
+            super(oraclenetservicesv3parser.keyword_return, self).__init__()
 
             self.tree = None
 
@@ -533,7 +533,7 @@ class OracleNetServicesV3Parser(Parser):
 
     class value_return(ParserRuleReturnScope):
         def __init__(self):
-            super(OracleNetServicesV3Parser.value_return, self).__init__()
+            super(oraclenetservicesv3parser.value_return, self).__init__()
 
             self.tree = None
 
@@ -594,7 +594,7 @@ class OracleNetServicesV3Parser(Parser):
 
     class value_list_return(ParserRuleReturnScope):
         def __init__(self):
-            super(OracleNetServicesV3Parser.value_list_return, self).__init__()
+            super(oraclenetservicesv3parser.value_list_return, self).__init__()
 
             self.tree = None
 
@@ -705,7 +705,7 @@ class OracleNetServicesV3Parser(Parser):
 
 def main(argv, stdin=sys.stdin, stdout=sys.stdout, stderr=sys.stderr):
     from .antlr3.main import ParserMain
-    main = ParserMain("OracleNetServicesV3Lexer", OracleNetServicesV3Parser)
+    main = ParserMain("oraclenetservicesv3lexer", oraclenetservicesv3parser)
     main.stdin = stdin
     main.stdout = stdout
     main.stderr = stderr
