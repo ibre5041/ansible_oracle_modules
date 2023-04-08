@@ -9,7 +9,7 @@ description:
     - Manage grants/privileges in an Oracle database
     - Handles role/sys privileges at the moment.
     - It is possible to add object privileges as well, but they are not considered when removing privs at the moment.
-version_added: "1.9.1"
+version_added: "3.0.0"
 options:
     hostname:
         description:
@@ -390,18 +390,18 @@ def remove_grants(module, conn, schema, remove_grants_list, state):
 
     # Get the current role grants for the schema.
     # If any are present, add them to the total
-    curr_role_grants=get_current_role_grants(conn, schema)
+    curr_role_grants = get_current_role_grants(conn, schema)
     if any(curr_role_grants):
         total_current.extend(curr_role_grants)
 
     # Get the current sys privs for the schema
     # If any are present, add them to the total
-    curr_sys_grants=get_current_sys_grants(conn, schema)
+    curr_sys_grants = get_current_sys_grants(conn, schema)
     if any(curr_sys_grants):
         total_current.extend(curr_sys_grants)
 
     # Get the difference between current grants and wanted grants
-    grants_to_remove=set(remove_grants_list).intersection(total_current)
+    grants_to_remove = set(remove_grants_list).intersection(total_current)
 
     # If state=REMOVEALL is used, all grants/privs will be removed
     if state == 'REMOVEALL' and any(total_current):
