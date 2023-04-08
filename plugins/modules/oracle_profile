@@ -7,7 +7,7 @@ module: oracle_profile
 short_description: Manage profiles in an Oracle database
 description:
     - Manage profiles in an Oracle database
-version_added: "2.9.9"
+version_added: "3.0.0"
 options:
     name:
         description:
@@ -64,7 +64,6 @@ options:
         required: false
         default: None
         aliases: ['oh']
-
 
 
 notes:
@@ -136,6 +135,7 @@ except ImportError:
 else:
     cx_oracle_exists = True
 
+changed = False
 
 # define Python user-defined exceptions
 class ModuleExecutionException(Exception):
@@ -148,17 +148,20 @@ class ModuleExecutionException(Exception):
 
 
 # Check if the profile exists
-def check_profile_exists(cursor, module, name):
-    sql = 'select count(*) from dba_profiles where lower (profile) = \'%s\'' % (name.lower())
-    result = execute_sql_get(module, msg, cursor, sql)
+def check_profile_exists(conn, name):
+    with conn.cursor() as cursor:
+        sql = "select count(*) from dba_profiles where upper(profile) = '%s'" % (name.upper())
+        try:
+            cursor.execute(sql)
+            result = cursor.fetchone()[0]
+            return bool(result)
+        except cx_Oracle.DatabaseError as exc:
+            error, = exc.args
+            msg = error.message + 'sql: ' + sql
+            raise ModuleExecutionException(msg)
 
-    if result[0][0] > 0:
-        return True
-    else:
-        return False
 
-def create_profile(cursor, module, msg, name, attribute_name, attribute_value):
-
+def create_profile(module, conn, name, attribute_name, attribute_value):
     add_attr = False
     if not any(x == 'None' for x in attribute_name):
         add_attr = True
@@ -166,111 +169,109 @@ def create_profile(cursor, module, msg, name, attribute_name, attribute_value):
         add_attr = True
 
     if add_attr:
-        attributes =' '.join([''+str(n)+' '+ str(v) + '' for n,v in zip(attribute_name,attribute_value)])
+        attributes = ' '.join(['' + str(n) + ' ' + str(v) + '' for n, v in zip(attribute_name,attribute_value)])
 
-
-    sql = 'create profile %s limit ' % (name)
+    sql = 'create profile %s limit ' % name
     if add_attr:
         sql += ' %s' % (attributes.lower())
 
-    if execute_sql(module, msg, cursor, sql):
-        return True
-    else:
-        return False
+    execute_sql(conn, sql, change=True)
+    msg = 'Successfully created profile %s ' % name
+    module.exit_json(msg=msg, changed=changed)
 
 
-def remove_profile(cursor, module, msg, name):
-
+def remove_profile(module, conn, name):
+    global changed
     dropsql = 'drop profile %s' % (name)
-    if execute_sql(module, msg, cursor, dropsql):
-        return True
-    else:
-        return False
+    execute_sql(conn, dropsql, changed=True)
+    msg = 'Profile %s successfully removed' % name
+    module.exit_json(msg=msg, changed=changed)
 
-def ensure_profile_state(cursor, module, msg, name, state, attribute_name, attribute_value):
-    #pass
 
-    total_sql   = []
-    profile_sql    = 'alter profile %s ' % (name.upper())
+def ensure_profile_state(module, conn, name, state, attribute_name, attribute_value):
+    global changed
+    total_sql = []
 
     # Deal with attribute differences
-    if (attribute_name and attribute_value):
+    if attribute_name and attribute_value:
         # Make sure attributes are lower case
-        attribute_name =  [x.lower() for x in attribute_name]
-        attribute_value =  [str(y).lower() for y in attribute_value]
-        wanted_attributes = zip(attribute_name,attribute_value)
+        attribute_name = [x.lower() for x in attribute_name]
+        attribute_value = [str(y).lower() for y in attribute_value]
+        wanted_attributes = set(zip(attribute_name, attribute_value))
 
         # Check the current attributes
-        attribute_names_ =','.join(['\''+n[0]+'\'' for n in (wanted_attributes)])
-        if len(attribute_names_) != 0:
-            current_attributes = get_current_attributes (cursor, module, msg, name, attribute_names_)
+        attribute_names_ = ','.join(["'{}'".format(x) for (x, _,) in wanted_attributes])
+        if attribute_names_:
+            current_attributes = get_current_attributes(conn, name, attribute_names_)
+            current_attributes = set(current_attributes)
 
-            # Convert to dict and compare current with wanted
-            if cmp(dict(current_attributes),dict(wanted_attributes)) is not 0:
-                for i in wanted_attributes:
-                    total_sql.append("alter profile %s limit %s %s " % (name, i[0], i[1]))
+            changes = wanted_attributes.difference(current_attributes)
+            for i in changes:
+                total_sql.append("alter profile %s limit %s %s " % (name, i[0], i[1]))
 
-    # module.exit_json(msg=total_sql, changed=True)
-    if len(total_sql) > 0:
-        if ensure_profile_state_sql(module,msg,cursor,total_sql):
-            msg = 'profile %s has been put in the intended state' % (name)
-            module.exit_json(msg=msg, changed=True)
-        else:
-            return False
+    if total_sql:
+        ensure_profile_state_sql(conn, total_sql)
+        msg = 'profile %s has been put in the intended state' % name
+        module.exit_json(msg=msg, changed=changed)
     else:
         msg = 'Nothing to do'
         module.exit_json(msg=msg, changed=False)
 
-def ensure_profile_state_sql(module,msg,cursor,total_sql):
 
+def ensure_profile_state_sql(conn, total_sql):
     for sql in total_sql:
-        execute_sql(module, msg, cursor, sql)
-    return True
+        execute_sql(conn, sql)
 
 
-def get_current_attributes(cursor, module, msg, name,attribute_names_):
-    sql = 'select lower(resource_name),lower(limit) '
-    sql += 'from dba_profiles '
-    sql += 'where lower(profile) = \'%s\' ' % (name.lower())
-    sql += 'and lower(resource_name) in (%s) ' % (attribute_names_.lower())
-    result = execute_sql_get(module, msg, cursor, sql)
+def get_current_attributes(conn, name, attribute_names_):
+    sql =  """
+    select lower(resource_name),lower(limit)
+    from dba_profiles
+    where lower(profile) = '%s' 
+    and lower(resource_name) in (%s) """ % (name.lower(), attribute_names_.lower())
+    result = execute_sql_get(conn, sql)
     return result
 
 
-def execute_sql_get(module, msg, cursor, sql):
-    try:
-        cursor.execute(sql)
-        result = (cursor.fetchall())
-    except cx_Oracle.DatabaseError as exc:
-        error, = exc.args
-        msg = 'Something went wrong while executing sql_get - %s sql: %s' % (error.message, sql)
-        module.fail_json(msg=msg, changed=False)
-    return result
+def execute_sql_get(conn, sql):
+    with conn.cursor() as cursor:
+        try:
+            cursor.execute(sql)
+            result = (cursor.fetchall())
+            return result
+        except cx_Oracle.DatabaseError as exc:
+            error, = exc.args
+            msg = 'Something went wrong while executing sql_get - %s sql: %s' % (error.message, sql)
+            raise ModuleExecutionException(msg)
 
 
-def execute_sql(module, cursor, sql):
-    try:
-        cursor.execute(sql)
-    except cx_Oracle.DatabaseError as exc:
-        error, = exc.args
-        msg = 'Something went wrong while executing sql - %s sql: %s' % (error.message, sql)
-        module.fail_json(msg=msg, changed=False)
+def execute_sql(conn, sql, change=False):
+    global changed
+    with conn.cursor() as cursor:
+        try:
+            cursor.execute(sql)
+            changed = bool(changed or change)
+        except cx_Oracle.DatabaseError as exc:
+            error, = exc.args
+            msg = 'Something went wrong while executing sql - %s sql: %s' % (error.message, sql)
+            raise ModuleExecutionException(msg)
 
 
 def main():
+    global changed
     module = AnsibleModule(
         argument_spec = dict(
-            user                = dict(required=False, aliases = ['un','username']),
-            password            = dict(required=False, no_log=True, aliases = ['pw']),
-            mode                = dict(default='normal', choices=["normal","sysdba"]),
-            hostname            = dict(required=False, default = 'localhost', aliases = ['host']),
+            user                = dict(required=False, aliases=['un', 'username']),
+            password            = dict(required=False, no_log=True, aliases=['pw']),
+            mode                = dict(default='normal', choices=["normal", "sysdba"]),
+            hostname            = dict(required=False, default='localhost', aliases=['host']),
             port                = dict(required=False, default=1521, type='int'),
-            service_name        = dict(required=False, aliases = ['sn']),
-            oracle_home         = dict(required=False, aliases = ['oh']),            
-            name                = dict(required=True, aliases = ['profile']),
+            service_name        = dict(required=False, aliases=['sn']),
+            oracle_home         = dict(required=False, aliases=['oh']),
+            name                = dict(required=True, aliases=['profile']),
             attribute_name      = dict(required=True, type='list', aliases=['an']),
             attribute_value     = dict(required=True, type='list', aliases=['av']),
-            state               = dict(default="present", choices = ["present", "absent"]),
+            state               = dict(default="present", choices=["present", "absent"]),
         ),
     )
 
@@ -278,48 +279,29 @@ def main():
     attribute_name      = module.params["attribute_name"]
     attribute_value     = module.params["attribute_value"]
     state               = module.params["state"]
-    user                = module.params["user"]
-    password            = module.params["password"]
-    mode                = module.params["mode"]
-    hostname            = module.params["hostname"]
-    port                = module.params["port"]
-    service_name        = module.params["service_name"]
-    oracle_home         = module.params["oracle_home"]
-
 
     if not cx_oracle_exists:
         msg = "The cx_Oracle module is required. 'pip install cx_Oracle' should do the trick. If cx_Oracle is installed, make sure ORACLE_HOME & LD_LIBRARY_PATH is set"
         module.fail_json(msg=msg)
 
-    conn = oracle_connect(module)
-    cursor = conn.cursor()
-
-
-    if state == 'present':
-        if not check_profile_exists(cursor, module, msg, name):
-             if create_profile(cursor, module, msg, name, attribute_name, attribute_value):
-                 msg = 'Successfully created profile %s ' % (name)
-                 module.exit_json(msg=msg, changed=True)
-             else:
-                 module.fail_json(msg=msg, changed=False)
-        else:
-             module.exit_json(msg=msg, changed=False)
-#            ensure_profile_state(cursor, module, msg, name, state, attribute_name, attribute_value)
-
-    elif state == 'absent' :
-        if check_profile_exists(cursor, module, msg, name):
-            if remove_profile(cursor, module, msg, name):
-                msg = 'Profile %s successfully removed' % (name)
-                module.exit_json(msg=msg, changed=True)
+    try:
+        conn = oracle_connect(module)
+        if state == 'present':
+            if not check_profile_exists(conn, name):
+                create_profile(module, conn, name, attribute_name, attribute_value)
             else:
+                ensure_profile_state(module, conn, name, state, attribute_name, attribute_value)
+        elif state == 'absent' and attribute_name:
+            module.fail_json(msg='Attributes are only allowed when state=present', changed=False)
+        elif state == 'absent':
+            if check_profile_exists(conn, name):
+                remove_profile(module, conn, name)
+            else:
+                msg = 'Profile %s doesn\'t exist' % (name)
                 module.exit_json(msg=msg, changed=False)
-        else:
-            msg = 'Profile %s doesn\'t exist' % (name)
-            module.exit_json(msg=msg, changed=False)
-
-
-    module.exit_json(msg="Unhandled exit", changed=False)
-
+        module.exit_json(msg="Unhandled exit", changed=False)
+    except ModuleExecutionException as e:
+        module.fail_json(msg=e.message, changed=changed)
 
 
 if __name__ == '__main__':
