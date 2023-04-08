@@ -7,7 +7,7 @@ module: oracle_profile
 short_description: Manage profiles in an Oracle database
 description:
     - Manage profiles in an Oracle database
-version_added: "2.4.1.0"
+version_added: "2.9.9"
 options:
     name:
         description:
@@ -60,7 +60,7 @@ options:
         default: 1521
     oracle_home:
         description:
-            - The GI ORACLE_HOME
+            - The DB ORACLE_HOME
         required: false
         default: None
         aliases: ['oh']
@@ -137,9 +137,18 @@ else:
     cx_oracle_exists = True
 
 
-# Check if the profile exists
-def check_profile_exists(cursor, module, msg, name):
+# define Python user-defined exceptions
+class ModuleExecutionException(Exception):
+    "Raised when execution of some SQL fails"
+    pass
 
+    def __init__(self, message=""):
+        self.message = message
+        super().__init__(self.message)
+
+
+# Check if the profile exists
+def check_profile_exists(cursor, module, name):
     sql = 'select count(*) from dba_profiles where lower (profile) = \'%s\'' % (name.lower())
     result = execute_sql_get(module, msg, cursor, sql)
 
@@ -148,7 +157,7 @@ def check_profile_exists(cursor, module, msg, name):
     else:
         return False
 
-def create_profile(cursor, module, msg, oracle_home, name, attribute_name, attribute_value):
+def create_profile(cursor, module, msg, name, attribute_name, attribute_value):
 
     add_attr = False
     if not any(x == 'None' for x in attribute_name):
@@ -170,7 +179,7 @@ def create_profile(cursor, module, msg, oracle_home, name, attribute_name, attri
         return False
 
 
-def remove_profile(cursor, module, msg, oracle_home, name):
+def remove_profile(cursor, module, msg, name):
 
     dropsql = 'drop profile %s' % (name)
     if execute_sql(module, msg, cursor, dropsql):
@@ -220,19 +229,15 @@ def ensure_profile_state_sql(module,msg,cursor,total_sql):
 
 
 def get_current_attributes(cursor, module, msg, name,attribute_names_):
-
-
     sql = 'select lower(resource_name),lower(limit) '
     sql += 'from dba_profiles '
     sql += 'where lower(profile) = \'%s\' ' % (name.lower())
     sql += 'and lower(resource_name) in (%s) ' % (attribute_names_.lower())
-
     result = execute_sql_get(module, msg, cursor, sql)
-
     return result
 
-def execute_sql_get(module, msg, cursor, sql):
 
+def execute_sql_get(module, msg, cursor, sql):
     try:
         cursor.execute(sql)
         result = (cursor.fetchall())
@@ -240,43 +245,32 @@ def execute_sql_get(module, msg, cursor, sql):
         error, = exc.args
         msg = 'Something went wrong while executing sql_get - %s sql: %s' % (error.message, sql)
         module.fail_json(msg=msg, changed=False)
-        return False
-
-
     return result
 
 
-def execute_sql(module, msg, cursor, sql):
-
+def execute_sql(module, cursor, sql):
     try:
         cursor.execute(sql)
     except cx_Oracle.DatabaseError as exc:
         error, = exc.args
         msg = 'Something went wrong while executing sql - %s sql: %s' % (error.message, sql)
         module.fail_json(msg=msg, changed=False)
-        return False
-    return True
-
 
 
 def main():
-
-    msg = ['']
-    cursor = None
-
     module = AnsibleModule(
         argument_spec = dict(
-            name                = dict(required=True, aliases = ['profile']),
-            attribute_name      = dict(required=True, type='list', aliases=['an']),
-            attribute_value     = dict(required=True, type='list', aliases=['av']),
-            state               = dict(default="present", choices = ["present", "absent"]),
             user                = dict(required=False, aliases = ['un','username']),
             password            = dict(required=False, no_log=True, aliases = ['pw']),
             mode                = dict(default='normal', choices=["normal","sysdba"]),
             hostname            = dict(required=False, default = 'localhost', aliases = ['host']),
             port                = dict(required=False, default=1521, type='int'),
             service_name        = dict(required=False, aliases = ['sn']),
-            oracle_home         = dict(required=False, aliases = ['oh']),
+            oracle_home         = dict(required=False, aliases = ['oh']),            
+            name                = dict(required=True, aliases = ['profile']),
+            attribute_name      = dict(required=True, type='list', aliases=['an']),
+            attribute_value     = dict(required=True, type='list', aliases=['av']),
+            state               = dict(default="present", choices = ["present", "absent"]),
         ),
     )
 
@@ -303,7 +297,7 @@ def main():
 
     if state == 'present':
         if not check_profile_exists(cursor, module, msg, name):
-             if create_profile(cursor, module, msg, oracle_home, name, attribute_name, attribute_value):
+             if create_profile(cursor, module, msg, name, attribute_name, attribute_value):
                  msg = 'Successfully created profile %s ' % (name)
                  module.exit_json(msg=msg, changed=True)
              else:
@@ -314,7 +308,7 @@ def main():
 
     elif state == 'absent' :
         if check_profile_exists(cursor, module, msg, name):
-            if remove_profile(cursor, module, msg, oracle_home, name):
+            if remove_profile(cursor, module, msg, name):
                 msg = 'Profile %s successfully removed' % (name)
                 module.exit_json(msg=msg, changed=True)
             else:
