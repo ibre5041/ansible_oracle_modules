@@ -7,7 +7,7 @@ module: oracle_oratab
 short_description: Reads oratab to ansible_facts
 description:
     - Reads SID and ORACLE_HOME path from oratab, crs and running processes to ansible_facts
-version_added: "1.0.0.0"
+version_added: "3.0.0"
 author: Ivan Brezina
 options:
    writable_only:
