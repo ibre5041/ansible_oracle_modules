@@ -9,7 +9,7 @@ description:
     - Create/delete a database using dbca
     - If a responsefile is available, that will be used. If initparams is defined, those will be attached to the createDatabase command
     - If no responsefile is created, the database will be created based on all other parameters
-version_added: "2.4.0.0"
+version_added: "3.0.0"
 options:
     oracle_home:
         description:
@@ -64,7 +64,7 @@ options:
         required: False
         default: General_Purpose.dbc
     db_options:
-        required: false
+        required: False
         description:
             - JSERVER:true
             - ORACLE_TEXT:false
@@ -227,15 +227,49 @@ options:
         default: 1521
 
 
-
 notes:
     - cx_Oracle needs to be installed
 requirements: [ "cx_Oracle" ]
-author: Mikael Sandström, oravirt@gmail.com, @oravirt
+author: 
+    - Mikael Sandström, oravirt@gmail.com, @oravirt
+    - Ivan Brezina
+
 '''
 
 EXAMPLES = '''
 # Create a DB (non-cdb)
+
+- name: create database
+  oracle_db:
+    oracle_home: '/oracle/u01/product/19.17.0.0'
+    db_name: 'X01'
+    sid: 'X01'
+    db_unique_name: 'X01_A'
+    sys_password: "{{ sys_password }}"
+    #system_password:
+    #dbsnmp_password:
+    #template:
+    db_options:
+      - JSERVER:true
+      - ORACLE_TEXT:false
+      - IMEDIA:false
+      - CWMLITE:false
+      - SPATIAL:false
+      - OMS:false
+      - APEX:false
+      - DV:false
+    initparams:
+      - memory_target=0
+      - memory_max_target=0
+      - sga_target=1500MB
+      - sga_max_size=1500MB
+    storage_type: ASM
+    datafile_dest: +XDATA
+    #state: absent
+    state: present
+  become_user: oracle
+  become: yes
+
 oracle_db:
     oh=/u01/app/oracle/12.2.0.1/db1
     db_name=orclcdb
