@@ -199,7 +199,7 @@ def main():
         argument_spec = dict(
             hostname      = dict(default='localhost'),
             port          = dict(default=1521, type='int'),
-            service_name  = dict(required=True),
+            service_name  = dict(required=False),
             user          = dict(required=False),
             password      = dict(required=False, no_log=True),
             mode          = dict(default='normal', choices=["normal","sysdba"]),
