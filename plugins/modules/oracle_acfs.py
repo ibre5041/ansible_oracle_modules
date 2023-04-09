@@ -16,6 +16,11 @@ options:
         default: None
         aliases: ['volume','volume_name']
     diskgroup:
+        description:
+            - Name of diskgroup
+        required: false
+        default: None
+        aliases: ['dg']
     state:
         description:
             - The intended state of the diskgroup. 'status' will just show the status of the diskgroup
