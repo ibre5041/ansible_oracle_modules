@@ -61,8 +61,8 @@ options:
     grants_mode:
         description:
             - Should the list of grants be enforced, or just appended to.
-              enforce: Whatever is in the list of grants will be enforced, i.e grants/privileges will be removed if they are not in the list
-              append: Grants/privileges are just appended, nothing is removed
+            - enforce: Whatever is in the list of grants will be enforced, i.e grants/privileges will be removed if they are not in the list
+            - append: Grants/privileges are just appended, nothing is removed
         default: append
         choices: ['enforce','append']
     state:

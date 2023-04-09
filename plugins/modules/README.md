@@ -1,23 +1,67 @@
 # ansible-oracle-modules
 **Oracle modules for Ansible**
 
-- If you have any questions/requests just create an issue and I'll look into it
-- I've also included a playbook (test-modules.yml) that'll give you an idea on how the modules can be used.
+- This project was forked from https://github.com/oravirt/ansible-oracle-modules
+- This fork uses different layout than original, db connection code is shared via module_utils
+- This fork preffers to use `connect / as sysdba` over using a wallet
+- This fork uses `oracle_oratab` module to store list of databases as ansible facts
 
-To use the modules, create a 'library' directory next to your top level playbooks and put the different modules in that directory. Then just reference them as you would any other module.
+See project: https://github.com/ibre5041/ansible_oracle_modules_example.git as an example.
+
+To use the modules do either:
+ - Use this collection
+
+    ---
+    collections:
+      - name: https://github.com/ibre5041/ansible_oracle_modules.git
+        type: git
+        version: 0.0.3
+
+ - Place modules alongside with your playbooks. Create two directories in your project's root   
+   - library -> place all modules from plugins/modules/* here
+   - module_utils -> place all files from plugins/module_utils/* here
+   
+Then just reference them as you would any other module.
 For more information, check out: http://docs.ansible.com/developing_modules.html
-
 
 Most (if not all) requires `cx_Oracle` either on your controlmachine or on the managed node.
 
 The default behaviour for the modules using `cx_Oracle` is this:
 
+- If mode=='sysdba' connect internal `/ as sysdba` is used
 - If neither username or password is passed as input to the module(s), the use of an Oracle wallet is assumed.
 - In that case, the `cx_Oracle.makedsn` step is skipped, and the connection will use the `'/@<service_name>'` format instead.
 - You then need to make sure that you're using the correct tns-entry (service_name) to match the credential stored in the wallet.
 
 
 These are the different modules:
+**oracle_oratab**
+
+ - Parses oratab, crs_stat output to get list of databases
+ - Set facts as list of dict.
+   See sample playbook: https://github.com/ibre5041/ansible_oracle_modules_example/blob/main/oracle_oratab.yml
+
+       vars:
+       # List of affected databases, this variable overrides default: sid_list.oracle_list.keys()
+       # db_list | default(sid_list.oracle_list.keys())
+       # Comment out this variable to apply playbook onto all databases
+          db_list: [ TEST ]
+       
+       tasks:
+         - oracle_oratab:
+           register: sid_list
+	   
+         - name: Print Facts
+           debug:
+             var: sid_list
+	     
+         - oracle_role:
+           mode: sysdba
+             role: SOME_ROLE
+           environment:
+             ORACLE_HOME: "{{ sid_list.oracle_list[item].ORACLE_HOME }}"
+             ORACLE_SID:  "{{ sid_list.oracle_list[item].ORACLE_SID }}"
+           loop: "{{ db_list | default(sid_list.oracle_list.keys())}}"
 
 **oracle_user**
 

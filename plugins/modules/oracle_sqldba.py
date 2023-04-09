@@ -33,7 +33,7 @@ options:
             - Single SQL statement
             - Will be executed by sqlplus using dbms_xmlgen.getxml
             - Used for select only, returns dict in .state
-            - To access the column "value" of the first row write: "<<registered result>>.state.ROW[0].VALUE" (use uppercase)
+            - To access the column "value" of the first row write: <<registered result>>.state.ROW[0].VALUE (use uppercase)
         required: false
         default: None
     creates_sql:

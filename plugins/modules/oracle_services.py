@@ -49,15 +49,14 @@ options:
         required: false
         default: None
     role:
-        description:
+        description: 
             - Role of the service (primary, physical_standby, logical_standby, snapshot_standby)
         required: false
         default: None
-        choices: ['primary','physical_standby','logical_standby','snapshot_standby']
+        choices: ['primary', 'physical_standby', 'logical_standby', 'snapshot_standby']
     force:
         description:
             - Adds the 'force' flag to the srvctl command
-            force:
         default: False
         choices: ['true','false']
     username:
@@ -89,8 +88,6 @@ options:
             - The listener port to connect to the database if using dbms_service
         required: false
         default: 1521
-
-
 
 notes:
     - cx_Oracle needs to be installed

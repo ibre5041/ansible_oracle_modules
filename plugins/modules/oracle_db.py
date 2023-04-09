@@ -154,18 +154,12 @@ options:
     initparams:
         description:
             - List of key=value pairs
-            - e.g
-              initparams:
-                  - sga_target=1GB
-                  - sga_max_size=1GB
+            - e.g initparams: [ sga_target=1GB, sga_max_size=1GB ]
         required: False
     customscripts:
         description:
             - List of scripts to run after database is created
-            - e.g
-              customScripts:
-                  - /tmp/xxx.sql
-                  - /tmp/yyy.sql
+            - e.g customScripts: [/tmp/xxx.sql, /tmp/yyy.sql]
         required: False
     default_tablespace_type:
         description:
@@ -567,9 +561,9 @@ def create_db(module):
     else:
         if os.path.exist(rspfile):
             with open(responsefile) as rspfile:
-	        for line in rspfile:
-		    if re.match('systemPassword=.+', line):
-		        break
+                for line in rspfile:
+                    if re.match('systemPassword=.+', line):
+                        break
                 else:
                     system_password = sys_password # set system_password to sys_password when system password was not suplied
         else:
