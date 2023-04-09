@@ -345,62 +345,62 @@ DECLARE
         FOR rec in (select thread#, group#, status, bytes from v$standby_log order by thread#)
         LOOP
             IF rec.bytes/v_divisor != v_maxbytes_actual THEN
-	        v_redo_size_changes := v_redo_size_changes+1;
- 		FOR chloop in (select thread#, group#, status from v$standby_log where thread# = rec.thread# and group# = rec.group#)
- 		LOOP
- 		    IF chloop.status in ('CURRENT','ACTIVE') THEN
- 		        dbms_output.put_line('Current group: '||chloop.group#);
- 			execute immediate v_sql_sw_lf;
- 			execute immediate v_sql_cp;
- 			dbms_lock.sleep(v_sleep);
- 			execute immediate 'alter database add standby logfile thread '||chloop.thread# ||' size '||v_maxbytes ;
- 			execute immediate 'alter database drop standby logfile group '||chloop.group# ;
-		    ELSE
-			execute immediate 'alter database add standby logfile thread '||chloop.thread# ||' size '||v_maxbytes ;
- 			execute immediate 'alter database drop standby logfile group '||chloop.group# ;
- 		    END IF;
- 		END LOOP;
- 	    END IF;
- 	END LOOP;
+            v_redo_size_changes := v_redo_size_changes+1;
+         FOR chloop in (select thread#, group#, status from v$standby_log where thread# = rec.thread# and group# = rec.group#)
+         LOOP
+             IF chloop.status in ('CURRENT','ACTIVE') THEN
+                 dbms_output.put_line('Current group: '||chloop.group#);
+             execute immediate v_sql_sw_lf;
+             execute immediate v_sql_cp;
+             dbms_lock.sleep(v_sleep);
+             execute immediate 'alter database add standby logfile thread '||chloop.thread# ||' size '||v_maxbytes ;
+             execute immediate 'alter database drop standby logfile group '||chloop.group# ;
+            ELSE
+            execute immediate 'alter database add standby logfile thread '||chloop.thread# ||' size '||v_maxbytes ;
+             execute immediate 'alter database drop standby logfile group '||chloop.group# ;
+             END IF;
+         END LOOP;
+         END IF;
+     END LOOP;
         dbms_output.put_line('standby redo size changes: '||v_redo_size_changes);
 
- 	-- Get number of groups
- 	FOR t in (select * from v$thread where enabled != 'DISABLED')
- 	LOOP
- 	    dbms_output.put_line('Thread: '||t.thread#);
- 	    select count(*) into v_existing_redogroups from v$standby_log where thread# = t.thread#;
- 	    dbms_output.put_line('Thread: '||t.thread# ||' numgroups: '||v_existing_redogroups);
- 	    IF v_existing_redogroups < v_groups THEN
- 	        v_group_diff := v_groups - v_existing_redogroups;
- 		dbms_output.put_line('Adding '||v_group_diff ||' groups to thread: '||t.thread#);
- 		FOR grloop in 1..v_group_diff
- 		LOOP
- 		    v_redo_group_changes := v_redo_group_changes+1;
- 		    select max(group#) into v_max_redo_groupnum from v$log;
- 		    v_max_redo_groupnum := ceil(log(10, v_max_redo_groupnum));
- 		    v_max_redo_groupnum := power(10, v_max_redo_groupnum) + 1;
- 		    --
-		    select nvl(max(GROUP#) + 1, 0) into v_max_groupnum from v$standby_log;
- 		    v_max_groupnum := greatest(v_max_groupnum, v_max_redo_groupnum);
- 		    execute immediate 'alter database add standby logfile thread '|| t.thread# ||' group '||v_max_groupnum ||' size '||v_maxbytes;
- 		    dbms_output.put_line('adding group '||v_max_groupnum ||' to thread '||t.thread#);
- 		END LOOP;
- 	    ELSIF v_existing_redogroups > v_groups THEN
- 	        --select count(*) into v_existing_redogroups from v$standby_log where thread# = t.thread#;
- 		select v_existing_redogroups-v_groups into v_group_diff from dual;
- 		dbms_output.put_line('Removing ' ||v_group_diff ||' groups from thread: '||t.thread#);
+     -- Get number of groups
+     FOR t in (select * from v$thread where enabled != 'DISABLED')
+     LOOP
+         dbms_output.put_line('Thread: '||t.thread#);
+         select count(*) into v_existing_redogroups from v$standby_log where thread# = t.thread#;
+         dbms_output.put_line('Thread: '||t.thread# ||' numgroups: '||v_existing_redogroups);
+         IF v_existing_redogroups < v_groups THEN
+             v_group_diff := v_groups - v_existing_redogroups;
+         dbms_output.put_line('Adding '||v_group_diff ||' groups to thread: '||t.thread#);
+         FOR grloop in 1..v_group_diff
+         LOOP
+             v_redo_group_changes := v_redo_group_changes+1;
+             select max(group#) into v_max_redo_groupnum from v$log;
+             v_max_redo_groupnum := ceil(log(10, v_max_redo_groupnum));
+             v_max_redo_groupnum := power(10, v_max_redo_groupnum) + 1;
+             --
+             select nvl(max(GROUP#) + 1, 0) into v_max_groupnum from v$standby_log;
+             v_max_groupnum := greatest(v_max_groupnum, v_max_redo_groupnum);
+             execute immediate 'alter database add standby logfile thread '|| t.thread# ||' group '||v_max_groupnum ||' size '||v_maxbytes;
+             dbms_output.put_line('adding group '||v_max_groupnum ||' to thread '||t.thread#);
+         END LOOP;
+         ELSIF v_existing_redogroups > v_groups THEN
+             --select count(*) into v_existing_redogroups from v$standby_log where thread# = t.thread#;
+         select v_existing_redogroups-v_groups into v_group_diff from dual;
+         dbms_output.put_line('Removing ' ||v_group_diff ||' groups from thread: '||t.thread#);
 
- 		FOR grloop in 1..v_group_diff
- 		LOOP
-  		   v_redo_group_changes := v_redo_group_changes+1;
- 		   select max(group#) into v_max_groupnum from v$standby_log
- 		   where upper(status) not in ('ACTIVE','CURRENT') and thread# = t.thread#;
- 		   execute immediate 'alter database drop standby logfile group '||v_max_groupnum ;
- 		   dbms_output.put_line('dropping group '||v_max_groupnum ||' thread#: '||t.thread#);
- 	       END LOOP;
-       	   ELSE
- 	       dbms_output.put_line('Nothing to do');
- 	   END IF;
+         FOR grloop in 1..v_group_diff
+         LOOP
+             v_redo_group_changes := v_redo_group_changes+1;
+            select max(group#) into v_max_groupnum from v$standby_log
+            where upper(status) not in ('ACTIVE','CURRENT') and thread# = t.thread#;
+            execute immediate 'alter database drop standby logfile group '||v_max_groupnum ;
+            dbms_output.put_line('dropping group '||v_max_groupnum ||' thread#: '||t.thread#);
+            END LOOP;
+              ELSE
+            dbms_output.put_line('Nothing to do');
+        END IF;
        END LOOP;
 
        :o_size_changed := v_redo_size_changes;
@@ -420,7 +420,7 @@ DECLARE
     EXCEPTION
     WHEN missing_suffix THEN
         dbms_output.put_line('--------');
- 	dbms_output.put_line('You need to suffix the size with (M,G or T), i.e: '||v_maxbytes ||'M/'||v_maxbytes ||'G/' ||v_maxbytes ||'T');
+        dbms_output.put_line('You need to suffix the size with (M,G or T), i.e: '||v_maxbytes ||'M/'||v_maxbytes ||'G/' ||v_maxbytes ||'T');
         dbms_output.put_line('--------');
 END;
 """
