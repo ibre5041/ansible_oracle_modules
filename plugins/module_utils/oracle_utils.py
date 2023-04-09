@@ -78,7 +78,7 @@ def oracle_connect(module):
     return conn
 
 
-class oracleConnection(module):
+class oracleConnection:
     """
     Connect to the database using parameter provided by Ansible module instance.
     Return: connection
