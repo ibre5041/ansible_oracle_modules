@@ -47,7 +47,7 @@ dependencies: {}
 repository: https://github.com/ibre5041/ansible_oracle_modules
 
 # The URL to any online docs
-#TODO documentation: http://docs.example.com
+documentation: https://github.com/ibre5041/ansible_oracle_modules/wiki
 
 # The URL to the homepage of the collection/project
 homepage: https://github.com/ibre5041/ansible_oracle_modules
