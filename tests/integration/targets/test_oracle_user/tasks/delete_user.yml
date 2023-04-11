@@ -1,0 +1,28 @@
+---
+
+- name: "define connection parameters"
+  set_fact:
+    connection_parameters: &con_param
+      hostname: "{{ oracle_hostname }}"      
+      port: "{{ oracle_port }}"      
+      service_name: "{{ oracle_service_name }}"
+      username: "{{ oracle_username }}"
+      password: "{{ oracle_password }}"
+      mode: "sysdba"
+
+- name: "delete a system user (not authorized)"
+  oracle_user:
+    <<: *con_param
+    schema_name: "system"
+    state: "absent"
+  register: _
+  failed_when: not _.failed or 'Trying to drop an internal user' not in _.msg
+
+- name: "delete an inexistant user"
+  oracle_user:
+    <<: *con_param
+    schema_name: "inexistant_user"
+    state: "absent"
+  register: _
+  failed_when: _.failed or _.changed
+...

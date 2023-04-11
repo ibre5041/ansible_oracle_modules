@@ -1,0 +1,51 @@
+---
+- name: "install cx_Oracle"
+  pip:
+    name: "cx_Oracle"
+    state: "present"
+
+- block:
+    - name: "check InstantClient is installed"
+      apt:
+        name: "oracle-instantclient-basic-21.9.0.0.0-1"
+  rescue:
+    - name: "install Instant Client dependencies"
+      apt:
+        name:
+          - "libaio1"
+          - "alien"
+        state: "present"
+
+    - name: "get Instant Client RPM"
+      get_url:
+        url: "https://yum.oracle.com/repo/OracleLinux/OL8/oracle/instantclient21/x86_64/getPackage/oracle-instantclient-basic-21.9.0.0.0-1.el8.x86_64.rpm"
+        dest: "/tmp/instantclient.rpm"
+
+    - name: "install Instant Client"
+      command: "alien -i /tmp/instantclient.rpm"
+
+    - name: "run dynamic linker"
+      command: "ldconfig"
+  when: ansible_facts['os_family'] == "Debian"
+
+
+- block:
+    - name: "check InstantClient is installed"
+      dnf:
+        name: "oracle-instantclient-basic-21.9.0.0.0-1"
+  rescue:
+    - name: "install Instant Client dependencies"    
+      apt:
+        name:
+          - "libaio1"
+          - "alien"
+        state: "present"
+
+    - name: "get Instant Client RPM"
+      dnf:
+        name:: "https://yum.oracle.com/repo/OracleLinux/OL8/oracle/instantclient21/x86_64/getPackage/oracle-instantclient-basic-21.9.0.0.0-1.el8.x86_64.rpm"
+        state: "present"
+
+  when: ansible_facts['os_family'] == "RedHat"
+  
+...

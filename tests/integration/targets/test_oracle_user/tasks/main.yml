@@ -1,0 +1,10 @@
+---
+
+- include_tasks: "change_state.yml"
+- include_tasks: "check_mode.yml"
+- include_tasks: "create_user.yml"
+- include_tasks: "delete_user.yml"
+- include_tasks: "modify_user.yml"
+- include_tasks: "empty_user.yml"
+- include_tasks: "diff_mode.yml"
+...

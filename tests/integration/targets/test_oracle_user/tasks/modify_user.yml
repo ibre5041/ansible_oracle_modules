@@ -1,0 +1,212 @@
+---
+
+- name: "define connection parameters"
+  set_fact:
+    connection_parameters: &con_param
+      hostname: "{{ oracle_hostname }}"      
+      port: "{{ oracle_port }}"      
+      service_name: "{{ oracle_service_name }}"
+      username: "{{ oracle_username }}"
+      password: "{{ oracle_password }}"
+      mode: "sysdba"
+
+- name: "user creation"
+  oracle_user:
+    <<: *con_param
+    schema_name: "foo"
+    authentication_type: "none"
+    default_tablespace: "users"
+    temporary_tablespace: "temp"
+    profile: "default"
+    locked: no
+    expired: no
+    state: "present"
+
+- name: "change to authentication by password"
+  oracle_user:
+    <<: *con_param
+    schema_name: "foo"
+    schema_password: "pass"
+    state: "present"
+  register: _
+  failed_when: _.failed or 'identified by'.upper() not in _.ddls[0].upper()
+
+- name: "no change of authentication"
+  oracle_user:
+    <<: *con_param
+    schema_name: "foo"
+    schema_password: "pass"
+    state: "present"
+  register: _
+  failed_when: _.failed or _.changed
+
+# Not activated on my db
+#    - name: "change to global authentication"
+#      oracle_user:
+#        <<: *con_param
+#        schema_name: "foo"
+#        authentication_type: "global"
+#        state: "present"
+#      register: _
+#      failed_when: _.failed or 'identified globally' not in _.ddls[0]
+
+- name: "change to external authentication"
+  oracle_user:
+    <<: *con_param
+    schema_name: "foo"
+    authentication_type: "external"
+    state: "present"
+  register: _
+  failed_when: _.failed or 'identified externally'.upper() not in _.ddls[0].upper()
+
+- name: "change to no authentication"
+  oracle_user:
+    <<: *con_param
+    schema_name: "foo"
+    authentication_type: "none"
+    state: "present"
+  register: _
+  failed_when: _.failed or 'no authentication'.upper() not in _.ddls[0].upper()
+
+- name: "no change of default tablespace"
+  oracle_user:
+    <<: *con_param
+    schema_name: "foo"
+    default_tablespace: "users"
+    state: "present"
+  register: _
+  failed_when: _.failed or _.changed
+
+- name: "change of default tablespace"
+  oracle_user:
+    <<: *con_param
+    schema_name: "foo"
+    default_tablespace: "system"
+    state: "present"
+  register: _
+  failed_when: _.failed or 'default tablespace system'.upper() not in _.ddls[0].upper()
+
+- name: "no change of temp tablespace"
+  oracle_user:
+    <<: *con_param
+    schema_name: "foo"
+    temporary_tablespace: "temp"
+    state: "present"
+  register: _
+  failed_when: _.failed or _.changed
+
+- name: "error changing to inexistant temp tablespace"
+  oracle_user:
+    <<: *con_param
+    schema_name: "foo"
+    temporary_tablespace: "temp_1"
+    state: "present"
+  register: _
+  failed_when: not _.failed or _.code != 959  # ORA-00959: tablespace 'TEMP_1' does not exist
+
+- name: "no change of profile"
+  oracle_user:
+    <<: *con_param
+    schema_name: "foo"
+    profile: "default"
+    state: "present"
+  register: _
+  failed_when: _.failed or _.changed
+
+- name: "error changing to inexistant profile"
+  oracle_user:
+    <<: *con_param
+    schema_name: "foo"
+    profile: "prof_1"
+    state: "present"
+  register: _
+  failed_when: not _.failed or _.code != 2380  # ORA-02380: profile PROF_1 does not exist
+
+- name: "locking account"
+  oracle_user:
+    <<: *con_param
+    schema_name: "foo"
+    locked: yes
+    state: "present"
+  register: _
+  failed_when: _.failed or 'account lock'.upper() not in _.ddls[0].upper()
+
+- name: "unlocking account"
+  oracle_user:
+    <<: *con_param
+    schema_name: "foo"
+    locked: no
+    state: "present"
+  register: _
+  failed_when: _.failed or 'account unlock'.upper() not in _.ddls[0].upper()
+
+- name: "no unlock change"
+  oracle_user:
+    <<: *con_param
+    schema_name: "foo"
+    locked: no
+    state: "present"
+  register: _
+  failed_when: _.failed or _.changed
+
+- name: "change to authentication by password"
+  oracle_user:
+    <<: *con_param
+    schema_name: "foo"
+    schema_password: "pass"
+    state: "present"
+
+- name: "expiring account"
+  oracle_user:
+    <<: *con_param
+    schema_name: "foo"
+    schema_password: "pass"
+    expired: yes
+    state: "present"
+  register: _
+  failed_when: _.failed or 'expire'.upper() not in _.ddls[0].upper()
+
+- name: "no change to expired account"
+  oracle_user:
+    <<: *con_param
+    schema_name: "foo"
+    schema_password: "pass"
+    expired: yes
+    state: "present"
+  register: _
+  failed_when: _.failed or _.changed
+
+- name: "unexpiring account"
+  oracle_user:
+    <<: *con_param
+    schema_name: "foo"
+    schema_password: "pass"
+    expired: no
+    state: "present"
+  register: _
+  failed_when: _.failed or 'identified by'.upper() not in _.ddls[0].upper()
+
+- name: "changing password"
+  oracle_user:
+    <<: *con_param
+    schema_name: "foo"
+    schema_password: "bar"
+    state: "present"
+  register: _
+  failed_when: _.failed or not _.changed or 'identified by'.upper() not in _.ddls[0].upper()
+
+- name: "no change to password"
+  oracle_user:
+    <<: *con_param
+    schema_name: "foo"
+    schema_password: "bar"
+    state: "present"
+  register: _
+  failed_when: _.failed or _.changed
+
+- name: "delete user"
+  oracle_user:
+    <<: *con_param
+    schema_name: "foo"
+    state: "absent"
+...

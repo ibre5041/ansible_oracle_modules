@@ -1,0 +1,69 @@
+---
+
+- name: "define connection parameters"
+  set_fact:
+    connection_parameters: &con_param
+      hostname: "{{ oracle_hostname }}"      
+      port: "{{ oracle_port }}"      
+      service_name: "{{ oracle_service_name }}"
+      username: "{{ oracle_username }}"
+      password: "{{ oracle_password }}"
+      mode: "sysdba"
+
+- name: "user creation"
+  oracle_user:
+    <<: *con_param
+    schema_name: "foo"
+    schema_password: "pass"
+    state: "empty"
+
+- name: "empty an empty schema"
+  oracle_user:
+    <<: *con_param
+    schema_name: "foo"
+    state: "empty"
+  register: _
+  failed_when: _.failed or _.changed
+
+- name: "add one table, one view and one materialized view to schema"
+  oracle_sql:
+    <<: *con_param
+    script: |
+      create table foo.bar (col1 varchar2(10));
+      create view foo.baz as (select dummy from dual);
+      grant create table to foo;
+      alter user foo quota unlimited on users;
+      create materialized view foo.mbaz as (select dummy from dual);
+
+- name: "add one trigger on a table and one system trigger (both are invalid, but that's not the point)"
+  oracle_sql:
+    <<: *con_param
+    script: |
+      create trigger foo.tr_bar after insert on foo.bar
+      begin dbms_output.put('insert in bar') end;
+      create trigger foo.tr_table before create on foo.schema
+      begin dbms_output.put('create on foo') end;
+
+- name: "empty an non empty schema"
+  oracle_user:
+    <<: *con_param
+    schema_name: "foo"
+    state: "empty"
+  register: _
+
+- name: "table, view and mview were dropped"
+  assert:
+    that:
+      - _.changed
+      - _.ddls | length == 5
+      - _.ddls | select('match', 'drop TABLE') | length == 1
+      - _.ddls | select('match', 'drop VIEW') | length == 1
+      - _.ddls | select('match', 'drop MATERIALIZED VIEW') | length == 1
+      - _.ddls | select('match', 'drop TRIGGER') | length == 2
+
+- name: "delete user"
+  oracle_user:
+    <<: *con_param
+    schema_name: "foo"
+    state: "absent"
+...

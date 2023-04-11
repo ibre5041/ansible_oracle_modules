@@ -1,0 +1,8 @@
+---
+oracle_hostname: ..TODO.ADD.HOSTNAME
+oracle_port: ..TODO.ADD.PORT  
+oracle_service_name: ..TODO.ADD.ORACLE.SERVICE.NAME
+oracle_username: ..TODO.ADD.DB.USERNAME
+oracle_password: ..TODO.ADD.DB.PASSWORD
+--mode: "sysdba"
+

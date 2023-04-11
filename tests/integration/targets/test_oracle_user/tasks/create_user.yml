@@ -1,0 +1,149 @@
+---
+
+- name: "define connection parameters"
+  set_fact:
+    connection_parameters: &con_param
+      hostname: "{{ oracle_hostname }}"      
+      port: "{{ oracle_port }}"      
+      service_name: "{{ oracle_service_name }}"
+      username: "{{ oracle_username }}"
+      password: "{{ oracle_password }}"
+      mode: "sysdba"
+
+- name: "user creation with password"
+  oracle_user:
+    <<: *con_param
+    schema_name: "foo"
+    schema_password: "pass"
+    state: "present"
+  register: _
+  failed_when: _.failed or 'identified by' not in _.ddls[0]
+
+- name: "reset user"
+  oracle_user:
+    <<: *con_param
+    schema_name: "foo"
+    state: "absent"
+
+# Not activated on my db
+#    - name: "user creation identified globally"
+#      oracle_user:
+#        <<: *con_param
+#        schema_name: "foo"
+#        authentication_type: "global"
+#        state: "present"
+#      register: _
+#      failed_when: _.failed or 'identified globally' not in _.ddls[0]
+#
+#    - name: "reset user"
+#      oracle_user:
+#        <<: *con_param
+#        schema_name: "foo"
+#        state: "absent"
+
+- name: "user creation identified externaly"
+  oracle_user:
+    <<: *con_param
+    schema_name: "foo"
+    authentication_type: "external"
+    state: "present"
+  register: _
+  failed_when: _.failed or 'identified externally' not in _.ddls[0]
+
+- name: "reset user"
+  oracle_user:
+    <<: *con_param
+    schema_name: "foo"
+    state: "absent"
+
+- name: "user creation without authentication"
+  oracle_user:
+    <<: *con_param
+    schema_name: "foo"
+    state: "present"
+    authentication_type: "none"
+  register: _
+  failed_when: _.failed or 'no authentication' not in _.ddls[0]
+
+- name: "reset user"
+  oracle_user:
+    <<: *con_param
+    schema_name: "foo"
+    state: "absent"
+
+- name: "user creation with default tablespace"
+  oracle_user:
+    <<: *con_param
+    schema_name: "foo"
+    default_tablespace: "users"
+    state: "present"
+  register: _
+  failed_when: _.failed or 'default tablespace users' not in _.ddls[0]
+
+- name: "reset user"
+  oracle_user:
+    <<: *con_param
+    schema_name: "foo"
+    state: "absent"
+
+- name: "user creation with temp tablespace"
+  oracle_user:
+    <<: *con_param
+    schema_name: "foo"
+    temporary_tablespace: "temp"
+    state: "present"
+  register: _
+  failed_when: _.failed or 'temporary tablespace temp' not in _.ddls[0]
+
+- name: "reset user"
+  oracle_user:
+    <<: *con_param
+    schema_name: "foo"
+    state: "absent"
+
+- name: "user creation with profile"
+  oracle_user:
+    <<: *con_param
+    schema_name: "foo"
+    profile: "default"
+    state: "present"
+  register: _
+  failed_when: _.failed or 'profile default' not in _.ddls[0]
+
+- name: "reset user"
+  oracle_user:
+    <<: *con_param
+    schema_name: "foo"
+    state: "absent"
+
+- name: "user creation with locked account"
+  oracle_user:
+    <<: *con_param
+    schema_name: "foo"
+    locked: yes
+    state: "present"
+  register: _
+  failed_when: _.failed or 'account lock' not in _.ddls[0]
+
+- name: "reset user"
+  oracle_user:
+    <<: *con_param
+    schema_name: "foo"
+    state: "absent"
+
+- name: "user creation with expired account"
+  oracle_user:
+    <<: *con_param
+    schema_name: "foo"
+    schema_password: "pass"
+    expired: yes
+    state: "present"
+  register: _
+  failed_when: _.failed or 'expire' not in _.ddls[0]
+
+- name: "reset user"
+  oracle_user:
+    <<: *con_param
+    schema_name: "foo"
+    state: "absent"
+...
