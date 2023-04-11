@@ -3,6 +3,7 @@ from __future__ import absolute_import, division, print_function
 __metaclass__ = type
 
 from ansible.module_utils.basic import os
+from ansible.module_utils.basic import *
 
 try:
     import cx_Oracle
@@ -12,6 +13,7 @@ else:
     cx_oracle_exists = True
 
 from ansible.module_utils.basic import *
+
 
 def oracle_connect(module):
     """
@@ -87,15 +89,15 @@ class oracleConnection:
     def __init__(self, module):
         self.module = module
         self.chaged = False
-        
+
         if not cx_oracle_exists:
             module.fail_json(msg="The cx_Oracle module is required. 'pip install cx_Oracle' should do the trick.")
-        
-        if "oracle_home" in module.params:
+
+        if "oracle_home" in module.params and module.params["oracle_home"]:
             self.oracle_home = module.params["oracle_home"]
             os.environ['ORACLE_HOME'] = self.oracle_home.rstrip('/')
         elif 'ORACLE_HOME' in os.environ:
-            self.oracle_home = os.environ['ORACLE_HOME']            
+            self.oracle_home = os.environ['ORACLE_HOME']
         else:
             self.oracle_home = None
 
@@ -108,7 +110,7 @@ class oracleConnection:
 
         wallet_connect = '/@%s' % service_name
         sysdba_connect = '/'
-        
+
         try:
             if not user and not password: # If neither user or password is supplied, the use of an oracle connect internal or wallet is assumed
                 if mode == 'sysdba':
@@ -117,7 +119,7 @@ class oracleConnection:
                 else:
                     connect = wallet_connect
                     conn = cx_Oracle.connect(wallet_connect)
-            elif user and password: # Assume suplied user has SYSDBA role granted
+            elif user and password: # Assume supplied user has SYSDBA role granted
                 if mode == 'sysdba':
                     dsn = cx_Oracle.makedsn(host=hostname, port=port, service_name=service_name)
                     connect = dsn
@@ -127,7 +129,7 @@ class oracleConnection:
                     connect = dsn
                     conn = cx_Oracle.connect(user, password, dsn)
             elif not user or not password:
-                module.fail_json(msg='Missing username or password for cx_Oracle')            
+                module.fail_json(msg='Missing username or password for cx_Oracle')
         except cx_Oracle.DatabaseError as exc:
             error, = exc.args
             msg = 'Could not connect to database - %s, connect descriptor: %s' % (error.message, connect)
@@ -136,7 +138,7 @@ class oracleConnection:
         self.ddls = []
         self.changed = False
 
-        
+
     def execute_select(self, sql, params=None, fetchone=False):
         """Execute a select query and return fetched data.
 
@@ -155,9 +157,9 @@ class oracleConnection:
             self.module.fail_json(msg=error.message, code=error.code, request=sql, params=params, ddls=self.ddls, changed=self.changed)
 
 
-    def execute_select_to_dict(self, sql, params=None):
+    def execute_select_to_dict(self, sql, params=None, fetchone=False):
         """Execute a select query and return a list of dictionaries : one dictionary for each row.
-        
+
         sql -- SQL query
         params -- Dictionary of bind parameters (default {})
         """
@@ -167,7 +169,14 @@ class oracleConnection:
             with self.conn.cursor() as cursor:
                 cursor.execute(sql, params)
                 column_names = [description[0].lower() for description in cursor.description]  # First element is the column name.
-                return [dict(zip(column_names, row)) for row in cursor]
+                if fetchone:
+                    row = cursor.fetchone()
+                    if row:
+                        return dict(zip(column_names, row))
+                    else:
+                        return dict()
+                else:
+                    return [dict(zip(column_names, row)) for row in cursor]
         except cx_Oracle.DatabaseError as e:
             error = e.args[0]
             self.module.fail_json(msg=error.message, code=error.code, request=sql, params=params, ddls=self.ddls, changed=self.changed)
@@ -187,7 +196,7 @@ class oracleConnection:
                     self.ddls.append(request)
             else:
                 self.ddls.append('--' + request)
-            self.changed = True                
+            self.changed = True
         except cx_Oracle.DatabaseError as e:
             error = e.args[0]
             self.module.fail_json(msg=error.message, code=error.code, request=request, ddls=self.ddls, changed=self.changed)
