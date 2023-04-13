@@ -190,6 +190,8 @@ class oracleConnection:
         In check mode, query is not executed.
         """
         try:
+            if self.module._verbosity >= 3:
+                self.module.warn("SQL: --{}".format(request))
             if not self.module.check_mode:
                 with self.conn.cursor() as cursor:
                     cursor.execute(request)
