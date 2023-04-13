@@ -162,7 +162,7 @@ def ensure_profile_state(conn, module, current_set):
 
     # Check the current attributes
     for change in changes:
-        sql += ' % %' % (change[0], change[1])
+        sql += ' %s %s' % (change[0], change[1])
     else:
         msg = 'Nothing to do'
         module.exit_json(msg=msg, changed=False)
