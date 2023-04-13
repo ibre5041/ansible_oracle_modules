@@ -146,36 +146,29 @@ def remove_profile(conn, module):
     module.exit_json(msg=msg, changed=conn.changed, ddls=conn.ddls)
 
 
-def ensure_profile_state(conn, module):
+def ensure_profile_state(conn, module, current_set):
     profile_name = module.params['profile']
     attribute_name = module.params['attribute_name']
     attribute_value = module.params['attribute_value']
 
-    total_sql = []
-
     # Deal with attribute differences
-    if attribute_name and attribute_value:
-        # Make sure attributes are lower case
-        attribute_name = [x.lower() for x in attribute_name]
-        attribute_value = [str(y).lower() for y in attribute_value]
-        wanted_attributes = set(zip(attribute_name, attribute_value))
+    # Make sure attributes are upper case
+    attribute_name = [x.upper() for x in attribute_name]
+    attribute_value = [str(y).upper() for y in attribute_value]
+    wanted_set = set(zip(attribute_name, attribute_value))
 
-        # Check the current attributes
-        attribute_names_ = ','.join(["'{}'".format(x) for (x, _,) in wanted_attributes])
-        if attribute_names_:
-            current_attributes = None # get_current_attributes(conn, profile_name, attribute_names_)
-            current_attributes = set(current_attributes)
+    sql = "alter profile %s limit "
+    changes = wanted_set.difference(current_set)
 
-            changes = wanted_attributes.difference(current_attributes)
-            for i in changes:
-                total_sql.append("alter profile %s limit %s %s " % (profile_name, i[0], i[1]))
-
-    for sql in total_sql:
-        conn.execute_ddl(sql)
+    # Check the current attributes
+    for change in changes:
+        sql += ' % %' % (change[0], change[1])
     else:
         msg = 'Nothing to do'
         module.exit_json(msg=msg, changed=False)
-    msg = 'profile %s has been put in the intended state' % profile_name
+
+    conn.execute_ddl(sql)
+    msg = 'Successfully altered the profile (%s) / %s' % (profile_name, str(changes))
     module.exit_json(msg=msg, changed=conn.changed, ddls=conn.ddls)
 
 
@@ -198,6 +191,11 @@ def main():
         supports_check_mode=True
     )
 
+    attribute_name = module.params["attribute_name"]
+    attribute_value = module.params["attribute_value"]
+    if len(attribute_name) != len(attribute_value):
+        module.fail_json(msg="attribute_name and attribute_value must have same lengths", changed=False)
+
     name = module.params["profile"]
     state = module.params["state"]
 
@@ -206,7 +204,7 @@ def main():
     profile = check_profile_exists(oc, name)
     if state == 'present':
         if profile:
-            ensure_profile_state(oc, module)
+            ensure_profile_state(oc, module, profile)
         else:
             create_profile(oc, module)
     elif state == 'absent':
