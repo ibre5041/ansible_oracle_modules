@@ -193,8 +193,9 @@ def main():
 
     attribute_name = module.params["attribute_name"]
     attribute_value = module.params["attribute_value"]
-    if len(attribute_name) != len(attribute_value):
-        module.fail_json(msg="attribute_name and attribute_value must have same lengths", changed=False)
+    if attribute_name and attribute_value:
+        if len(attribute_name) != len(attribute_value):
+            module.fail_json(msg="attribute_name and attribute_value must have same lengths", changed=False)
 
     name = module.params["profile"]
     state = module.params["state"]
