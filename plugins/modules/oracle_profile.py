@@ -113,152 +113,66 @@ EXAMPLES = '''
 import os
 from ansible.module_utils.basic import AnsibleModule
 
-# In thise we do import from local project project sub-directory <project-dir>/module_utils
-# While this file is placed in <project-dir>/library
-# No colletions are used
-try:
-    from ansible.module_utils.oracle_utils import oracle_connect
-except:
-    pass
-
-# In thise we do import from collections
-try:
-    from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_utils import oracle_connect
-except:
-    pass
-
-
-try:
-    import cx_Oracle
-except ImportError:
-    cx_oracle_exists = False
-else:
-    cx_oracle_exists = True
-
-changed = False
-
-# define Python user-defined exceptions
-class ModuleExecutionException(Exception):
-    "Raised when execution of some SQL fails"
-    pass
-
-    def __init__(self, message=""):
-        self.message = message
-        super().__init__(self.message)
-
 
 # Check if the profile exists
-def check_profile_exists(conn, name):
-    with conn.cursor() as cursor:
-        sql = "select count(*) from dba_profiles where upper(profile) = '%s'" % (name.upper())
-        try:
-            cursor.execute(sql)
-            result = cursor.fetchone()[0]
-            return bool(result)
-        except cx_Oracle.DatabaseError as exc:
-            error, = exc.args
-            msg = error.message + 'sql: ' + sql
-            raise ModuleExecutionException(msg)
+def check_profile_exists(conn, profile_name):
+    sql = "select resource_name, limit from dba_profiles where upper(profile) = :profile_name"
+    result = conn.execute_select(sql, {'profile_name': profile_name.upper()}, fetchone=False)
+    return set(result)
 
 
-def create_profile(module, conn, name, attribute_name, attribute_value):
-    add_attr = False
-    if not any(x == 'None' for x in attribute_name):
-        add_attr = True
-    if not any(x == None for x in attribute_name):
-        add_attr = True
+def create_profile(conn, module):
+    profile_name = module.params['profile']
+    attribute_name = module.params['attribute_name']
+    attribute_value = module.params['attribute_value']
 
-    if add_attr:
-        attributes = ' '.join(['' + str(n) + ' ' + str(v) + '' for n, v in zip(attribute_name,attribute_value)])
+    sql = 'create profile %s limit ' % profile_name
 
-    sql = 'create profile %s limit ' % name
-    if add_attr:
-        sql += ' %s' % (attributes.lower())
+    wanted_set = list(zip(attribute_name, attribute_value))
 
-    execute_sql(conn, sql, change=True)
-    msg = 'Successfully created profile %s ' % name
-    module.exit_json(msg=msg, changed=changed)
+    for limit in wanted_set:
+        sql += ' %s %s' % (limit[0], limit[1])
+
+    conn.execute_ddl(sql)
+    msg = 'Successfully created profile %s ' % profile_name
+    module.exit_json(msg=msg, changed=conn.changed, ddls=conn.ddls)
 
 
-def remove_profile(module, conn, name):
-    global changed
-    dropsql = 'drop profile %s' % (name)
-    execute_sql(conn, dropsql, changed=True)
-    msg = 'Profile %s successfully removed' % name
-    module.exit_json(msg=msg, changed=changed)
+def remove_profile(conn, module):
+    profile_name = module.params['profile']
+    dropsql = 'drop profile %s' % profile_name
+    conn.execute_ddl(dropsql)
+    msg = 'Profile %s successfully removed' % profile_name
+    module.exit_json(msg=msg, changed=conn.changed, ddls=conn.ddls)
 
 
-def ensure_profile_state(module, conn, name, state, attribute_name, attribute_value):
-    global changed
-    total_sql = []
+def ensure_profile_state(conn, module, current_set):
+    profile_name = module.params['profile']
+    attribute_name = module.params['attribute_name']
+    attribute_value = module.params['attribute_value']
 
     # Deal with attribute differences
-    if attribute_name and attribute_value:
-        # Make sure attributes are lower case
-        attribute_name = [x.lower() for x in attribute_name]
-        attribute_value = [str(y).lower() for y in attribute_value]
-        wanted_attributes = set(zip(attribute_name, attribute_value))
+    # Make sure attributes are upper case
+    attribute_name = [x.upper() for x in attribute_name]
+    attribute_value = [str(y).upper() for y in attribute_value]
+    wanted_set = set(zip(attribute_name, attribute_value))
 
-        # Check the current attributes
-        attribute_names_ = ','.join(["'{}'".format(x) for (x, _,) in wanted_attributes])
-        if attribute_names_:
-            current_attributes = get_current_attributes(conn, name, attribute_names_)
-            current_attributes = set(current_attributes)
+    sql = "alter profile %s limit " % profile_name
+    changes = wanted_set.difference(current_set)
 
-            changes = wanted_attributes.difference(current_attributes)
-            for i in changes:
-                total_sql.append("alter profile %s limit %s %s " % (name, i[0], i[1]))
+    if not changes:
+        module.exit_json(msg='Nothing to do', changed=conn.changed, ddls=conn.ddls)
 
-    if total_sql:
-        ensure_profile_state_sql(conn, total_sql)
-        msg = 'profile %s has been put in the intended state' % name
-        module.exit_json(msg=msg, changed=changed)
-    else:
-        msg = 'Nothing to do'
-        module.exit_json(msg=msg, changed=False)
+    # Process changed attributes
+    for change in changes:
+        sql += ' %s %s' % (change[0], change[1])
 
-
-def ensure_profile_state_sql(conn, total_sql):
-    for sql in total_sql:
-        execute_sql(conn, sql)
-
-
-def get_current_attributes(conn, name, attribute_names_):
-    sql =  """
-    select lower(resource_name),lower(limit)
-    from dba_profiles
-    where lower(profile) = '%s' 
-    and lower(resource_name) in (%s) """ % (name.lower(), attribute_names_.lower())
-    result = execute_sql_get(conn, sql)
-    return result
-
-
-def execute_sql_get(conn, sql):
-    with conn.cursor() as cursor:
-        try:
-            cursor.execute(sql)
-            result = (cursor.fetchall())
-            return result
-        except cx_Oracle.DatabaseError as exc:
-            error, = exc.args
-            msg = 'Something went wrong while executing sql_get - %s sql: %s' % (error.message, sql)
-            raise ModuleExecutionException(msg)
-
-
-def execute_sql(conn, sql, change=False):
-    global changed
-    with conn.cursor() as cursor:
-        try:
-            cursor.execute(sql)
-            changed = bool(changed or change)
-        except cx_Oracle.DatabaseError as exc:
-            error, = exc.args
-            msg = 'Something went wrong while executing sql - %s sql: %s' % (error.message, sql)
-            raise ModuleExecutionException(msg)
+    conn.execute_ddl(sql)
+    msg = 'Successfully altered the profile (%s) / %s' % (profile_name, str(changes))
+    module.exit_json(msg=msg, changed=conn.changed, ddls=conn.ddls)
 
 
 def main():
-    global changed
     module = AnsibleModule(
         argument_spec = dict(
             user                = dict(required=False, aliases=['un', 'username']),
@@ -268,40 +182,55 @@ def main():
             port                = dict(required=False, default=1521, type='int'),
             service_name        = dict(required=False, aliases=['sn']),
             oracle_home         = dict(required=False, aliases=['oh']),
-            name                = dict(required=True, aliases=['profile']),
-            attribute_name      = dict(required=True, type='list', aliases=['an']),
-            attribute_value     = dict(required=True, type='list', aliases=['av']),
+            profile             = dict(required=True, aliases=['name']),
+            attribute_name      = dict(required=False, type='list', aliases=['an']),
+            attribute_value     = dict(required=False, type='list', aliases=['av']),
             state               = dict(default="present", choices=["present", "absent"]),
         ),
+        required_if=[('state', 'present', ('attribute_name', 'attribute_value'))],
+        supports_check_mode=True
     )
 
-    name                = module.params["name"]
-    attribute_name      = module.params["attribute_name"]
-    attribute_value     = module.params["attribute_value"]
-    state               = module.params["state"]
+    attribute_name = module.params["attribute_name"]
+    attribute_value = module.params["attribute_value"]
+    if attribute_name and attribute_value:
+        if len(attribute_name) != len(attribute_value):
+            module.fail_json(msg="attribute_name and attribute_value must have same lengths", changed=False)
 
-    if not cx_oracle_exists:
-        msg = "The cx_Oracle module is required. 'pip install cx_Oracle' should do the trick. If cx_Oracle is installed, make sure ORACLE_HOME & LD_LIBRARY_PATH is set"
-        module.fail_json(msg=msg)
+    name = module.params["profile"]
+    state = module.params["state"]
 
-    try:
-        conn = oracle_connect(module)
-        if state == 'present':
-            if not check_profile_exists(conn, name):
-                create_profile(module, conn, name, attribute_name, attribute_value)
-            else:
-                ensure_profile_state(module, conn, name, state, attribute_name, attribute_value)
-        elif state == 'absent' and attribute_name:
-            module.fail_json(msg='Attributes are only allowed when state=present', changed=False)
-        elif state == 'absent':
-            if check_profile_exists(conn, name):
-                remove_profile(module, conn, name)
-            else:
-                msg = 'Profile %s doesn\'t exist' % (name)
-                module.exit_json(msg=msg, changed=False)
-        module.exit_json(msg="Unhandled exit", changed=False)
-    except ModuleExecutionException as e:
-        module.fail_json(msg=e.message, changed=changed)
+    oc = oracleConnection(module)
+
+    profile = check_profile_exists(oc, name)
+    if state == 'present':
+        if profile:
+            ensure_profile_state(oc, module, profile)
+        else:
+            create_profile(oc, module)
+    elif state == 'absent':
+        if profile:
+            remove_profile(oc, module)
+        else:
+            module.exit_json(msg="Profile %s doesn't exist" % name, changed=False)
+    module.exit_json(msg="Unhandled exit", changed=False)
+
+
+from ansible.module_utils.basic import *
+
+# In these we do import from local project project sub-directory <project-dir>/module_utils
+# While this file is placed in <project-dir>/library
+# No collections are used
+try:
+    from ansible.module_utils.oracle_utils import oracleConnection
+except:
+    pass
+
+# In these we do import from collections
+try:
+    from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_utils import oracleConnection
+except:
+    pass
 
 
 if __name__ == '__main__':
