@@ -157,7 +157,7 @@ def ensure_profile_state(conn, module, current_set):
     attribute_value = [str(y).upper() for y in attribute_value]
     wanted_set = set(zip(attribute_name, attribute_value))
 
-    sql = "alter profile %s limit "
+    sql = "alter profile %s limit " % profile_name
     changes = wanted_set.difference(current_set)
 
     if not changes:
