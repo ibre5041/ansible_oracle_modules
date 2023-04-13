@@ -198,7 +198,7 @@ def main():
         supports_check_mode=True
     )
 
-    name = module.params["name"]
+    name = module.params["profile"]
     state = module.params["state"]
 
     oc = oracleConnection(module)
