@@ -612,25 +612,22 @@ def remove_db (module):
     sys_password = module.params["sys_password"]
     output = module.params["output"]
 
-    module.warn('remove_db')
-
-    remove_db = ''
     if gimanaged:
-        conn = oracle_connect(module)
-        cursor = conn.cursor()
-        israc_sql = 'select parallel,instance_name,host_name from v$instance'
-        israc_ = execute_sql_get(module, cursor, israc_sql)
+        conn = oracleConnection(module)
+        israc_sql = 'select parallel, instance_name, host_name from v$instance'
+        result = conn.execute_select_to_dict(israc_sql, fetchone=True)
+        israc = bool(result['parallel'] == 'YES')
 
-        if db_unique_name is not None:
+        if db_unique_name:
             remove_db = db_unique_name
-        elif sid is not None and israc_[0][0] == 'YES':
+        elif sid is not None and israc == 'YES':
             remove_db = db_name
-        elif sid is not None and israc_[0][0] == 'NO':
+        elif sid is not None and israc == 'NO':
             remove_db = sid
         else:
             remove_db = db_name
     else:
-        if sid is not None:
+        if sid:
             remove_db = sid
         else:
             remove_db = db_name
@@ -787,27 +784,31 @@ def ensure_db_state(module):
     changes = wanted_set.difference(set(db_parameters.items()))
 
     if change_db_sql or change_restart_sql:
+        return_ddls = []
         # Flashback database needs to be turned off before archivelog is turned off
         if c_log_mode == 'ARCHIVELOG' and c_flashback_on == 'YES' and not archivelog and not flashback:
             # <- Apply changes that does not require a restart
             if change_db_sql:
                 ddls = apply_norestart_changes(module, change_db_sql)
+                return_ddls.append(ddls)
 
             # <- Apply changes that requires database in mount state
             if change_restart_sql:
                 ddls = apply_restart_changes(module, instance_name, host_name, israc, change_restart_sql)
+                return_ddls.append(ddls)
         else:
             # <- Apply changes that requires database in mount state
             if change_restart_sql:
-                apply_restart_changes(module, instance_name, host_name, israc, change_restart_sql)
-
+                ddls = apply_restart_changes(module, instance_name, host_name, israc, change_restart_sql)
+                return_ddls.append(ddls)
             # <- Apply changes that does not require a restart
             if change_db_sql:
-                apply_norestart_changes(module, change_db_sql)
+                ddls = apply_norestart_changes(module, change_db_sql)
+                return_ddls.append(ddls)
 
         msg = 'Database %s has been put in the intended state - Archivelog: %s, Force Logging: %s, Flashback: %s, Supplemental Logging: %s, Timezone: %s' %\
                 (db_name, archivelog,force_logging,flashback,supplemental_logging, timezone)
-        module.exit_json(msg=msg, changed=True)
+        module.exit_json(msg=msg, changed=True, ddls=return_ddls)
     else:
         if newdb:
             msg = 'Database %s successfully created created (%s) ' % (db_name, archcomp)
@@ -831,11 +832,12 @@ def apply_restart_changes(module, instance_name, host_name, israc, change_restar
 
     for sql in change_restart_sql:
         conn.execute_ddl(sql)
-        stop_db(module, oracle_home, db_name, db_unique_name, sid)
-        start_db(module, oracle_home, db_name, db_unique_name, sid)
+    stop_db(module, oracle_home, db_name, db_unique_name, sid)
+    start_db(module, oracle_home, db_name, db_unique_name, sid)
     return conn.ddls
 
-def apply_norestart_changes(conn, change_db_sql):
+def apply_norestart_changes(module, change_db_sql):
+    conn = oracleConnection(module)
     for sql in change_db_sql:
         conn.execute_ddl(sql)
     return conn.ddls
@@ -845,7 +847,7 @@ def stop_db(module, oracle_home, db_name, db_unique_name, sid):
     if gimanaged:
         if db_unique_name is not None:
             db_name = db_unique_name
-        command = '%s/bin/srvctl stop database -d %s -o immediate' % (oracle_home,db_name)
+        command = '%s/bin/srvctl stop database -d %s -o immediate' % (oracle_home, db_name)
         (rc, stdout, stderr) = module.run_command(command)
         if rc != 0:
             msg = 'Error - STDOUT: %s, STDERR: %s, COMMAND: %s' % (stdout, stderr, command)
@@ -861,7 +863,7 @@ def stop_db(module, oracle_home, db_name, db_unique_name, sid):
         exit
         '''
         sqlplus_bin = '%s/bin/sqlplus' % oracle_home
-        p = subprocess.Popen([sqlplus_bin,'/nolog'], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        p = subprocess.Popen([sqlplus_bin, '/nolog'], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         (stdout, stderr) = p.communicate(shutdown_sql.encode('utf-8'))
         rc = p.returncode
         if rc != 0:
@@ -1023,7 +1025,7 @@ def main():
         gimanaged = True
     else:
         gimanaged = False
-    #gimanaged = False # TODO REMOVE
+    #gimanaged = False# TODO REMOVE - override GI presence for testing
 
     # Connection details for database
     user = 'sys'
