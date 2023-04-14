@@ -263,14 +263,13 @@ def main():
             hostname      = dict(default='localhost'),
             port          = dict(default=1521, type="int"),
             service_name  = dict(required=False, aliases = ['tns']),
-            user          = dict(required=False),
+            user          = dict(required=False, aliases=['username']),
             password      = dict(required=False, no_log=True),
             mode          = dict(default='normal', choices=["normal","sysdba"]),
             role          = dict(default=None),
             state         = dict(default="present", choices=["present", "absent"]),
             auth          = dict(default='none', choices=["none", "password", "external", "global", "application"]),
             auth_conf     = dict(default=None)
-
         ),
 
     )
