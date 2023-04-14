@@ -9,7 +9,7 @@ description:
     - Manage grants/privileges in an Oracle database
     - Handles role/sys privileges at the moment.
     - It is possible to add object privileges as well, but they are not considered when removing privs at the moment.
-version_added: "1.9.1"
+version_added: "3.0.0"
 options:
     hostname:
         description:
@@ -118,7 +118,6 @@ def main():
             oracle_home   = dict(required=False, aliases=['oh']),
             directory_name = dict(default=None),
             directory_path = dict(default=None),
-            directory_mode = dict(default="enforce", choices=["normal", "enforce"]),
             state          = dict(default="present", choices=["present", "absent"])
         ),
         required_together=[['user', 'password']],
