@@ -166,8 +166,8 @@ def main():
             mode          = dict(default='normal', choices=["normal","sysdba"]),
             role          = dict(required=True, type='str'),
             state         = dict(default="present", choices=["present", "absent"]),
-            auth          = dict(default='none', choices=["none", "password", "external", "global", "application"]),
-            auth_conf     = dict(default=None)
+            auth          = dict(default='none', choices=["none", "password", "external", "global", "application"], aliases=['identified_method']),
+            auth_conf     = dict(default=None, aliases=['identified_value'])
         ),
         required_together=[['user', 'password']],
         supports_check_mode=True
