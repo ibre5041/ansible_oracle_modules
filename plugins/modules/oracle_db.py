@@ -967,13 +967,13 @@ def main():
             listeners           = dict(required=False, aliases=['listener']),
             cdb                 = dict(default=False, type='bool', aliases=['container']),
             local_undo          = dict(default=True, type='bool'),
-            datafile_dest       = dict(required=False, aliases= ['dfd']),
-            recoveryfile_dest   = dict(required=False, aliases= ['rfd']),
-            storage_type        = dict(default='FS', aliases= ['storage'], choices=['FS', 'ASM']),
+            datafile_dest       = dict(required=False, aliases=['dfd']),
+            recoveryfile_dest   = dict(required=False, aliases=['rfd']),
+            storage_type        = dict(default='FS', aliases=['storage'], choices=['FS', 'ASM']),
             omf                 = dict(default=True, type='bool'),
-            dbconfig_type       = dict(default='SI', choices = ['SI', 'RAC', 'RACONENODE']),
-            db_type             = dict(default='MULTIPURPOSE',choices = ['MULTIPURPOSE', 'DATA_WAREHOUSING', 'OLTP']),
-            racone_service      = dict(required=False,aliases = ['ron_service']),
+            dbconfig_type       = dict(default='SI', choices=['SI', 'RAC', 'RACONENODE']),
+            db_type             = dict(default='MULTIPURPOSE', choices=['MULTIPURPOSE', 'DATA_WAREHOUSING', 'OLTP']),
+            racone_service      = dict(required=False, aliases=['ron_service']),
             characterset        = dict(default='AL32UTF8'),
             memory_percentage   = dict(required=False),
             memory_totalmb      = dict(default='2048'),
@@ -1072,7 +1072,6 @@ def main():
             else:
                 module.fail_json(msg=msg, changed=False)
         else:
-            module.warn('db exists')
             ensure_db_state(module)
             # msg = 'Database %s already exists' % (db_name)
             # module.exit_json(msg=msg, changed=False)
