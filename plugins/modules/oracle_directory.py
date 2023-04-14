@@ -84,12 +84,12 @@ def ensure_directory(conn, module, current_directory):
         current_path = next(v for (a, v) in current_directory if a == 'directory_path')
         if current_path == directory_path:
             msg = 'Directory %s already exists (%s)' % (directory_name, directory_path)
-            module.exit_json(msg, changed=False)
+            module.exit_json(msg=msg, changed=False)
         else:
             directory_sql = 'create or replace directory %s as \'%s\'' % (directory_name, directory_path)
             conn.execute_ddl(directory_sql)
             msg = 'Directory %s, changed to path: %s (old path: %s)'% (directory_name, directory_path, current_path)
-            module.exit_json(msg, changed=conn.changed, ddls=conn.ddls)
+            module.exit_json(msg=msg, changed=conn.changed, ddls=conn.ddls)
     else:
         directory_sql = "create directory %s as '%s'" % (directory_name, directory_path)
         conn.execute_ddl(directory_sql)
