@@ -1,0 +1,71 @@
+---
+- name: "define connection parameters"
+  set_fact:
+    connection_parameters: &con_param
+      hostname: "{{ oracle_hostname }}"      
+      port: "{{ oracle_port }}"      
+      service_name: "{{ oracle_service_name }}"
+      username: "{{ oracle_username }}"
+      password: "{{ oracle_password }}"
+      mode: "sysdba"
+
+- name: remove inexistent privilege from user
+  oracle_grant:
+    <<: *con_param
+    grantee: "u_foo"
+    privileges: "create session"
+    state: "absent"
+  register: _
+  failed_when: _.failed or _.changed
+
+- name: add a privilege to user
+  oracle_grant:
+    <<: *con_param
+    grantee: "u_foo"
+    privileges: "create session"
+    state: "present"
+
+- name: remove this privilege from user
+  oracle_grant:
+    <<: *con_param
+    grantee: "u_foo"
+    privileges: "create session"
+    state: "absent"
+  register: _
+  failed_when: _.failed or not _.changed
+
+- name: add privileges to user
+  oracle_grant:
+    <<: *con_param
+    grantee: "u_foo"
+    privileges:
+      - "create session"
+      - "create table"
+      - "create synonym"
+      - "create view"
+    state: "present"
+
+- name: remove this privilege from user
+  oracle_grant:
+    <<: *con_param
+    grantee: "u_foo"
+    privileges:
+      - "create table"
+      - "create synonym"
+      - "create materialized view"
+    state: "absent"
+  register: _
+  failed_when: |
+    _.failed or (
+    not _.changed and
+    'create session' in _.ddls and
+    'create view' in _.ddls and
+    'create materialized view' in _.ddls and
+    'create table' not in _.ddls and
+    'create synonym' not in _.ddls)
+
+- name: reset user's privilege
+  oracle_grant:
+    <<: *con_param
+    grantee: "u_foo"
+...

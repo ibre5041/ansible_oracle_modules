@@ -1,0 +1,35 @@
+---
+- name: "define connection parameters"
+  set_fact:
+    connection_parameters: &con_param
+      service_name: "{{ service_name }}"
+      username: "SYS"
+      password: "{{ sys_password }}"
+      mode: "sysdba"
+
+- name: grant create session in check mode
+  oracle_grant:
+    <<: *con_param
+    grantee: "u_foo"
+    privileges: "create session"
+  check_mode: yes
+  register: _
+  failed_when: _.failed or not _.changed
+
+- name: grant again create session in check mode (must change again)
+  oracle_grant:
+    <<: *con_param
+    grantee: "u_foo"
+    privileges: "create session"
+  check_mode: yes
+  register: _
+  failed_when: _.failed or not _.changed
+
+- name: Remove grants (nothing to do, as nothing was added)
+  oracle_grant:
+    <<: *con_param
+    grantee: "u_foo"
+  check_mode: yes
+  register: _
+  failed_when: _.failed or _.changed
+...

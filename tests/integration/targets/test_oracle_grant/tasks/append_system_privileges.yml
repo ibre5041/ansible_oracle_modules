@@ -1,0 +1,73 @@
+---
+- name: "define connection parameters"
+  set_fact:
+    connection_parameters: &con_param
+      service_name: "{{ service_name }}"
+      username: "SYS"
+      password: "{{ sys_password }}"
+      mode: "sysdba"
+
+- name: grant create session to inexistent user
+  oracle_grant:
+    <<: *con_param
+    grantee: "bar"
+    privileges: "create session"
+    state: "present"
+  register: _
+  failed_when: not _.failed or _.code != 1917
+
+- name: grant create session to existent user
+  oracle_grant:
+    <<: *con_param
+    grantee: "u_foo"
+    privileges: "create session"
+    state: "present"
+  register: _
+  failed_when: _.failed or not _.changed
+
+- name: grant existing privilege to user
+  oracle_grant:
+    <<: *con_param
+    grantee: "u_foo"
+    privileges: "create session"
+    state: "present"
+  register: _
+  failed_when: _.failed or _.changed
+
+- name: grant new privilege to user
+  oracle_grant:
+    <<: *con_param
+    grantee: "u_foo"
+    privileges: "create table"
+    state: "present"
+  register: _
+  failed_when: _.failed or (not _.changed and 'create table' not in _.ddls)
+
+- name: grant existing privileges to user
+  oracle_grant:
+    <<: *con_param
+    grantee: "u_foo"
+    privileges:
+      - "create table"
+      - "create session"
+    state: "present"
+  register: _
+  failed_when: _.failed or _.changed
+
+- name: grant new privileges to user
+  oracle_grant:
+    <<: *con_param
+    grantee: "u_foo"
+    privileges:
+      - "create synonym"
+      - "create table"
+      - "create view"
+    state: "present"
+  register: _
+  failed_when: _.failed or (not _.changed and 'create table' in _.ddls and 'create synonym' not in _.ddls and 'create view' not in _.ddls)
+
+- name: reset user's privilege
+  oracle_grant:
+    <<: *con_param
+    grantee: "u_foo"
+...

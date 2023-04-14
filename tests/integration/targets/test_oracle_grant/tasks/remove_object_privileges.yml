@@ -1,0 +1,76 @@
+---
+- name: "define connection parameters"
+  set_fact:
+    connection_parameters: &con_param
+      hostname: "{{ oracle_hostname }}"      
+      port: "{{ oracle_port }}"      
+      service_name: "{{ oracle_service_name }}"
+      username: "{{ oracle_username }}"
+      password: "{{ oracle_password }}"
+      mode: "sysdba"
+
+- name: remove inexistent privilege from user
+  oracle_grant:
+    <<: *con_param
+    grantee: "u_foo"
+    objects_privileges:
+      dbms_random:
+        - "execute"
+    state: "absent"
+  register: _
+  failed_when: _.failed or _.changed
+
+- name: add a privilege to user
+  oracle_grant:
+    <<: *con_param
+    grantee: "u_foo"
+    objects_privileges:
+      dbms_random:
+        - "execute"
+    state: "present"
+
+- name: remove this privilege from user
+  oracle_grant:
+    <<: *con_param
+    grantee: "u_foo"
+    objects_privileges:
+      dbms_random:
+        - "execute"
+    state: "absent"
+  register: _
+  failed_when: _.failed or not _.changed
+
+- name: add privileges to user
+  oracle_grant:
+    <<: *con_param
+    grantee: "u_foo"
+    objects_privileges:
+      dbms_random:
+        - "execute"
+      dba_users:
+        - "select"
+        - "read"
+    state: "present"
+
+- name: remove this privilege from user
+  oracle_grant:
+    <<: *con_param
+    grantee: "u_foo"
+    objects_privileges:
+      dba_users:
+        - "select"
+    state: "absent"
+  register: _
+  failed_when: |
+    _.failed or (
+    not _.changed and
+    'dbms_random' in _.ddls and
+    'dba_users' not in _.ddls and
+    'read' in _.ddls and
+    'select' not in _.ddls)
+
+- name: reset user's privilege
+  oracle_grant:
+    <<: *con_param
+    grantee: "u_foo"
+...

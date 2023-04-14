@@ -1,0 +1,24 @@
+---
+- name: "define connection parameters"
+  set_fact:
+    connection_parameters: &con_param
+      hostname: "{{ oracle_hostname }}"      
+      port: "{{ oracle_port }}"      
+      service_name: "{{ oracle_service_name }}"
+      username: "{{ oracle_username }}"
+      password: "{{ oracle_password }}"
+      mode: "sysdba"
+
+- name: drop u_foo user
+  oracle_user:
+    <<: *con_param
+    schema_name: "u_foo"
+    schema_password: "bar"
+    state: "absent"
+
+- name: drop r_foo role
+  oracle_role:
+    <<: *con_param
+    role: "r_foo"
+    state: "absent"
+...

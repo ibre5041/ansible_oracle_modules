@@ -1,0 +1,15 @@
+---
+- include_tasks: "set_up.yml"
+
+- include_tasks: "append_system_privileges.yml"
+- include_tasks: "remove_system_privileges.yml"
+- include_tasks: "replace_system_privileges.yml"
+- include_tasks: "append_object_privileges.yml"
+- include_tasks: "remove_object_privileges.yml"
+- include_tasks: "replace_object_privileges.yml"
+- include_tasks: "append_remove_privileges_role.yml"
+- include_tasks: "append_remove_directory_privileges.yml"
+- include_tasks: "check_mode.yml"
+
+- include_tasks: "tear_down.yml"
+...
