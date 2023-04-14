@@ -163,6 +163,18 @@ This results into situation when all white-noise characters are omited and resul
            attribute_value: ["UNLIMITED", "UNLIMITED"]
            state: present
 
+## **oracle_role**
+
+*pre-req: cx_Oracle*
+
+- Manages roles in the database
+
+        - name
+          oracle_role:
+            mode: sysdba        
+            role: test_role
+            state: present
+
 ## **oracle_user**
 
 *pre-req: cx_Oracle*
@@ -263,13 +275,6 @@ This results into situation when all white-noise characters are omited and resul
        become_user: "{{ oracle_owner }}"
        become_method: sudo
 
-**Note:** Should be considered as experimental, or an alpha-release
-
-## **oracle_role**
-
-*pre-req: cx_Oracle*
-
-- Manages roles in the database
 
 **oracle_parameter**
 
