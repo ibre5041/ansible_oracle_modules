@@ -433,6 +433,7 @@ def main():
             container     = dict(default=None),
             container_data = dict(default=None)
         ),
+        required_together=[['username', 'password']],
         mutually_exclusive=[['schema_password', 'schema_password_hash']],
         supports_check_mode=True
     )
@@ -460,7 +461,7 @@ def main():
 
 from ansible.module_utils.basic import *
 
-# In these we do import from local project project sub-directory <project-dir>/module_utils
+# In these we do import from local project sub-directory <project-dir>/module_utils
 # While this file is placed in <project-dir>/library
 # No collections are used
 try:

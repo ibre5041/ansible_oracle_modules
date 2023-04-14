@@ -187,6 +187,7 @@ def main():
             attribute_value     = dict(required=False, type='list', aliases=['av']),
             state               = dict(default="present", choices=["present", "absent"]),
         ),
+        required_together=[['user', 'password']],
         required_if=[('state', 'present', ('attribute_name', 'attribute_value'))],
         supports_check_mode=True
     )
@@ -218,7 +219,7 @@ def main():
 
 from ansible.module_utils.basic import *
 
-# In these we do import from local project project sub-directory <project-dir>/module_utils
+# In these we do import from local project sub-directory <project-dir>/module_utils
 # While this file is placed in <project-dir>/library
 # No collections are used
 try:
