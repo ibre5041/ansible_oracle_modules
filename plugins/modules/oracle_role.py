@@ -76,7 +76,7 @@ oracle_role: hostname=localhost service_name=orcl user=system password=manager r
 
 # Check if the user/role exists
 def check_role_exists(conn, role):
-    sql = "select upeper(role), authentication_type from dba_roles where upper(role) = upper(:role_name)"
+    sql = "select role, authentication_type from dba_roles where upper(role) = upper(:role_name)"
     r = conn.execute_select_to_dict(sql, {'role_name': role}, fetchone=True)
     return set(r.items())
 
@@ -118,7 +118,7 @@ def modify_role(conn, module, current_set):
 
     sql = 'alter role %s' % role
 
-    current_auth = next(v for (a, v) in current_set if a == 'AUTHENTICATION_TYPE')
+    current_auth = next(v for (a, v) in current_set if a == 'authentication_type')
     if current_auth.upper() == auth.upper():
         module.exit_json(msg='The role (%s) already exists' % role, changed=conn.changed, ddls=conn.ddls)
 
