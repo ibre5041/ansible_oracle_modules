@@ -73,267 +73,140 @@ oracle_role: hostname=localhost service_name=orcl user=system password=manager r
 
 '''
 
-try:
-    import cx_Oracle
-except ImportError:
-    cx_oracle_exists = False
-else:
-    cx_oracle_exists = True
-
-
-def clean_string(item):
-    item = item.replace("'","").replace(", ",",").lstrip(" ").rstrip(",").replace("[","").replace("]","")
-
-    return item
-
-def clean_list(item):
-    item = [p.replace("'","").replace(", ",",").lstrip(" ").rstrip(",").replace("[","").replace("]","") for p in item]
-
-    return item
-
-
 
 # Check if the user/role exists
-def check_role_exists(module, msg, cursor, role, auth):
-
-    if not(role):
-        module.fail_json(msg='Error: Missing role name', changed=False)
-        return False
-
-    role = clean_string(role)
-    sql = 'select count(*) from dba_roles where role = upper(\'%s\')' % role
-    #sql = 'select lower(role), lower(authentication_type) from dba_roles where role = upper(\'%s\')' % role
-
-
-    try:
-            cursor.execute(sql)
-            result = cursor.fetchone()[0]
-    except cx_Oracle.DatabaseError as exc:
-            error, = exc.args
-            msg[0] = error.message+ 'sql: ' + sql
-            return False
-
-    if result > 0:
-
-        msg[0] = 'The role (%s) already exists' % role
-        return True
+def check_role_exists(conn, role):
+    sql = "select role, authentication_type from dba_roles where upper(role) = upper(:role_name)"
+    r = conn.execute_select_to_dict(sql, {'role_name': role}, fetchone=True)
+    return set(r.items())
 
 
 # Create the role
-def create_role(module, msg, cursor, role, auth, auth_conf):
-
-    if not(role) or not (auth):
-        module.fail_json(msg='Error: Missing role name', changed=False)
-        return False
-
+def create_role(conn, module):
+    role = module.params["role"]
+    auth = module.params["auth"]
+    auth_conf = module.params["auth_conf"]
 
     # This is the default role creation
-    sql = 'create role %s ' % role
-
+    sql = 'create role %s' % role
 
     if auth == 'password':
         if not auth_conf:
-            module.fail_json(msg='Missing password', changed=False)
-            return False
+            module.fail_json(msg='Missing password', changed=conn.changed, ddls=conn.ddls)
         else:
-            sql += 'identified by %s' % auth_conf
-
-    if auth == 'application':
-        if not (auth_conf):
+            sql += ' identified by %s' % auth_conf
+    elif auth == 'application':
+        if auth_conf:
             module.fail_json(msg='Missing authentication package (schema.name)', changed=False)
-            return False
         else:
-            sql += 'identified using %s' % auth_conf
+            sql += ' identified using %s' % auth_conf
+    elif auth == 'external':
+        sql += ' identified externally'
 
-    if auth == 'external':
-        sql += 'identified externally '
+    elif auth == 'global':
+        sql += ' identified globally'
 
-    if auth == 'global':
-        sql += 'identified globally'
-
-
-
-
-    try:
-        cursor.execute(sql)
-    except cx_Oracle.DatabaseError as exc:
-        error, = exc.args
-        msg[0] = 'Blergh, something went wrong while creating the role - %s sql: %s' % (error.message, sql)
-        return False
-
-    msg[0] = 'The role (%s) has been created successfully, authentication: %s' % (role, auth)
-    return True
+    conn.execute_ddl(sql)
+    msg = 'The role (%s) has been created successfully, authentication: "%s"' % (role, auth)
+    module.exit_json(msg=msg , changed=conn.changed, ddls=conn.ddls)
 
 
-def modify_role(module, msg, cursor, role, auth, auth_conf):
+def modify_role(conn, module, current_set):
+    role = module.params["role"]
+    auth = module.params["auth"]
+    auth_conf = module.params["auth_conf"]
 
-    if not(role) or not (auth):
-        module.fail_json(msg='Error: Missing role name', changed=False)
-        return False
+    sql = 'alter role %s' % role
 
-    sql = 'alter role %s ' % (role)
+    current_auth = next(v for (a, v) in current_set if a == 'authentication_type')
+    if current_auth.upper() == auth.upper():
+        module.exit_json(msg='The role (%s) already exists' % role, changed=conn.changed, ddls=conn.ddls)
 
-    currauth = get_role_specs(module, msg, cursor, role)
+    if auth == 'none':
+        sql += ' not identified'
+    elif auth == 'password':
+        if not auth_conf:
+            module.fail_json(msg='Missing password for authentication_type %s' % auth, changed=False)
+        else:
+            sql += ' identified by %s' % auth_conf
+    elif auth == 'application':
+        if auth_conf:
+            module.fail_json(msg='Missing authentication package (schema.name)', changed=False)
+        else:
+            sql += ' identified using %s' % auth_conf
+    elif auth == 'external':
+        sql += ' identified externally'
+    elif auth == 'global':
+        sql += ' identified globally'
 
-    if currauth.lower() == auth.lower():
-        module.exit_json(msg='The role (%s) already exists' % role, changed=False)
-
-    else:
-        if auth == 'none':
-            sql += ' not identified '
-
-        if auth == 'password':
-            if not auth_conf:
-                module.fail_json(msg='Missing password for authentication_type %s' % (auth), changed=False)
-                return False
-            else:
-                sql += ' identified by %s' % auth_conf
-
-        if auth == 'application':
-            if not (auth_conf):
-                module.fail_json(msg='Missing authentication package (schema.name)', changed=False)
-                return False
-            else:
-                sql += 'identified using %s' % auth_conf
-
-        if auth == 'external':
-            sql += 'identified externally '
-
-        if auth == 'global':
-            sql += 'identified globally'
+    conn.execute_ddl(sql)
+    msg = 'The role (%s) has been changed successfully, authentication: %s, previous: %s' % (role, auth, current_auth)
+    module.exit_json(msg=msg, changed=conn.changed, ddls=conn.ddls)
 
 
-        try:
-            cursor.execute(sql)
-        except cx_Oracle.DatabaseError as exc:
-            error, = exc.args
-            msg[0] = 'Blergh, something went wrong while altering the role - %s sql: %s' % (error.message, sql)
-            return False
-
-        msg[0] = 'The role (%s) has been changed successfully, authentication: %s, previous: %s' % (role, auth, currauth)
-    return True
-
-
-
-def get_role_specs(module, msg, cursor, role):
-
-    sql = 'select lower(authentication_type) from dba_roles where role = upper(\'%s\')' % role
-
-
-    try:
-        cursor.execute(sql)
-        result = (cursor.fetchall()[0][0])
-    except cx_Oracle.DatabaseError as exc:
-        error, = exc.args
-        msg[0] = 'Blergh, something went wrong while getting the role auth scheme - %s sql: %s' % (error.message, sql)
-        module.fail_json(msg=msg[0], changed=False)
-        return False
-
-    #module.exit_json(msg='Result: %s, sql: %s' % (result, sql), changed=False)
-    return result
-
-
-# Create the role
-def drop_role(module, msg, cursor, role):
-
-    if not(role):
-        module.fail_json(msg='Error: Missing role name', changed=False)
-        return False
-
-
+# Drop the role
+def drop_role(conn, module):
+    role = module.params["role"]
     sql = 'drop role %s' % role
 
-    try:
-        cursor.execute(sql)
-    except cx_Oracle.DatabaseError as exc:
-        error, = exc.args
-        msg[0] = 'Blergh, something went wrong while dropping the role - %s sql: %s' % (error.message, sql)
-        return False
-
-    msg[0] = 'The role (%s) has been successfully dropped' % role
-    return True
+    conn.execute_ddl(sql)
+    msg = 'The role (%s) has been successfully dropped' % role
+    module.exit_json(msg=msg, changed=conn.changed, ddls=conn.ddls)
 
 
 def main():
-
-    msg = ['']
     module = AnsibleModule(
         argument_spec = dict(
             oracle_home   = dict(required=False, aliases=['oh']),
             hostname      = dict(default='localhost'),
             port          = dict(default=1521, type="int"),
-            service_name  = dict(required=False, aliases = ['tns']),
+            service_name  = dict(required=False, aliases=['tns']),
             user          = dict(required=False, aliases=['username']),
             password      = dict(required=False, no_log=True),
             mode          = dict(default='normal', choices=["normal","sysdba"]),
-            role          = dict(default=None),
+            role          = dict(required=True, type='str'),
             state         = dict(default="present", choices=["present", "absent"]),
-            auth          = dict(default='none', choices=["none", "password", "external", "global", "application"]),
-            auth_conf     = dict(default=None)
+            auth          = dict(default='none', choices=["none", "password", "external", "global", "application"], aliases=['identified_method']),
+            auth_conf     = dict(default=None, aliases=['identified_value'])
         ),
-
+        required_together=[['user', 'password']],
+        supports_check_mode=True
     )
 
-    oracle_home = module.params["oracle_home"]
-    hostname = module.params["hostname"]
-    port = module.params["port"]
-    service_name = module.params["service_name"]
-    user = module.params["user"]
-    password = module.params["password"]
-    mode = module.params["mode"]
     role = module.params["role"]
     state = module.params["state"]
-    auth = module.params["auth"]
-    auth_conf = module.params["auth_conf"]
 
+    oc = oracleConnection(module)
 
-
-    if not cx_oracle_exists:
-        module.fail_json(msg="The cx_Oracle module is required. 'pip install cx_Oracle' should do the trick. If cx_Oracle is installed, make sure ORACLE_HOME & LD_LIBRARY_PATH is set")
-
-    conn = oracle_connect(module)
-    cursor = conn.cursor()
-
+    current_role = check_role_exists(oc, role)
     if state == 'present':
-        if not check_role_exists(module, msg, cursor, role, auth):
-            if create_role(module, msg, cursor, role, auth, auth_conf):
-                module.exit_json(msg=msg[0], changed=True)
-            else:
-                module.fail_json(msg=msg[0], changed=False)
-
-        elif modify_role(module, msg, cursor, role, auth, auth_conf):
-            module.exit_json(msg=msg[0], changed=True)
-
+        if not current_role:
+            create_role(oc, module)
         else:
-            module.fail_json(msg=msg[0], changed=False)
-
+            modify_role(oc, module, current_role)
 
     elif state == 'absent':
-        if check_role_exists(module, msg, cursor, role, auth):
-            if drop_role(module, msg, cursor, role):
-                module.exit_json(msg=msg[0], changed=True)
+        if current_role:
+            drop_role(oc, module)
         else:
-            module.exit_json(msg='The role (%s) doesn\'t exist' % role, changed=False)
+            module.exit_json(msg="The role (%s) doesn't exist" % role, changed=False)
 
-
-
-
-    module.exit_json(msg=msg[0], changed=False)
+    module.fail_json(msg='Unhandled exit', changed=oc.changed, ddls=oc.ddls)
 
 
 from ansible.module_utils.basic import *
 
-# In thise we do import from local project project sub-directory <project-dir>/module_utils
+# In these we do import from local project sub-directory <project-dir>/module_utils
 # While this file is placed in <project-dir>/library
-# No colletions are used
+# No collections are used
 try:
-    from ansible.module_utils.oracle_utils import oracle_connect
+    from ansible.module_utils.oracle_utils import oracleConnection
 except:
     pass
 
-# In thise we do import from collections
+# In these we do import from collections
 try:
-    from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_utils import oracle_connect
+    from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_utils import oracleConnection
 except:
     pass
 
