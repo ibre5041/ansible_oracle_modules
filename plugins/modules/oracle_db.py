@@ -336,7 +336,7 @@ else:
     cx_oracle_exists = True
 
 
-def get_version(module, msg, oracle_home):
+def get_version(module, oracle_home):
     command = '%s/bin/sqlplus -V' % (oracle_home)
     (rc, stdout, stderr) = module.run_command(command)
     if rc != 0:
@@ -357,7 +357,7 @@ def check_db_exists(module):
         sid = ''
     module.warn('gimanaged: %s' % gimanaged)
     if gimanaged:
-        if db_unique_name != None:
+        if db_unique_name:
             checkdb = db_unique_name
         else:
             checkdb = db_name
@@ -369,7 +369,7 @@ def check_db_exists(module):
         module.warn('srvctl config database: %s' % rc)
         if rc != 0:
             if 'PRCD-1229' in stdout: #<-- DB is created, but with a different ORACLE_HOME
-                msg='Database %s already exists in a different home. Stdout -> %s' % (db_name, stdout)
+                msg = 'Database %s already exists in a different home. Stdout -> %s' % (db_name, stdout)
                 module.fail_json(msg=msg, changed=False)
             elif '%s' % (db_name) in stdout: #<-- db doesn't exist
                 module.warn('Database %s does not exist' % checkdb)
@@ -444,26 +444,13 @@ def create_db(module):
     nodelist            = module.params["nodelist"]
     db_type             = module.params["db_type"]
     amm                 = module.params["amm"]
-    initparams          = module.params["initparams"]
+    initparams          = module.params["initparams"] or []
     customscripts       = module.params["customscripts"]
-    default_tablespace_type = module.params["default_tablespace_type"]
-    default_tablespace      = module.params["default_tablespace"]
-    default_temp_tablespace = module.params["default_temp_tablespace"]
-    archivelog          = module.params["archivelog"]
-    force_logging       = module.params["force_logging"]
-    supplemental_logging    = module.params["supplemental_logging"]
-    flashback           = module.params["flashback"]
-    datapatch           = module.params["datapatch"]
     domain              = module.params["domain"]
-    timezone            = module.params["timezone"]
     output              = module.params["output"]
-    state               = module.params["state"]
-    hostname            = module.params["hostname"]
-    port                = module.params["port"]
 
     paramslist = []
-    scriptlist = ''
-    
+
     for i in initparams:
         if i.lower().startswith('sga_target'):
             skip_memory = True
@@ -474,73 +461,73 @@ def create_db(module):
     else:
         skip_memory = False
 
-    command = "%s/bin/dbca -createDatabase -silent " % (oracle_home)
+    command = "%s/bin/dbca -createDatabase -silent " % oracle_home
     if responsefile is not None:
         if os.path.exists(responsefile):
-            command += ' -responseFile %s ' % (responsefile)
+            command += ' -responseFile %s ' % responsefile
         else:
-            msg='Responsefile %s doesn\'t exist' % (responsefile)
+            msg="Responsefile %s doesn't exist" % responsefile
             module.fail_json(msg=msg, changed=False)
 
     if dbconfig_type == 'RAC' and nodelist:
         nodelist = ",".join(nodelist)
-        command += ' -nodelist %s ' % (nodelist)
+        command += ' -nodelist %s ' % nodelist
     if template:
-        command += ' -templateName \"%s\"' % (template)
+        command += ' -templateName \"%s\"' % template
     if db_options:
         command += ' -dbOptions %s' % (",".join(db_options))
     if listeners:
         command += ' -listeners %s' % listeners
     if major_version > '11.2':
-        if cdb == True:
+        if cdb:
             command += ' -createAsContainerDatabase true '
-            if local_undo == True:
+            if local_undo:
                 command += ' -useLocalUndoForPDBs true'
             else:
                 command += ' -useLocalUndoForPDBs false'
         else:
             command += ' -createAsContainerDatabase false '
-    if datafile_dest != None:
-        command += ' -datafileDestination %s ' % (datafile_dest)
-    if recoveryfile_dest != None:
-        command += ' -recoveryAreaDestination %s ' % (recoveryfile_dest)
-    if storage_type != None:
-        command += ' -storageType %s ' % (storage_type)
+    if datafile_dest:
+        command += ' -datafileDestination %s ' % datafile_dest
+    if recoveryfile_dest:
+        command += ' -recoveryAreaDestination %s ' % recoveryfile_dest
+    if storage_type:
+        command += ' -storageType %s ' % storage_type
     if omf and storage_type == 'FS':
         command += ' -useOMF %s ' % str(omf).lower()
-    if dbconfig_type != None:
+    if dbconfig_type:
         if dbconfig_type == 'SI':
             dbconfig_type = 'SINGLE'
         if major_version == '12.2':
-            command += ' -databaseConfigType %s ' % (dbconfig_type)
+            command += ' -databaseConfigType %s ' % dbconfig_type
         elif major_version == '12.1':
-            command += ' -databaseConfType %s ' % (dbconfig_type)
+            command += ' -databaseConfType %s ' % dbconfig_type
     if dbconfig_type == 'RACONENODE':
         if racone_service is None:
             racone_service = db_name+'_ronserv'
-        command += ' -RACOneNodeServiceName %s ' % (racone_service)
-    if characterset != None:
-        command += ' -characterSet %s ' % (characterset)
+        command += ' -RACOneNodeServiceName %s ' % racone_service
+    if characterset:
+        command += ' -characterSet %s ' % characterset
     if memory_percentage and not skip_memory:
-        command += ' -memoryPercentage %s ' % (memory_percentage)
+        command += ' -memoryPercentage %s ' % memory_percentage
     if memory_totalmb and not skip_memory:
-        command += ' -totalMemory %s ' % (memory_totalmb)
+        command += ' -totalMemory %s ' % memory_totalmb
     if dbconfig_type == 'RAC':
-        if nodelist != None:
+        if nodelist:
             nodelist = ",".join(nodelist)
-            command += ' -nodelist %s ' % (nodelist)
-    if db_type != None:
-        command += ' -databaseType %s ' % (db_type)
-    if amm != None:
+            command += ' -nodelist %s ' % nodelist
+    if db_type:
+        command += ' -databaseType %s ' % db_type
+    if amm:
         if major_version == '12.2':
-            if amm == True:
+            if amm:
                 command += ' -memoryMgmtType AUTO '
             else:
                 command += ' -memoryMgmtType AUTO_SGA '
         elif major_version == '12.1':
             command += ' -automaticMemoryManagement %s ' % (str(amm).lower())
         elif major_version == '11.2':
-            if amm == True:
+            if amm:
                 command += ' -automaticMemoryManagement '
         elif major_version.startswith('19'):
             if amm:
@@ -548,18 +535,18 @@ def create_db(module):
             else:
                 command += ' -memoryMgmtType AUTO_SGA '
             
-    if customscripts is not None:
+    if customscripts:
         scriptlist = ",".join(customscripts)
-        command += ' -customScripts %s ' % (scriptlist)
+        command += ' -customScripts %s ' % scriptlist
 
-    command += ' -gdbName %s' % (db_name)
+    command += ' -gdbName %s' % db_name
 
     if sys_password:
-        command += ' -sysPassword \"%s\"' % (sys_password)
+        command += ' -sysPassword \"%s\"' % sys_password
     if system_password:
-        command += ' -systemPassword \"%s\"' % (system_password)
+        command += ' -systemPassword \"%s\"' % system_password
     else:
-        if os.path.exist(rspfile):
+        if responsefile and os.path.exists(responsefile):
             with open(responsefile) as rspfile:
                 for line in rspfile:
                     if re.match('systemPassword=.+', line):
@@ -568,15 +555,15 @@ def create_db(module):
                     system_password = sys_password # set system_password to sys_password when system password was not suplied
         else:
             system_password = sys_password
-        command += ' -systemPassword \"%s\"' % (system_password)
-    if dbsnmp_password is not None:
-        command += ' -dbsnmpPassword \"%s\"' % (dbsnmp_password)
+        command += ' -systemPassword \"%s\"' % system_password
+    if dbsnmp_password:
+        command += ' -dbsnmpPassword \"%s\"' % dbsnmp_password
     else:
         dbsnmp_password = sys_password
-        command += ' -dbsnmpPassword \"%s\"' % (dbsnmp_password)
+        command += ' -dbsnmpPassword \"%s\"' % dbsnmp_password
 
     if sid:
-        command += ' -sid %s' % (sid)
+        command += ' -sid %s' % sid
 
     if db_unique_name:
         paramslist.append('db_name=%s' % db_name)
@@ -615,45 +602,7 @@ def create_db(module):
             verbosemsg = 'STDOUT: %s,  COMMAND: %s' % (stdout, command)
             verboselist.append(verbosemsg)
             return True, verboselist
-            # module.exit_json(msg=verbosemsg, changed=True)
 
-    # elif rc == 0 and datapatch:
-    #     if run_datapatch(module, msg, oracle_home, db_name, db_unique_name, sys_password):
-    #         return True
-    # else:
-    #     return True
-
-# def run_datapatch(module, msg, oracle_home, db_name, db_unique_name, sys_password):
-#
-#     cursor = getconn(module,msg)
-#     sid_sql = 'select instance_name from v$instance'
-#     sid_ = execute_sql_get(module, cursor, sid_sql)
-#     os.environ['ORACLE_SID'] = sid_[0][0]
-#
-#     if major_version > '11.2':
-#         command = '%s/OPatch/datapatch -verbose' % (oracle_home)
-#         (rc, stdout, stderr) = module.run_command(command)
-#         if rc != 0:
-#             msg = 'Error - STDOUT: %s, STDERR: %s, COMMAND: %s' % (stdout, stderr, command)
-#             module.fail_json(msg=msg, changed=False)
-#         else:
-#             return True
-#     else:
-#         datapatch_sql = '''
-#         connect / as sysdba
-#         @?/rdbms/admin/catbundle.sql psu apply
-#         exit
-#         '''
-#         sqlplus_bin = '%s/bin/sqlplus' % (oracle_home)
-#         p = subprocess.Popen([sqlplus_bin,'/nolog'],stdin=subprocess.PIPE,
-#         stdout=subprocess.PIPE,stderr=subprocess.PIPE)
-#         (stdout,stderr) = p.communicate(datapatch_sql.encode('utf-8'))
-#         rc = p.returncode
-#         if rc != 0:
-#             msg = 'Error - STDOUT: %s, STDERR: %s, COMMAND: %s' % (stdout, stderr, datapatch_sql)
-#             module.fail_json(msg=msg, changed=False)
-#         else:
-#             return True
 
 def remove_db (module):
     oracle_home = module.params["oracle_home"]
@@ -698,137 +647,174 @@ def remove_db (module):
             msg = 'STDOUT: %s,  COMMAND: %s' % (stdout, command)
             module.exit_json(msg=msg, changed=True)
 
-def ensure_db_state (module):
+
+def ensure_db_state(module):
     module.warn('ensure_db_state')
-    oracle_home    = module.params["oracle_home"]
     db_name        = module.params["db_name"]
-    db_unique_name = module.params["db_unique_name"]
-    sid            = module.params["sid"]
     archivelog     = module.params["archivelog"]
     force_logging  = module.params["force_logging"]
-    supplemental_logging = module.params["supplemental_logging"]
     flashback      = module.params["flashback"]
-    default_tablespace_type = module.params["default_tablespace_type"]
+    supplemental_logging = module.params["supplemental_logging"]
+    default_tablespace_type = module.params["default_tablespace_type"].upper()
     default_tablespace = module.params["default_tablespace"]
     default_temp_tablespace = module.params["default_temp_tablespace"]
     timezone       = module.params["timezone"]
-    output         = module.params["output"]
 
-    conn = oracle_connect(module)
-    cursor = conn.cursor()
-    alterdb_sql = 'alter database'
+    wanted_set = set()
+    wanted_set.add(('log_mode', "ARCHIVELOG" if archivelog else "NOARCHIVELOG"))
+    wanted_set.add(('force_logging', "YES" if force_logging else "NO"))
+    wanted_set.add(('flashback_on', "YES" if flashback else "NO"))
+    wanted_set.add(('supplemental_logging', "YES" if supplemental_logging else "NO"))
+    wanted_set.add(('DEFAULT_TBS_TYPE', default_tablespace_type))
+    if default_tablespace:
+        wanted_set.add(('DEFAULT_PERMANENT_TABLESPACE', default_tablespace_type))
+    if default_temp_tablespace:
+        wanted_set.add(('DEFAULT_TEMP_TABLESPACE', default_temp_tablespace))
+    if timezone:
+        wanted_set.add(('timezone', timezone))
 
-    propsql = "select lower(property_value) from database_properties where property_name in ('DEFAULT_TBS_TYPE','DEFAULT_PERMANENT_TABLESPACE','DEFAULT_TEMP_TABLESPACE') order by 1"
-    tzsql = "select lower(property_value) from database_properties where property_name = 'DBTIMEZONE'"
+    conn = oracleConnection(module)
 
-    curr_time_zone = execute_sql_get(module, cursor, tzsql)
-    def_tbs_type,def_tbs,def_temp_tbs = execute_sql_get(module, cursor, propsql)
+    propsql = """
+    select property_name, property_value 
+    from database_properties 
+    where property_name in ('DEFAULT_TBS_TYPE','DEFAULT_PERMANENT_TABLESPACE','DEFAULT_TEMP_TABLESPACE', 'DBTIMEZONE') 
+    order by 1"""
+
+    result = conn.execute_select(propsql, {}, fetchone=False)
+    db_parameters = dict(result)
+
+    #tzsql = "select property_value from database_properties where property_name = 'DBTIMEZONE'"
+
+    curr_time_zone = db_parameters['DBTIMEZONE'].upper()
+    def_tbs_type   = db_parameters['DEFAULT_TBS_TYPE'].upper()
+    def_tbs        = db_parameters['DEFAULT_PERMANENT_TABLESPACE'].upper()
+    def_temp_tbs   = db_parameters['DEFAULT_TEMP_TABLESPACE'].upper()
+
+    # def_tbs_type,def_tbs,def_temp_tbs = execute_sql_get(module, cursor, propsql)
+
     israc_sql = 'select parallel, instance_name, host_name from v$instance'
-    israc_ = execute_sql_get(module, cursor, israc_sql)
-    instance_name = israc_[0][1]
-    host_name = israc_[0][2]
+    result = conn.execute_select_to_dict(israc_sql, {}, fetchone=True)
+    db_parameters.update(result)
+    #instance_name = israc_[0][1]
+    #host_name = israc_[0][2]
+    israc         = bool(db_parameters['parallel'] != 'NO')
+    instance_name = db_parameters['instance_name']
+    host_name     = db_parameters['host_name']
+
 
     change_restart_sql = []
     change_db_sql = []
-    supp_log_check_sql = 'select SUPPLEMENTAL_LOG_DATA_MIN,SUPPLEMENTAL_LOG_DATA_PL,SUPPLEMENTAL_LOG_DATA_SR,SUPPLEMENTAL_LOG_DATA_PK,SUPPLEMENTAL_LOG_DATA_UI from v$database'
-    # No column SUPPLEMENTAL_LOG_DATA_SR in 12.2 database
+
+    # NOTE: No column SUPPLEMENTAL_LOG_DATA_SR in 12.2 database
+    supp_log_check_sql = """
+        select SUPPLEMENTAL_LOG_DATA_MIN
+        ,SUPPLEMENTAL_LOG_DATA_PL
+        ,SUPPLEMENTAL_LOG_DATA_SR
+        ,SUPPLEMENTAL_LOG_DATA_PK
+        ,SUPPLEMENTAL_LOG_DATA_UI from v$database
+    """
     supp_log_check_sql = 'select SUPPLEMENTAL_LOG_DATA_MIN from v$database'
-
     log_check_sql = 'select log_mode, force_logging, flashback_on from v$database'
-    supp_log_check_ = execute_sql_get(module, cursor, supp_log_check_sql)
-    log_check_ = execute_sql_get(module, cursor, log_check_sql)
 
-    if israc_[0][0] == 'NO':
-        israc = False
-    else:
-        israc = True
+    log_sql = 'select SUPPLEMENTAL_LOG_DATA_MIN as supplemental_logging, log_mode, force_logging, flashback_on from v$database'
+    result = conn.execute_select_to_dict(log_sql, {}, fetchone=True)
+    db_parameters.update(result)
+    c_supplemental_log_data_min = db_parameters['supplemental_logging']
+    c_log_mode      = db_parameters['log_mode']
+    c_force_logging = db_parameters['force_logging']
+    c_flashback_on  = db_parameters['flashback_on']
 
-    if archivelog == True:
+    #supp_log_check_ = execute_sql_get(module, cursor, supp_log_check_sql)
+    #log_check_ = execute_sql_get(module, cursor, log_check_sql)
+
+    if archivelog:
         archcomp = 'ARCHIVELOG'
-        archsql = alterdb_sql + ' archivelog'
+        archsql = 'alter database archivelog'
     else:
         archcomp = 'NOARCHIVELOG'
-        archsql = alterdb_sql + ' noarchivelog'
+        archsql = 'alter database noarchivelog'
 
-    if force_logging == True:
+    if force_logging:
         flcomp = 'YES'
-        flsql = alterdb_sql + ' force logging'
+        flsql = 'alter database force logging'
     else:
         flcomp = 'NO'
-        flsql = alterdb_sql +  ' no force logging'
+        flsql = 'alter database no force logging'
 
-    if flashback == True:
+    if flashback:
         fbcomp = 'YES'
-        fbsql = alterdb_sql + ' flashback on'
+        fbsql = 'alter database flashback on'
     else:
         fbcomp = 'NO'
-        fbsql = alterdb_sql +  ' flashback off'
+        fbsql = 'alter database flashback off'
 
-    if supplemental_logging == True:
+    if supplemental_logging:
         slcomp = 'YES'
-        slsql = alterdb_sql + ' add supplemental log data'
+        slsql = 'alter database add supplemental log data'
     else:
         slcomp = 'NO'
-        slsql = alterdb_sql +  ' drop supplemental log data'
+        slsql = 'alter database drop supplemental log data'
 
-    if def_tbs_type[0] != default_tablespace_type:
-        deftbstypesql = 'alter database set default %s tablespace ' % (default_tablespace_type)
+    if def_tbs_type != default_tablespace_type:
+        deftbstypesql = 'alter database set default %s tablespace ' % default_tablespace_type
         change_db_sql.append(deftbstypesql)
 
-    if default_tablespace is not None and def_tbs[0] != default_tablespace:
-        deftbssql = 'alter database default tablespace %s' % (default_tablespace)
+    if default_tablespace and def_tbs != default_tablespace.upper():
+        deftbssql = 'alter database default tablespace %s' % default_tablespace
         change_db_sql.append(deftbssql)
 
-    if default_temp_tablespace is not None and def_temp_tbs[0] != default_temp_tablespace:
-        deftempsql = 'alter database default temporary tablespace %s' % (default_temp_tablespace)
+    if default_temp_tablespace and def_temp_tbs != default_temp_tablespace.upper():
+        deftempsql = 'alter database default temporary tablespace %s' % default_temp_tablespace
         change_db_sql.append(deftempsql)
 
-    if timezone is not None and curr_time_zone[0][0] != timezone:
-        deftzsql = 'alter database set time_zone = \'%s\'' % (timezone)
+    if timezone and curr_time_zone != timezone.upper():
+        deftzsql = "alter database set time_zone = '%s'" % timezone
         change_db_sql.append(deftzsql)
 
-    if log_check_[0][0] != archcomp:
+    if c_log_mode != archcomp:
         change_restart_sql.append(archsql)
 
-    if log_check_[0][1] != flcomp:
+    if c_force_logging != flcomp:
         change_db_sql.append(flsql)
 
-    if log_check_[0][2] != fbcomp:
+    if c_flashback_on != fbcomp:
         change_db_sql.append(fbsql)
 
-    if supp_log_check_[0][0] != slcomp:
+    if c_supplemental_log_data_min != slcomp:
         change_db_sql.append(slsql)
 
+    changes = wanted_set.difference(set(db_parameters.items()))
+
     if change_db_sql or change_restart_sql:
+        # Flashback database needs to be turned off before archivelog is turned off
+        if c_log_mode == 'ARCHIVELOG' and c_flashback_on == 'YES' and not archivelog and not flashback:
+            # <- Apply changes that does not require a restart
+            if change_db_sql:
+                ddls = apply_norestart_changes(module, change_db_sql)
 
-        if log_check_[0][0] == 'ARCHIVELOG' and log_check_[0][2] == 'YES' and not archivelog and not flashback: # Flashback database needs to be turned off before archivelog is turned off
-
-            if change_db_sql: # <- Apply changes that does not require a restart
-                apply_norestart_changes(module, change_db_sql)
-
-            if change_restart_sql: # <- Apply changes that requires a restart
-                apply_restart_changes(module, instance_name, host_name, israc, change_restart_sql)
+            # <- Apply changes that requires database in mount state
+            if change_restart_sql:
+                ddls = apply_restart_changes(module, instance_name, host_name, israc, change_restart_sql)
         else:
-            if change_restart_sql: # <- Apply changes that requires a restart
+            # <- Apply changes that requires database in mount state
+            if change_restart_sql:
                 apply_restart_changes(module, instance_name, host_name, israc, change_restart_sql)
 
-            if change_db_sql: # <- Apply changes that does not require a restart
+            # <- Apply changes that does not require a restart
+            if change_db_sql:
                 apply_norestart_changes(module, change_db_sql)
 
-        msg = ('Database %s has been put in the intended state - Archivelog: %s, Force Logging: %s, Flashback: %s, Supplemental Logging: %s, Timezone: %s' %
-                (db_name, archivelog,force_logging,flashback,supplemental_logging, timezone))
+        msg = 'Database %s has been put in the intended state - Archivelog: %s, Force Logging: %s, Flashback: %s, Supplemental Logging: %s, Timezone: %s' %\
+                (db_name, archivelog,force_logging,flashback,supplemental_logging, timezone)
         module.exit_json(msg=msg, changed=True)
     else:
         if newdb:
             msg = 'Database %s successfully created created (%s) ' % (db_name, archcomp)
-            if output == 'verbose':
-                msg += ' ,'.join(verboselist)
-            changed = True
         else:
-            msg = ('Database %s already exists and is in the intended state - Archivelog: %s, Force Logging: %s, Flashback: %s, Supplemental Logging: %s, Timezone: %s' %
-                    (db_name, archivelog,force_logging,flashback, supplemental_logging, timezone))
-            changed = False
-        module.exit_json(msg=msg, changed=changed)
+            msg = 'Database %s already exists and is in the intended state - Archivelog: %s, Force Logging: %s, Flashback: %s, Supplemental Logging: %s, Timezone: %s' %\
+                    (db_name, archivelog, force_logging, flashback, supplemental_logging, timezone)
+        module.exit_json(msg=msg, changed=newdb)
 
 
 def apply_restart_changes(module, instance_name, host_name, israc, change_restart_sql):
@@ -837,40 +823,25 @@ def apply_restart_changes(module, instance_name, host_name, israc, change_restar
     db_name     = module.params["db_name"]
     db_unique_name = module.params["db_unique_name"]
     sid           = module.params["sid"]
-    output      = module.params["output"]
 
-    if stop_db(module, oracle_home, db_name, db_unique_name, sid):
-        if start_instance(module, oracle_home, db_name, db_unique_name, sid, 'mount', instance_name, host_name, israc):
-            time.sleep(10) #<- To allow the DB to register with the listener
-            conn = oracle_connect(module)
-            cursor = conn.cursor()
+    stop_db(module, oracle_home, db_name, db_unique_name, sid)
+    start_instance(module, oracle_home, db_name, db_unique_name, sid, 'mount', instance_name, israc)
+    time.sleep(10) #<- To allow the DB to register with the listener
+    conn = oracleConnection(module)
 
-            for sql in change_restart_sql:
-                execute_sql(module, cursor, sql)
-                if stop_db(module, oracle_home, db_name, db_unique_name, sid):
-                    if start_db(module, oracle_home, db_name, db_unique_name, sid):
-                        if newdb:
-                            msg = 'Database %s successfully created: (%s)' % (db_name, sql)
-                            if output == 'verbose':
-                                msg += ' ,'.join(verboselist)
-                            changed = True
-                        else:
-                            msg = 'Database %s has been put in the intended state - (%s) ' % (db_name, sql)
-                            if output == 'verbose':
-                                msg += ' ,'.join(verboselist)
-                            changed = True
-                        module.warn(msg)
+    for sql in change_restart_sql:
+        conn.execute_ddl(sql)
+        stop_db(module, oracle_home, db_name, db_unique_name, sid)
+        start_db(module, oracle_home, db_name, db_unique_name, sid)
+    return conn.ddls
 
-
-def apply_norestart_changes(module, change_db_sql):
-    conn = oracle_connect(module)
-    cursor = conn.cursor()
+def apply_norestart_changes(conn, change_db_sql):
     for sql in change_db_sql:
-        execute_sql(module, cursor, sql)
+        conn.execute_ddl(sql)
+    return conn.ddls
 
 
 def stop_db(module, oracle_home, db_name, db_unique_name, sid):
-    module.warn('stop_db')
     if gimanaged:
         if db_unique_name is not None:
             db_name = db_unique_name
@@ -879,10 +850,8 @@ def stop_db(module, oracle_home, db_name, db_unique_name, sid):
         if rc != 0:
             msg = 'Error - STDOUT: %s, STDERR: %s, COMMAND: %s' % (stdout, stderr, command)
             module.fail_json(msg=msg, changed=False)
-        else:
-            return True
     else:
-        if sid is not None:
+        if sid:
             os.environ['ORACLE_SID'] = sid
         else:
             os.environ['ORACLE_SID'] = db_name
@@ -891,32 +860,26 @@ def stop_db(module, oracle_home, db_name, db_unique_name, sid):
         shutdown immediate;
         exit
         '''
-        sqlplus_bin = '%s/bin/sqlplus' % (oracle_home)
-        p = subprocess.Popen([sqlplus_bin,'/nolog'],stdin=subprocess.PIPE,
-        stdout=subprocess.PIPE,stderr=subprocess.PIPE)
-        (stdout,stderr) = p.communicate(shutdown_sql.encode('utf-8'))
+        sqlplus_bin = '%s/bin/sqlplus' % oracle_home
+        p = subprocess.Popen([sqlplus_bin,'/nolog'], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        (stdout, stderr) = p.communicate(shutdown_sql.encode('utf-8'))
         rc = p.returncode
         if rc != 0:
             msg = 'Error - STDOUT: %s, STDERR: %s, COMMAND: %s' % (stdout, stderr, shutdown_sql)
             module.fail_json(msg=msg, changed=False)
-        else:
-            return True
 
 
 def start_db (module, oracle_home, db_name, db_unique_name, sid):
-
     if gimanaged:
         if db_unique_name is not None:
             db_name = db_unique_name
-        command = '%s/bin/srvctl start database -d %s' % (oracle_home,db_name)
+        command = '%s/bin/srvctl start database -d %s' % (oracle_home, db_name)
         (rc, stdout, stderr) = module.run_command(command)
         if rc != 0:
             msg = 'Error - STDOUT: %s, STDERR: %s, COMMAND: %s' % (stdout, stderr, command)
             module.fail_json(msg=msg, changed=False)
-        else:
-            return True
     else:
-        if sid is not None:
+        if sid:
             os.environ['ORACLE_SID'] = sid
         else:
             os.environ['ORACLE_SID'] = db_name
@@ -927,36 +890,30 @@ def start_db (module, oracle_home, db_name, db_unique_name, sid):
         exit
         '''
         sqlplus_bin = '%s/bin/sqlplus' % (oracle_home)
-        p = subprocess.Popen([sqlplus_bin,'/nolog'],stdin=subprocess.PIPE,
-        stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+        p = subprocess.Popen([sqlplus_bin, '/nolog'], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         (stdout,stderr) = p.communicate(startup_sql.encode('utf-8'))
         rc = p.returncode
         if rc != 0:
             msg = 'Error - STDOUT: %s, STDERR: %s, COMMAND: %s' % (stdout, stderr, startup_sql)
             module.fail_json(msg=msg, changed=False)
-        else:
-            return True
 
 
-def start_instance(module, oracle_home, db_name, db_unique_name,sid, open_mode, instance_name, host_name, israc):
-
+def start_instance(module, oracle_home, db_name, db_unique_name, sid, open_mode, instance_name, israc):
     if gimanaged:
-        if db_unique_name is not None:
+        if db_unique_name:
             db_name = db_unique_name
         if israc:
             command = '%s/bin/srvctl start instance  -d %s -i %s' % (oracle_home, db_name, instance_name)
         else:
             command = '%s/bin/srvctl start database -d %s ' % (oracle_home, db_name)
-        if open_mode is not None:
-            command += ' -o %s ' %  (open_mode)
+        if open_mode:
+            command += ' -o %s ' % open_mode
         (rc, stdout, stderr) = module.run_command(command)
         if rc != 0:
             msg = 'Error - STDOUT: %s, STDERR: %s, COMMAND: %s' % (stdout, stderr, command)
             module.fail_json(msg=msg, changed=False)
-        else:
-            return True
     else:
-        if sid is not None:
+        if sid:
             os.environ['ORACLE_SID'] = sid
         else:
             os.environ['ORACLE_SID'] = db_name
@@ -966,45 +923,16 @@ def start_instance(module, oracle_home, db_name, db_unique_name,sid, open_mode, 
         startup mount;
         exit
         '''
-        sqlplus_bin = '%s/bin/sqlplus' % (oracle_home)
-        p = subprocess.Popen([sqlplus_bin,'/nolog'],stdin=subprocess.PIPE,
-        stdout=subprocess.PIPE,stderr=subprocess.PIPE)
-        (stdout,stderr) = p.communicate(startup_sql.encode('utf-8'))
+        sqlplus_bin = '%s/bin/sqlplus' % oracle_home
+        p = subprocess.Popen([sqlplus_bin, '/nolog'], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        (stdout, stderr) = p.communicate(startup_sql.encode('utf-8'))
         rc = p.returncode
         if rc != 0:
-            msg = 'Error - STDOUT: %s, STDERR: %s, COMMAND: %s' % (stdout, stderr, shutdown_sql)
+            msg = 'Error - STDOUT: %s, STDERR: %s, COMMAND: %s' % (stdout, stderr, startup_sql)
             module.fail_json(msg=msg, changed=False)
-        else:
-            return True
 
-
-def execute_sql_get(module, cursor, sql):
-
-    try:
-        cursor.execute(sql)
-        result = (cursor.fetchall())
-    except cx_Oracle.DatabaseError as exc:
-        error, = exc.args
-        msg = 'Something went wrong while executing sql_get - %s sql: %s' % (error.message, sql)
-        module.fail_json(msg=msg, changed=False)
-        return False
-    return result
-
-def execute_sql(module, cursor, sql):
-
-    try:
-        cursor.execute(sql)
-    except cx_Oracle.DatabaseError as exc:
-        error, = exc.args
-        msg = 'Something went wrong while executing sql - %s sql: %s' % (error.message, sql)
-        module.fail_json(msg=msg, changed=False)
-        return False
-    return True
 
 def main():
-
-    msg = ['']
-    cursor = None
     global gimanaged
     global major_version
     global user
@@ -1024,114 +952,78 @@ def main():
 
     module = AnsibleModule(
         argument_spec = dict(
-            oracle_home         = dict(default=None, aliases = ['oh']),
-            db_name             = dict(required=True, aliases = ['db','database_name','name']),
+            oracle_home         = dict(default=None, aliases=['oh']),
+            db_name             = dict(required=True, aliases=['db', 'database_name', 'name']),
             sid                 = dict(required=False),
-            db_unique_name      = dict(required=False, aliases = ['dbunqn','unique_name']),
-            sys_password        = dict(required=False, no_log=True, aliases = ['syspw','sysdbapassword','sysdbapw']),
-            system_password     = dict(required=False, no_log=True, aliases = ['systempw']),
-            dbsnmp_password     = dict(required=False, no_log=True, aliases = ['dbsnmppw']),
+            db_unique_name      = dict(required=False, aliases=['dbunqn','unique_name']),
+            sys_password        = dict(required=False, no_log=True, aliases=['syspw', 'sysdbapassword', 'sysdbapw']),
+            system_password     = dict(required=False, no_log=True, aliases=['systempw']),
+            dbsnmp_password     = dict(required=False, no_log=True, aliases=['dbsnmppw']),
             responsefile        = dict(required=False),
             template            = dict(default='General_Purpose.dbc'),
             db_options          = dict(required=False, type='list'),
             listeners           = dict(required=False, aliases=['listener']),
-            cdb                 = dict(default=False, type='bool', aliases= ['container']),
+            cdb                 = dict(default=False, type='bool', aliases=['container']),
             local_undo          = dict(default=True, type='bool'),
             datafile_dest       = dict(required=False, aliases= ['dfd']),
             recoveryfile_dest   = dict(required=False, aliases= ['rfd']),
-            storage_type        = dict(default='FS', aliases= ['storage'], choices = ['FS','ASM']),
+            storage_type        = dict(default='FS', aliases= ['storage'], choices=['FS', 'ASM']),
             omf                 = dict(default=True, type='bool'),
-            dbconfig_type       = dict(default='SI', choices = ['SI','RAC','RACONENODE']),
-            db_type             = dict(default='MULTIPURPOSE',choices = ['MULTIPURPOSE','DATA_WAREHOUSING','OLTP']),
+            dbconfig_type       = dict(default='SI', choices = ['SI', 'RAC', 'RACONENODE']),
+            db_type             = dict(default='MULTIPURPOSE',choices = ['MULTIPURPOSE', 'DATA_WAREHOUSING', 'OLTP']),
             racone_service      = dict(required=False,aliases = ['ron_service']),
             characterset        = dict(default='AL32UTF8'),
             memory_percentage   = dict(required=False),
             memory_totalmb      = dict(default='2048'),
             nodelist            = dict(required=False, type='list'),
-            amm                 = dict(default=False, type='bool', aliases = ['automatic_memory_management']),
+            amm                 = dict(default=False, type='bool', aliases=['automatic_memory_management']),
             initparams          = dict(required=False, type='list'),
             customscripts       = dict(required=False, type='list'),
-            default_tablespace_type  = dict(default='smallfile',choices = ['smallfile','bigfile']),
+            default_tablespace_type  = dict(default='smallfile', choices=['smallfile', 'bigfile']),
             default_tablespace  = dict(required=False),
             default_temp_tablespace  = dict(required=False),
             archivelog          = dict(default=False, type='bool'),
             force_logging       = dict(default=False, type='bool'),
-            supplemental_logging       = dict(default=False, type='bool'),
+            supplemental_logging = dict(default=False, type='bool'),
             flashback           = dict(default=False, type='bool'),
             datapatch           = dict(default=True, type='bool'),
             domain                = dict(required=False),
             timezone            = dict(required=False),
-            output              = dict(default="short", choices = ["short","verbose"]),
-            state               = dict(default="present", choices = ["present", "absent", "started"]),
-            hostname            = dict(required=False, default = 'localhost', aliases = ['host']),
-            port                = dict(required=False, default = 1521, type="int"),
+            output              = dict(default="short", choices=["short", "verbose"]),
+            state               = dict(default="present", choices=["present", "absent", "started"]),
+            hostname            = dict(required=False, default='localhost', aliases=['host']),
+            port                = dict(required=False, default=1521, type="int"),
 
         ),
-        mutually_exclusive = [['memory_percentage', 'memory_totalmb']],
-        supports_check_mode = False,
-        required_if = [
+        mutually_exclusive=[['memory_percentage', 'memory_totalmb']],
+        supports_check_mode=False,
+        required_if=[
             ["state", "present", ["datafile_dest", "recoveryfile_dest", "sys_password"]]
         ]
     )
 
     oracle_home         = module.params["oracle_home"]
     db_name             = module.params["db_name"]
-    # sid                 = module.params["sid"]
     db_unique_name      = module.params["db_unique_name"]
     sys_password        = module.params["sys_password"]
-    # system_password     = module.params["system_password"]
-    # dbsnmp_password     = module.params["dbsnmp_password"]
-    # responsefile        = module.params["responsefile"]
-    # template            = module.params["template"]
-    # cdb                 = module.params["cdb"]
-    # local_undo          = module.params["local_undo"]
-    # datafile_dest       = module.params["datafile_dest"]
-    # recoveryfile_dest   = module.params["recoveryfile_dest"]
-    # storage_type        = module.params["storage_type"]
-    # dbconfig_type       = module.params["dbconfig_type"]
-    # racone_service      = module.params["racone_service"]
-    # characterset        = module.params["characterset"]
-    # memory_percentage   = module.params["memory_percentage"]
-    # memory_totalmb      = module.params["memory_totalmb"]
-    # nodelist            = module.params["nodelist"]
-    # db_type             = module.params["db_type"]
-    # amm                 = module.params["amm"]
-    # initparams          = module.params["initparams"]
-    # customscripts       = module.params["customscripts"]
-    # default_tablespace_type = module.params["default_tablespace_type"]
-    # default_tablespace      = module.params["default_tablespace"]
-    # default_temp_tablespace = module.params["default_temp_tablespace"]
-    # archivelog          = module.params["archivelog"]
-    # force_logging       = module.params["force_logging"]
-    # supplemental_logging    = module.params["supplemental_logging"]
-    # flashback           = module.params["flashback"]
-    # datapatch           = module.params["datapatch"]
     domain              = module.params["domain"]
-    # timezone            = module.params["timezone"]
-    # output              = module.params["output"]
     state               = module.params["state"]
-    # hostname            = module.params["hostname"]
-    # port                = module.params["port"]
 
     if oracle_home is not None:
         os.environ['ORACLE_HOME'] = oracle_home.rstrip('/')
     elif 'ORACLE_HOME' in os.environ:
-        oracle_home     = os.environ['ORACLE_HOME']
+        oracle_home = os.environ['ORACLE_HOME']
+        module.params["oracle_home"] = os.environ['ORACLE_HOME']
     else:
         msg = 'ORACLE_HOME variable not set. Please set it and re-run the command'
         module.fail_json(msg=msg, changed=False)
-
-    if not cx_oracle_exists:
-        msg = "The cx_Oracle module is required. 'pip install cx_Oracle' should do the trick. If cx_Oracle is installed, make sure ORACLE_HOME & LD_LIBRARY_PATH is set"
-        module.fail_json(msg=msg)
-
 
     # Decide whether to use srvctl or sqlplus
     if os.path.exists('/etc/oracle/olr.loc'):
         gimanaged = True
     else:
         gimanaged = False
-    gimanaged = False
+    #gimanaged = False # TODO REMOVE
 
     # Connection details for database
     user = 'sys'
@@ -1155,7 +1047,7 @@ def main():
     module.params["mode"] = 'sysdba'                
 
     # Get the Oracle version
-    major_version = get_version(module,msg,oracle_home)
+    major_version = get_version(module, oracle_home)
 
     if state == 'started':
         msg = "oracle_home: %s db_name: %s sid: %s db_unique_name: %s" % (oracle_home, db_name, sid, db_unique_name)
@@ -1186,12 +1078,12 @@ def main():
     elif state == 'absent':
         if check_db_exists(module):
             if remove_db(module):
-                msg = 'Successfully removed database %s' % (db_name)
+                msg = 'Successfully removed database %s' % db_name
                 module.exit_json(msg=msg, changed=True)
             else:
                 module.fail_json(msg=msg, changed=False)
         else:
-            msg = 'Database %s doesn\'t exist' % (db_name)
+            msg = "Database %s doesn't exist" % db_name
             module.exit_json(msg=msg, changed=False)
 
     module.exit_json(msg="Unhandled exit", changed=False)
@@ -1199,17 +1091,19 @@ def main():
 
 from ansible.module_utils.basic import *
 
-# In thise we do import from local project project sub-directory <project-dir>/module_utils
+# In these we do import from local project sub-directory <project-dir>/module_utils
 # While this file is placed in <project-dir>/library
-# No colletions are used
+# No collections are used
 try:
-    from ansible.module_utils.oracle_utils import oracle_connect
+    from ansible.module_utils.oracle_utils import oracleConnection
+    from ansible.module_utils.oracle_homes import oracle_homes
 except:
     pass
 
-# In thise we do import from collections
+# In these we do import from collections
 try:
-    from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_utils import oracle_connect
+    from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_utils import oracleConnection
+    from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_homes import oracle_homes
 except:
     pass
 
