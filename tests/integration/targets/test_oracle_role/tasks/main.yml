@@ -1,0 +1,7 @@
+---
+- import_tasks: "create_delete.yml"
+- import_tasks: "parameter.yml"
+- import_tasks: "change_identified_method.yml"
+- import_tasks: "every_identified_method.yml"
+- import_tasks: "check_mode.yml"
+...
