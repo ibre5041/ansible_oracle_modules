@@ -138,10 +138,10 @@ def check_pdb_exists(conn, pdb_name):
 
 def unplug_pdb(conn, module):
     pdb_name = module.params['pdb_name']
-    unplug_dest = module.params['unplug_dest']
+    plug_file = module.params['plug_file'] # clone from XML
     run_sql = []
     close_sql = 'alter pluggable database %s close immediate instances=all' % pdb_name
-    unplug_sql = "alter pluggable database %s unplug into '%s'" % (pdb_name, unplug_dest)
+    unplug_sql = "alter pluggable database %s unplug into '%s'" % (pdb_name, plug_file)
     drop_sql = 'drop pluggable database %s keep datafiles ' % pdb_name
 
     run_sql.append(close_sql)
@@ -155,38 +155,47 @@ def unplug_pdb(conn, module):
 
 def create_pdb(conn, module):
     pdb_name = module.params['pdb_name']
-    unplug_dest = module.params['unplug_dest']
-    datafile_dest = module.params['datafile_dest']
-    pdb_admin_username = module.params['pdb_admin_username']
+    plug_file = module.params['plug_file'] # clone from XML
+    sourcedb = module.params['sourcedb'] # clone from DB
+    pdb_admin_username = module.params['pdb_admin_username'] # clone form seed
     pdb_admin_password = module.params['pdb_admin_password']
+    roles = module.params['roles']
+
+    datafile_dest = module.params['datafile_dest']
     file_name_convert = module.params['file_name_convert']
     save_state = module.params['save_state']
     run_sql = []
+
+    createsql = 'create pluggable database %s' % pdb_name
     opensql = 'alter pluggable database %s open instances=all' % pdb_name
-    createsql = 'create pluggable database %s ' % pdb_name
 
-    createsql += ' admin user %s identified by \"%s\" ' % (pdb_admin_username, pdb_admin_password)
+    if plug_file:
+        # TODO: copy/nocopy tempfile reuse
+        createsql += " using %s"
+    elif sourcedb:
+        # TODO: snapshot copy
+        createsql += " from %s"
+    elif pdb_admin_username:
+        createsql += " admin user %s identified by \"%s\" " % (pdb_admin_username, pdb_admin_password)
+    else:
+        module.fail_json("Missing one parameter: [plug_file, sourcedb, pdb_admin_password]", changed=conn.changed, ddls=conn.ddls)
 
-    if unplug_dest:
-        createsql += " using '%s' " % unplug_dest
-        createsql += " tempfile reuse"
+    if roles:
+        createsql += ' roles = (%s)' % ','.join(roles)
+
+    if file_name_convert:
+        quoted = ",".join("'" + p + "'" for p in file_name_convert.split(","))
+        createsql += ' file_name_convert = (%s)' % quoted
 
     if datafile_dest:
         createsql += " create_file_dest = '%s'" % datafile_dest
-
-    if file_name_convert and unplug_dest is not None:
-        quoted = ",".join("'" + p + "'" for p in file_name_convert.split(","))
-        createsql += ' file_name_convert = (%s) copy' % quoted
-
-    if file_name_convert is not None and unplug_dest is None:
-        quoted = ",".join("'" + p + "'" for p in file_name_convert.split(","))
-        createsql += ' file_name_convert = (%s)' % quoted
 
     run_sql.append(createsql)
     run_sql.append(opensql)
     for sql in run_sql:
         conn.execute_ddl(sql)
 
+    # TODO: select a.name,b.state from v$pdbs a , dba_pdb_saved_states b where a.con_id = b.con_id;
     if save_state:
         sql = 'alter pluggable database %s save state instances=all' % pdb_name
         conn.execute_ddl(sql)
@@ -209,81 +218,82 @@ def remove_pdb(conn, module):
 def ensure_pdb_state(conn, module):
     pdb_name = module.params['pdb_name']
     state = module.params['state']
-    current_state = []
-    wanted_state = []
-    change_db_sql = []
-    total_sql = []
+    default_tablespace_type = module.params['default_tablespace_type']
+    default_tablespace = module.params['default_tablespace']
+    default_temp_tablespace = module.params['default_temp_tablespace']
+    timezone = module.params['timezone']
+    save_state = module.params['save_state']
+
+    changed_state = conn.changed
+    conn.execute_ddl('ALTER SESSION SET CONTAINER = %s' % pdb_name)
+    conn.changed = changed_state
 
     sql = 'select name, upper(open_mode) open_mode, upper(restricted) restricted from v$pdbs where upper(name) = :pdb_name'
-    state_now = conn.execute_select_to_dict(sql, {"pdb_name": pdb_name}, fetchone=True)
+    current_state = conn.execute_select_to_dict(sql, {"pdb_name": pdb_name}, fetchone=True)
 
     propsql = "select property_name, property_value " \
               "from database_properties " \
               "where property_name in ('DEFAULT_TBS_TYPE','DEFAULT_PERMANENT_TABLESPACE','DEFAULT_TEMP_TABLESPACE', 'DBTIMEZONE') " \
               "order by 1"
     prop = conn.execute_select(propsql, None, fetchone=False)
-    state_now.update(dict(prop))
+    current_state.update(dict(prop))
 
     #tzsql = "select lower(property_value) from database_properties where property_name = 'DBTIMEZONE'"
     #curr_time_zone = conn.execute_select_to_dict(tzsql, None, fetchone=True)
     #def_tbs_type,def_tbs,def_temp_tbs = (1, 2, 3)
 
-    ensure_sql = 'alter pluggable database %s ' % pdb_name
+    change_db_sql = []
 
+    wanted_state = {}
+    ensure_sql = 'alter pluggable database %s ' % pdb_name
     if state in ('present', 'open', 'read_write'):
-        wanted_state = [('read write', 'no')]
+        wanted_state.update({'open_mode': 'READ WRITE'})
         ensure_sql += ' open force'
     elif state == 'closed':
-        wanted_state = [('mounted', None)]
+        wanted_state.update({'open_mode': 'CLOSED'})
         ensure_sql += ' close immediate'
     elif state == 'read_only':
-        wanted_state = [('read only', 'no')]
+        wanted_state.update({'open_mode': 'READ ONLY'})
         ensure_sql += 'open read only force'
-    elif state == 'restricted':
-        wanted_state = [('read write', 'yes')]
-        ensure_sql += 'open restricted force'
+    # elif state == 'restricted':
+    #     wanted_state = [('read write', 'yes')]
+    #     ensure_sql += 'open restricted force'
 
-    # if def_tbs_type[0] != default_tablespace_type:
-    #     deftbstypesql = 'alter database set default %s tablespace' % (default_tablespace_type)
-    #     change_db_sql.append(deftbstypesql)
-    #
-    # if default_tablespace is not None and def_tbs[0] != default_tablespace:
-    #     deftbssql = 'alter database default tablespace %s' % (default_tablespace)
-    #     change_db_sql.append(deftbssql)
-    #
-    # if default_temp_tablespace is not None and def_temp_tbs[0] != default_temp_tablespace:
-    #     deftempsql = 'alter database default temporary tablespace %s' % (default_temp_tablespace)
-    #     change_db_sql.append(deftempsql)
-    #
-    # if timezone is not None and curr_time_zone[0][0] != timezone:
-    #     deftzsql = 'alter database set time_zone = \'%s\'' % (timezone)
-    #     change_db_sql.append(deftzsql)
-    #
-    # if len(change_db_sql) > 0 :
-    #     total_sql.append(change_db_sql)
-    #     for sql in total_sql:
-    #         execute_sql(module, msg, cursor, sql)
-    #     dbchange = True
+    if default_tablespace_type and current_state['DEFAULT_TBS_TYPE'].upper() != default_tablespace_type.upper():
+        sql = 'alter PLUGGABLE database set default %s tablespace' % default_tablespace_type
+        change_db_sql.append(sql)
+        wanted_state.update({'DEFAULT_TBS_TYPE': default_tablespace_type})
 
-    if wanted_state == state_now:
+    if default_tablespace and current_state['DEFAULT_PERMANENT_TABLESPACE'].upper() != default_tablespace.upper():
+        sql = 'alter PLUGGABLE database default tablespace %s' % default_tablespace
+        change_db_sql.append(sql)
+        wanted_state.update({'DEFAULT_PERMANENT_TABLESPACE': default_tablespace})
+
+    if default_temp_tablespace and current_state['DEFAULT_TEMP_TABLESPACE'].upper() != default_temp_tablespace.upper():
+        sql = 'alter PLUGGABLE database default temporary tablespace %s' % default_temp_tablespace
+        change_db_sql.append(sql)
+        wanted_state.update({'DEFAULT_TEMP_TABLESPACE': default_temp_tablespace})
+
+    if timezone and current_state['DBTIMEZONE'].upper() != timezone.upper():
+        sql = "alter PLUGGABLE database set time_zone = '%s'" % timezone
+        change_db_sql.append(sql)
+        wanted_state.update({'DBTIMEZONE': timezone})
+
+    changes = set(wanted_state.items()).difference(current_state.items())
+
+    if changes and save_state:
+        sql = 'alter pluggable database %s save state instances=all' % pdb_name
+        change_db_sql.append(sql)
+
+    if not changes:
         if conn.changed:
             msg = 'Successfully created pluggable database %s' % pdb_name
             module.exit_json(msg=msg, changed=conn.changed, ddls=conn.ddls)
         msg = 'Pluggable database %s already in the intended state' % pdb_name
         module.exit_json(msg=msg, changed=conn.changed, ddls=conn.ddls)
 
-    #     if len(ensure_sql) > 0:
-    #         total_sql.append(ensure_sql)
-    #     module.exit_json(msg=total_sql, changed=True)
-    #     for sql in total_sql:
-    #         execute_sql(module, msg, cursor, sql)
-    #     msg = 'Pluggable database %s has been put in the intended state: %s' % (name, state)
-    #     module.exit_json(msg=msg, changed=True)
-    # else:
-    #     msg = 'Pluggable database %s already in the intended state' % (name)
-    #     module.exit_json(msg=msg, changed=False)
-
-    conn.execute_ddl(ensure_sql)
+    for sql in change_db_sql:
+        conn.execute_ddl(sql)
     msg = 'Pluggable database %s has been put in the intended state: %s' % (pdb_name, state)
     module.exit_json(msg=msg, changed=conn.changed, ddls=conn.ddls)
 
@@ -307,14 +317,21 @@ def main():
             port                   = dict(required=False, default=1521, type='int'),
             service_name           = dict(required=False, aliases=['sn']),
             oracle_home            = dict(required=False, aliases=['oh']),
+
             pdb_name               = dict(required=True, aliases=['pdb', 'name']),
+
             sourcedb               = dict(required=False, aliases=['db', 'container', 'cdb']),
-            state                  = dict(default="present", choices=["present", "absent", "open", "closed", "read_write", "read_only", "restricted", "status", "unplugged"]),
-            save_state             = dict(default=True, type='bool'),
+            plug_file              = dict(required=False, aliases=['plug_file_xml']),
             pdb_admin_username     = dict(required=False, default='pdb_admin', aliases=['pdbadmun']),
             pdb_admin_password     = dict(required=False, no_log=True, default='pdb_admin', aliases=['pdbadmpw']),
+
+            roles                  = dict(type='list', elements='str', default=[]),
+
+            state                  = dict(default="present", choices=["absent", "present", "open", "read_only"]),
+
+            save_state             = dict(default=True, type='bool'),
             datafile_dest          = dict(required=False, aliases=['dfd', 'create_file_dest']),
-            unplug_dest            = dict(required=False, aliases=['plug_dest', 'upd', 'pd']),
+            #unplug_dest            = dict(required=False, aliases=['plug_dest', 'upd', 'pd']),
             file_name_convert      = dict(required=False, aliases=['fnc']),
             service_name_convert   = dict(required=False, aliases=['snc']),
             default_tablespace_type = dict(default='smallfile', choices=['smallfile', 'bigfile']),
@@ -323,7 +340,8 @@ def main():
             timezone            = dict(required=False)
         ),
         required_together=[['user', 'password'], ['pdb_admin_username', 'pdb_admin_password']],
-        mutually_exclusive=[['datafile_dest', 'file_name_convert']],
+        #mutually_exclusive=[['datafile_dest', 'file_name_convert']],
+        mutually_exclusive=[['pdb_admin_username', 'clone_from', 'plug_file']],
         required_if=[('state', 'present', ('pdb_admin_username', 'pdb_admin_password'))],
         supports_check_mode=True
     )
