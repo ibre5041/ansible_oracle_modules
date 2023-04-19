@@ -327,7 +327,7 @@ def main():
 
             roles                  = dict(type='list', elements='str', default=[]),
 
-            state                  = dict(default="present", choices=["absent", "present", "open", "read_only"]),
+            state                  = dict(default="present", choices=["absent", "present", "open", "closed", "read_only"]),
 
             save_state             = dict(default=True, type='bool'),
             datafile_dest          = dict(required=False, aliases=['dfd', 'create_file_dest']),
