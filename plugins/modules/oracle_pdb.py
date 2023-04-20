@@ -272,7 +272,7 @@ def ensure_pdb_state(conn, module, current_state):
 
     changes = set(wanted_state.items()).difference(current_state)
 
-    about_to_open = wanted_state['open_mode'] in ['open', 'restricted', 'read_only', 'read_write']
+    about_to_open = wanted_state['open_mode'] in ['open', 'restricted', 'read_only']
 
     if 'open_mode' in dict(changes):
         change_db_sql.append(ensure_sql)
@@ -338,11 +338,8 @@ def main():
             plug_file              = dict(required=False, aliases=['plug_file_xml']),
             pdb_admin_username     = dict(required=False, default='pdb_admin', aliases=['pdbadmun']),
             pdb_admin_password     = dict(required=False, no_log=True, default='pdb_admin', aliases=['pdbadmpw']),
-
             roles                  = dict(type='list', elements='str', default=[]),
-
-            state                  = dict(default="present", choices=["absent", "opened", "closed", "read_only"]),
-
+            state                  = dict(default="present", choices=["absent", "opened", "closed", "read_only", "status"]),
             save_state             = dict(default=True, type='bool'),
             datafile_dest          = dict(required=False, aliases=['dfd', 'create_file_dest']),
             #unplug_dest            = dict(required=False, aliases=['plug_dest', 'upd', 'pd']),
@@ -365,7 +362,7 @@ def main():
 
     oc = oracleConnection(module)
     pdb = check_pdb_exists(oc, pdb_name)
-    if state in ['present', 'closed', 'open', 'restricted', 'read_only', 'read_write']:
+    if state in ['closed', 'opened', 'restricted', 'read_only']:
         if not pdb:
             pdb = create_pdb(oc, module)
             ensure_pdb_state(oc, module, pdb)
@@ -389,9 +386,7 @@ def main():
     elif state == 'status':
         if pdb:
             pdb = check_pdb_status(oc, module)
-            msg = 'pdb name: %s, con_id: %s, con_uid: %s, open_mode: %s, restricted: %s,  open_time: %s' % \
-                  () #  (a[0].lower(), a[1], a[2], a[3], a[4], a[5])
-            module.exit_json(msg=msg, changed=False)
+            module.exit_json(msg=str(pdb), state=dict(pdb), changed=False)
         else:
             msg = "Pluggable database %s doesn't exist" % pdb_name
             module.exit_json(msg=msg, changed=False)
