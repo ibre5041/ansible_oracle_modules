@@ -213,6 +213,8 @@ def create_pdb(conn, module):
     for sql in run_sql:
         conn.execute_ddl(sql)
 
+    return set({'name': pdb_name.upper(), 'open_mode': 'MOUNTED'}.items())
+
 def remove_pdb(conn, module, current_state):
     pdb_name = module.params['pdb_name']
     run_sql = []
@@ -245,7 +247,7 @@ def ensure_pdb_state(conn, module, current_state):
         wanted_state.update({'open_mode': 'READ WRITE'})
         ensure_sql += ' open force'
     elif state == 'closed':
-        wanted_state.update({'open_mode': 'CLOSED'})
+        wanted_state.update({'open_mode': 'MOUNTED'})
         ensure_sql += ' close immediate'
     elif state == 'read_only':
         wanted_state.update({'open_mode': 'READ ONLY'})
@@ -268,25 +270,28 @@ def ensure_pdb_state(conn, module, current_state):
 
     changes = set(wanted_state.items()).difference(current_state)
 
+    about_to_open = wanted_state['open_mode'] in ['open', 'restricted', 'read_only', 'read_write']
+
     if 'open_mode' in dict(changes):
         change_db_sql.append(ensure_sql)
 
-    if 'DEFAULT_TBS_TYPE' in dict(changes):
+    if 'DEFAULT_TBS_TYPE' in dict(changes) and about_to_open:
         sql = 'alter PLUGGABLE database %s set default %s tablespace' % (pdb_name, default_tablespace_type)
         change_db_sql.append(sql)
 
-    if 'DEFAULT_PERMANENT_TABLESPACE' in dict(changes):
+    if 'DEFAULT_PERMANENT_TABLESPACE' in dict(changes) and about_to_open:
         sql = 'alter PLUGGABLE database %s default tablespace %s' % (pdb_name, default_tablespace)
         change_db_sql.append(sql)
 
-    if 'DEFAULT_TEMP_TABLESPACE' in dict(changes):
+    if 'DEFAULT_TEMP_TABLESPACE' in dict(changes) and about_to_open:
         sql = 'alter PLUGGABLE database %s default temporary tablespace %s' % (pdb_name, default_temp_tablespace)
         change_db_sql.append(sql)
 
-    if 'DBTIMEZONE' in dict(changes):
+    if 'DBTIMEZONE' in dict(changes) and about_to_open:
         sql = "alter PLUGGABLE database %s set time_zone = '%s'" % (pdb_name, timezone)
         change_db_sql.append(sql)
 
+    # TODO: select a.name,b.state from v$pdbs a , dba_pdb_saved_states b where a.con_id = b.con_id;
     if changes and save_state:
         sql = 'alter pluggable database %s save state instances=all' % pdb_name
         change_db_sql.append(sql)
@@ -299,11 +304,6 @@ def ensure_pdb_state(conn, module, current_state):
         module.exit_json(msg=msg, changed=conn.changed, ddls=conn.ddls)
 
     for sql in change_db_sql:
-        conn.execute_ddl(sql)
-
-    # TODO: select a.name,b.state from v$pdbs a , dba_pdb_saved_states b where a.con_id = b.con_id;
-    if save_state:
-        sql = 'alter pluggable database %s save state instances=all' % pdb_name
         conn.execute_ddl(sql)
 
     msg = 'Pluggable database %s has been put in the intended state: %s' % (pdb_name, state)
@@ -365,7 +365,7 @@ def main():
     pdb = check_pdb_exists(oc, pdb_name)
     if state in ['present', 'closed', 'open', 'restricted', 'read_only', 'read_write']:
         if not pdb:
-            create_pdb(oc, module)
+            pdb = create_pdb(oc, module)
             ensure_pdb_state(oc, module, pdb)
         else:
             ensure_pdb_state(oc, module, pdb)
