@@ -1,5 +1,7 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
 
 DOCUMENTATION = '''
 ---
@@ -142,9 +144,7 @@ def check_pdb_exists(conn, pdb_name):
     if not result['open_mode'].startswith('READ'):
         return set(result.items())
 
-    _changed = conn.changed # Push current change state
-    conn.execute_ddl('ALTER SESSION SET CONTAINER = %s' % pdb_name)
-    conn.changed = _changed # Pop current change state. ALTER SESSION does not modify database
+    conn.execute_ddl('ALTER SESSION SET CONTAINER = %s' % pdb_name, no_change=True)
 
     sql = "select property_name, property_value" \
           " from database_properties " \
@@ -225,7 +225,7 @@ def remove_pdb(conn, module, current_state):
 
     if dict(current_state)['open_mode'].startswith('READ'):
         run_sql.append(close_sql)
-    run_sql.append("ALTER SESSION SET CONTAINER = CDB$ROOT")
+    conn.execute_ddl("ALTER SESSION SET CONTAINER = CDB$ROOT", no_change=True)
     run_sql.append(dropsql)
     for sql in run_sql:
         conn.execute_ddl(sql)
