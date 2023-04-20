@@ -213,12 +213,6 @@ def create_pdb(conn, module):
     for sql in run_sql:
         conn.execute_ddl(sql)
 
-    # TODO: select a.name,b.state from v$pdbs a , dba_pdb_saved_states b where a.con_id = b.con_id;
-    if save_state:
-        sql = 'alter pluggable database %s save state instances=all' % pdb_name
-        conn.execute_ddl(sql)
-
-
 def remove_pdb(conn, module, current_state):
     pdb_name = module.params['pdb_name']
     run_sql = []
@@ -306,6 +300,12 @@ def ensure_pdb_state(conn, module, current_state):
 
     for sql in change_db_sql:
         conn.execute_ddl(sql)
+
+    # TODO: select a.name,b.state from v$pdbs a , dba_pdb_saved_states b where a.con_id = b.con_id;
+    if save_state:
+        sql = 'alter pluggable database %s save state instances=all' % pdb_name
+        conn.execute_ddl(sql)
+
     msg = 'Pluggable database %s has been put in the intended state: %s' % (pdb_name, state)
     module.exit_json(msg=msg, changed=conn.changed, ddls=conn.ddls)
 
