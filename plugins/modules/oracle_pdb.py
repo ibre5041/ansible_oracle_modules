@@ -175,13 +175,13 @@ def create_pdb(conn, module):
     pdb_name = module.params['pdb_name']
     plug_file = module.params['plug_file'] # clone from XML
     sourcedb = module.params['sourcedb'] # clone from DB
+    snapshot_copy = module.params['snapshot_copy'] # clone from DB
     pdb_admin_username = module.params['pdb_admin_username'] # clone form seed
     pdb_admin_password = module.params['pdb_admin_password']
     roles = module.params['roles']
 
     datafile_dest = module.params['datafile_dest']
     file_name_convert = module.params['file_name_convert']
-    save_state = module.params['save_state']
     run_sql = []
 
     createsql = 'create pluggable database %s' % pdb_name
@@ -192,7 +192,9 @@ def create_pdb(conn, module):
         createsql += " using %s"
     elif sourcedb:
         # TODO: snapshot copy
-        createsql += " from %s"
+        createsql += " from %s" % sourcedb
+        if snapshot_copy:
+            createsql += ' snapshot copy'
     elif pdb_admin_username:
         createsql += " admin user %s identified by \"%s\" " % (pdb_admin_username, pdb_admin_password)
     else:
@@ -333,7 +335,8 @@ def main():
 
             pdb_name               = dict(required=True, aliases=['pdb', 'name']),
 
-            sourcedb               = dict(required=False, aliases=['db', 'container', 'cdb']),
+            sourcedb               = dict(required=False, aliases=['db', 'container', 'cdb', 'clone_from']),
+            snapshot_copy          = dict(type='bool', default=False),
             plug_file              = dict(required=False, aliases=['plug_file_xml']),
             pdb_admin_username     = dict(required=False, default='pdb_admin', aliases=['pdbadmun']),
             pdb_admin_password     = dict(required=False, no_log=True, default='pdb_admin', aliases=['pdbadmpw']),
