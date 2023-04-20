@@ -387,7 +387,7 @@ def main():
             pdb = check_pdb_status(oc, module)
             if pdb['open_mode'].startswith('READ'):
                 state = 'open'
-            if pdb['open_mode'] == 'MOUNTED':
+            elif pdb['open_mode'] == 'MOUNTED':
                 state = 'closed'
             else:
                 module.fail_json(msg='Unsupported PDB state %s' % pdb['open_mode'])
