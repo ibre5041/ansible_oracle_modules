@@ -274,20 +274,23 @@ def ensure_pdb_state(conn, module, current_state):
 
     changes = set(wanted_state.items()).difference(current_state)
 
+    if 'open_mode' in dict(changes):
+        change_db_sql.append(ensure_sql)
+
     if 'DEFAULT_TBS_TYPE' in dict(changes):
-        sql = 'alter PLUGGABLE database set default %s tablespace' % default_tablespace_type
+        sql = 'alter PLUGGABLE database %s set default %s tablespace' % (pdb_name, default_tablespace_type)
         change_db_sql.append(sql)
 
     if 'DEFAULT_PERMANENT_TABLESPACE' in dict(changes):
-        sql = 'alter PLUGGABLE database default tablespace %s' % default_tablespace
+        sql = 'alter PLUGGABLE database %s default tablespace %s' % (pdb_name, default_tablespace)
         change_db_sql.append(sql)
 
     if 'DEFAULT_TEMP_TABLESPACE' in dict(changes):
-        sql = 'alter PLUGGABLE database default temporary tablespace %s' % default_temp_tablespace
+        sql = 'alter PLUGGABLE database %s default temporary tablespace %s' % (pdb_name, default_temp_tablespace)
         change_db_sql.append(sql)
 
-    if 'DBTIMEZONE' in dict(current_state):
-        sql = "alter PLUGGABLE database set time_zone = '%s'" % timezone
+    if 'DBTIMEZONE' in dict(changes):
+        sql = "alter PLUGGABLE database %s set time_zone = '%s'" % (pdb_name, timezone)
         change_db_sql.append(sql)
 
     if changes and save_state:
