@@ -1,0 +1,69 @@
+---
+- name: "define connection parameters"
+  set_fact:
+    connection_parameters: &con_param
+      service_name: "{{ service_name }}"
+      username: "SYS"
+      password: "{{ sys_password }}"
+      mode: "sysdba"
+
+- name: create an opened PDB2
+  oracle_pdb:
+    <<: *con_param
+    pdb_name: "XEPDB2"
+    state: "opened"
+    pdb_admin_username: foo
+    pdb_admin_password: bar
+    file_name_convert:
+      "/opt/oracle/oradata/XE/pdbseed": "/tmp/xepdb2/dbf01"
+
+- name: XML file doesn't exist
+  file:
+    path: "/tmp/xepdb2.xml"
+    state: "absent"
+
+- name: unplug PDB2
+  oracle_pdb:
+    <<: *con_param
+    pdb_name: "XEPDB2"
+    state: "absent"
+    unplug_file: "/tmp/xepdb2.xml"
+
+- name: XML file was created exists
+  file:
+    path: "/tmp/xepdb2.xml"
+    state: "file"
+
+- name: DBF file still exists (check only one DBF)
+  file:
+    path: "/tmp/xepdb2/dbf01/system01.dbf"
+    state: "file"
+
+- name: plug in a PDB3
+  oracle_pdb:
+    <<: *con_param
+    pdb_name: "XEPDB3"
+    state: "opened"
+    plug_file: "/tmp/xepdb2.xml"
+    file_name_convert:
+      "/tmp/xepdb2/dbf01": "/tmp/xepdb3/dbf01"
+
+- name: drop PDB3
+  oracle_pdb:
+    <<: *con_param
+    pdb_name: "XEPDB3"
+    state: "absent"
+
+- name: replug the PDB2
+  oracle_pdb:
+    <<: *con_param
+    pdb_name: "XEPDB2"
+    state: "opened"
+    plug_file: "/tmp/xepdb2.xml"
+
+- name: drop PDB2
+  oracle_pdb:
+    <<: *con_param
+    pdb_name: "XEPDB2"
+    state: "absent"
+...
