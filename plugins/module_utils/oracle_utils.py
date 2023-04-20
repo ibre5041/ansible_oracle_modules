@@ -182,11 +182,9 @@ class oracleConnection:
             self.module.fail_json(msg=error.message, code=error.code, request=sql, params=params, ddls=self.ddls, changed=self.changed)
 
 
-    def execute_ddl(self, request):
+    def execute_ddl(self, request, no_change=False):
         """Execute a DDL request and keep trace it in ddls attribute.
-
         request -- SQL query, no bind parameter allowed on DDL request.
-
         In check mode, query is not executed.
         """
         try:
@@ -198,7 +196,8 @@ class oracleConnection:
                     self.ddls.append(request)
             else:
                 self.ddls.append('--' + request)
-            self.changed = True
+            if not no_change: # In case of alter session, do not set changed to True
+                self.changed = True
         except cx_Oracle.DatabaseError as e:
             error = e.args[0]
             self.module.fail_json(msg=error.message, code=error.code, request=request, ddls=self.ddls, changed=self.changed)
