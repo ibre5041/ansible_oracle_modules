@@ -1,0 +1,9 @@
+---
+- include_tasks: "create_delete.yml"
+- include_tasks: "existence.yml"
+- include_tasks: "open_close.yml"
+- include_tasks: "clone.yml"
+#- include_tasks: "unplug_plug.yml"  # TODO: Fix this test
+- include_tasks: "exclusive_options.yml"
+#- include_tasks: "check_mode.yml"
+...

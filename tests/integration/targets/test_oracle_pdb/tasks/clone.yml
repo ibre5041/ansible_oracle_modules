@@ -1,0 +1,56 @@
+---
+
+- name: "define connection parameters"
+  set_fact:
+    connection_parameters: &con_param
+      hostname: "{{ oracle_hostname }}"      
+      port: "{{ oracle_port }}"      
+      service_name: "{{ oracle_service_name }}"
+      username: "{{ oracle_username }}"
+      password: "{{ oracle_password }}"
+      mode: "sysdba"
+
+- name: 'Connection paramters - see or use integration_config.yml.template'
+  debug:
+    var: connection_parameters
+
+- name: create an opened PDB
+  oracle_pdb:
+    <<: *con_param
+    pdb_name: "XEPDB2"
+    state: "opened"
+    pdb_admin_username: foo
+    pdb_admin_password: bar
+    # TODO: test this on non-ASM instance        
+    # file_name_convert:
+    #   "/opt/oracle/oradata/XE/pdbseed": "/tmp/xepdb2/dbf01"
+
+- name: open PDB source in read only
+  oracle_pdb:
+    <<: *con_param
+    pdb_name: "XEPDB2"
+    state: "read_only"
+
+- name: create a clone PDB
+  oracle_pdb:
+    <<: *con_param
+    pdb_name: "XESNAP1"
+    state: "opened"
+    clone_from: "XEPDB2"
+    # ORA-17517
+    #snapshot_copy: yes
+    # file_name_convert:
+    #   "/tmp/xepdb2/dbf01": "/tmp/xesnap1/dbf01"
+
+- name: drop clone PDB
+  oracle_pdb:
+    <<: *con_param
+    pdb_name: "XESNAP1"
+    state: "absent"
+
+- name: drop source PDB
+  oracle_pdb:
+    <<: *con_param
+    pdb_name: "XEPDB2"
+    state: "absent"
+...
