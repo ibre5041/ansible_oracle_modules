@@ -131,9 +131,27 @@ import os
 
 # Check if the pdb exists
 def check_pdb_exists(conn, pdb_name):
-    sql = "select upper(pdb_name) as pdb_name from dba_pdbs where upper(pdb_name) = :pdb_name"
+    sql = sql = 'select name, open_mode, restricted from v$pdbs where upper(name) = :pdb_name'
     result = conn.execute_select_to_dict(sql, {"pdb_name": pdb_name}, fetchone=True)
-    return result
+
+    if not result:
+        return set()
+
+    if not result['open_mode'].startswith('READ'):
+        return set(result.items())
+
+    _changed = conn.changed # Push current change state
+    conn.execute_ddl('ALTER SESSION SET CONTAINER = %s' % pdb_name)
+    conn.changed = _changed # Pop current change state. ALTER SESSION does not modify database
+
+    sql = "select property_name, property_value" \
+          " from database_properties " \
+          " where property_name in ('DEFAULT_TBS_TYPE','DEFAULT_PERMANENT_TABLESPACE','DEFAULT_TEMP_TABLESPACE', 'DBTIMEZONE') " \
+          " order by 1"
+    prop = conn.execute_select(sql, None, fetchone=False)
+    result.update(dict(prop))
+
+    return set(result.items())
 
 
 def unplug_pdb(conn, module):
@@ -167,7 +185,7 @@ def create_pdb(conn, module):
     run_sql = []
 
     createsql = 'create pluggable database %s' % pdb_name
-    opensql = 'alter pluggable database %s open instances=all' % pdb_name
+    #opensql = 'alter pluggable database %s open instances=all' % pdb_name
 
     if plug_file:
         # TODO: copy/nocopy tempfile reuse
@@ -184,14 +202,14 @@ def create_pdb(conn, module):
         createsql += ' roles = (%s)' % ','.join(roles)
 
     if file_name_convert:
-        quoted = ",".join("'" + p + "'" for p in file_name_convert.split(","))
+        quoted = ','.join([ "'%s', '%s'" % (x[0], x[1]) for x in zip(file_name_convert.keys(), file_name_convert.values())])
         createsql += ' file_name_convert = (%s)' % quoted
 
     if datafile_dest:
         createsql += " create_file_dest = '%s'" % datafile_dest
 
     run_sql.append(createsql)
-    run_sql.append(opensql)
+
     for sql in run_sql:
         conn.execute_ddl(sql)
 
@@ -201,13 +219,14 @@ def create_pdb(conn, module):
         conn.execute_ddl(sql)
 
 
-def remove_pdb(conn, module):
+def remove_pdb(conn, module, current_state):
     pdb_name = module.params['pdb_name']
     run_sql = []
     close_sql = 'alter pluggable database %s close immediate instances=all' % pdb_name
     dropsql = 'drop pluggable database %s including datafiles' % pdb_name
 
-    run_sql.append(close_sql)
+    if dict(current_state)['open_mode'].startswith('READ'):
+        run_sql.append(close_sql)
     run_sql.append(dropsql)
     for sql in run_sql:
         conn.execute_ddl(sql)
@@ -215,7 +234,7 @@ def remove_pdb(conn, module):
     module.exit_json(msg=msg, changed=conn.changed, ddls=conn.ddls)
 
 
-def ensure_pdb_state(conn, module):
+def ensure_pdb_state(conn, module, current_state):
     pdb_name = module.params['pdb_name']
     state = module.params['state']
     default_tablespace_type = module.params['default_tablespace_type']
@@ -223,24 +242,6 @@ def ensure_pdb_state(conn, module):
     default_temp_tablespace = module.params['default_temp_tablespace']
     timezone = module.params['timezone']
     save_state = module.params['save_state']
-
-    changed_state = conn.changed
-    conn.execute_ddl('ALTER SESSION SET CONTAINER = %s' % pdb_name)
-    conn.changed = changed_state
-
-    sql = 'select name, upper(open_mode) open_mode, upper(restricted) restricted from v$pdbs where upper(name) = :pdb_name'
-    current_state = conn.execute_select_to_dict(sql, {"pdb_name": pdb_name}, fetchone=True)
-
-    propsql = "select property_name, property_value " \
-              "from database_properties " \
-              "where property_name in ('DEFAULT_TBS_TYPE','DEFAULT_PERMANENT_TABLESPACE','DEFAULT_TEMP_TABLESPACE', 'DBTIMEZONE') " \
-              "order by 1"
-    prop = conn.execute_select(propsql, None, fetchone=False)
-    current_state.update(dict(prop))
-
-    #tzsql = "select lower(property_value) from database_properties where property_name = 'DBTIMEZONE'"
-    #curr_time_zone = conn.execute_select_to_dict(tzsql, None, fetchone=True)
-    #def_tbs_type,def_tbs,def_temp_tbs = (1, 2, 3)
 
     change_db_sql = []
 
@@ -259,27 +260,35 @@ def ensure_pdb_state(conn, module):
     #     wanted_state = [('read write', 'yes')]
     #     ensure_sql += 'open restricted force'
 
-    if default_tablespace_type and current_state['DEFAULT_TBS_TYPE'].upper() != default_tablespace_type.upper():
-        sql = 'alter PLUGGABLE database set default %s tablespace' % default_tablespace_type
-        change_db_sql.append(sql)
-        wanted_state.update({'DEFAULT_TBS_TYPE': default_tablespace_type})
+    if default_tablespace_type:
+        wanted_state.update({'DEFAULT_TBS_TYPE': default_tablespace_type.upper()})
 
-    if default_tablespace and current_state['DEFAULT_PERMANENT_TABLESPACE'].upper() != default_tablespace.upper():
-        sql = 'alter PLUGGABLE database default tablespace %s' % default_tablespace
-        change_db_sql.append(sql)
-        wanted_state.update({'DEFAULT_PERMANENT_TABLESPACE': default_tablespace})
+    if default_tablespace:
+        wanted_state.update({'DEFAULT_PERMANENT_TABLESPACE': default_tablespace.upper()})
 
-    if default_temp_tablespace and current_state['DEFAULT_TEMP_TABLESPACE'].upper() != default_temp_tablespace.upper():
-        sql = 'alter PLUGGABLE database default temporary tablespace %s' % default_temp_tablespace
-        change_db_sql.append(sql)
-        wanted_state.update({'DEFAULT_TEMP_TABLESPACE': default_temp_tablespace})
+    if default_temp_tablespace:
+        wanted_state.update({'DEFAULT_TEMP_TABLESPACE': default_temp_tablespace.upper()})
 
-    if timezone and current_state['DBTIMEZONE'].upper() != timezone.upper():
-        sql = "alter PLUGGABLE database set time_zone = '%s'" % timezone
-        change_db_sql.append(sql)
+    if timezone:
         wanted_state.update({'DBTIMEZONE': timezone})
 
-    changes = set(wanted_state.items()).difference(current_state.items())
+    changes = set(wanted_state.items()).difference(current_state)
+
+    if 'DEFAULT_TBS_TYPE' in dict(changes):
+        sql = 'alter PLUGGABLE database set default %s tablespace' % default_tablespace_type
+        change_db_sql.append(sql)
+
+    if 'DEFAULT_PERMANENT_TABLESPACE' in dict(changes):
+        sql = 'alter PLUGGABLE database default tablespace %s' % default_tablespace
+        change_db_sql.append(sql)
+
+    if 'DEFAULT_TEMP_TABLESPACE' in dict(changes):
+        sql = 'alter PLUGGABLE database default temporary tablespace %s' % default_temp_tablespace
+        change_db_sql.append(sql)
+
+    if 'DBTIMEZONE' in dict(current_state):
+        sql = "alter PLUGGABLE database set time_zone = '%s'" % timezone
+        change_db_sql.append(sql)
 
     if changes and save_state:
         sql = 'alter pluggable database %s save state instances=all' % pdb_name
@@ -332,8 +341,8 @@ def main():
             save_state             = dict(default=True, type='bool'),
             datafile_dest          = dict(required=False, aliases=['dfd', 'create_file_dest']),
             #unplug_dest            = dict(required=False, aliases=['plug_dest', 'upd', 'pd']),
-            file_name_convert      = dict(required=False, aliases=['fnc']),
-            service_name_convert   = dict(required=False, aliases=['snc']),
+            file_name_convert      = dict(type='dict', required=False, aliases=['fnc']),
+            service_name_convert   = dict(type='dict', required=False, aliases=['snc']),
             default_tablespace_type = dict(default='smallfile', choices=['smallfile', 'bigfile']),
             default_tablespace  = dict(required=False),
             default_temp_tablespace = dict(required=False),
@@ -354,13 +363,13 @@ def main():
     if state in ['present', 'closed', 'open', 'restricted', 'read_only', 'read_write']:
         if not pdb:
             create_pdb(oc, module)
-            ensure_pdb_state(oc, module)
+            ensure_pdb_state(oc, module, pdb)
         else:
-            ensure_pdb_state(oc, module)
+            ensure_pdb_state(oc, module, pdb)
 
     elif state == 'absent':
         if pdb:
-            remove_pdb(oc, module)
+            remove_pdb(oc, module, pdb)
         else:
             msg = "Pluggable database %s doesn't exist" % pdb_name
             module.exit_json(msg=msg, changed=False)
