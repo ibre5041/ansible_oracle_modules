@@ -225,6 +225,7 @@ def remove_pdb(conn, module, current_state):
 
     if dict(current_state)['open_mode'].startswith('READ'):
         run_sql.append(close_sql)
+    run_sql.append("ALTER SESSION SET CONTAINER = CDB$ROOT")
     run_sql.append(dropsql)
     for sql in run_sql:
         conn.execute_ddl(sql)
