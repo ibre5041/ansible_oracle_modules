@@ -385,10 +385,16 @@ def main():
     elif state == 'status':
         if pdb:
             pdb = check_pdb_status(oc, module)
-            module.exit_json(msg=str(pdb), state=dict(pdb), changed=False)
+            if pdb['open_mode'].startswith('READ'):
+                state = 'open'
+            if pdb['open_mode'] == 'MOUNTED':
+                state = 'closed'
+            else:
+                module.fail_json(msg='Unsupported PDB state %s' % pdb['open_mode'])
+            module.exit_json(msg='PDB %s exists' % pdb_name, state=dict(pdb), changed=False)
         else:
             msg = "Pluggable database %s doesn't exist" % pdb_name
-            module.exit_json(msg=msg, changed=False)
+            module.fail_json(msg=msg, changed=False)
 
     module.exit_json(msg="Unhandled exit", changed=False)
 
