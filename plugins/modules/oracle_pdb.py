@@ -87,7 +87,9 @@ options:
 notes:
     - cx_Oracle needs to be installed
 requirements: [ "cx_Oracle" ]
-author: Mikael Sandström, oravirt@gmail.com, @oravirt
+author: 
+    - Mikael Sandström, oravirt@gmail.com, @oravirt
+    - Ivan Brezina
 '''
 
 EXAMPLES = '''
@@ -243,7 +245,7 @@ def ensure_pdb_state(conn, module, current_state):
 
     wanted_state = {}
     ensure_sql = 'alter pluggable database %s ' % pdb_name
-    if state in ('present', 'open', 'read_write'):
+    if state in ('opened', 'read_write'):
         wanted_state.update({'open_mode': 'READ WRITE'})
         ensure_sql += ' open force'
     elif state == 'closed':
@@ -339,7 +341,7 @@ def main():
 
             roles                  = dict(type='list', elements='str', default=[]),
 
-            state                  = dict(default="present", choices=["absent", "present", "open", "closed", "read_only"]),
+            state                  = dict(default="present", choices=["absent", "opened", "closed", "read_only"]),
 
             save_state             = dict(default=True, type='bool'),
             datafile_dest          = dict(required=False, aliases=['dfd', 'create_file_dest']),
