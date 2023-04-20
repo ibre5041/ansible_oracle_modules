@@ -1,7 +1,5 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
-#!/usr/bin/python
-# -*- coding: utf-8 -*-
 
 DOCUMENTATION = '''
 ---
@@ -315,7 +313,7 @@ def ensure_pdb_state(conn, module, current_state):
 
 def check_pdb_status(conn, module):
     sql = "select name, con_id, con_uid, open_mode,restricted" \
-          " ,to_char(open_time,'HH24:MI:SS YYYY-MM-DD')" \
+          " ,to_char(open_time,'HH24:MI:SS YYYY-MM-DD') as open_time" \
           " ,recovery_status " \
           " from v$pdbs where upper(name) = :pdb_name"
     result = conn.execute_select_to_dict(sql, {"pdb_name": module.params['pdb_name'].upper()}, fetchone=True)
