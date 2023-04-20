@@ -391,7 +391,8 @@ def main():
                 state = 'closed'
             else:
                 module.fail_json(msg='Unsupported PDB state %s' % pdb['open_mode'])
-            module.exit_json(msg='PDB %s exists' % pdb_name, state=dict(pdb), changed=False)
+            module.exit_json(msg='PDB %s exists' % pdb_name, state=state
+                             , read_only=bool(pdb['open_mode'] == 'READ ONLY'), changed=False)
         else:
             msg = "Pluggable database %s doesn't exist" % pdb_name
             module.fail_json(msg=msg, changed=False)
