@@ -225,9 +225,7 @@ def analyze_patch (module, oracle_home, patch_base, opatchauto):
         elif rc == 0 and 'failed' in stdout: # <- Conflicts exist
             msg = 'STDOUT: %s, COMMAND: %s' % (stdout,cmd)
             module.fail_json(msg=msg, changed=False)
-        else:
-            return True
-
+    return True
 
 def apply_patch (module, oracle_home, patch_base, patch_id, patch_version, opatchauto, ocm_response_file, offline, stop_processes, rolling, output):
     '''
@@ -267,10 +265,10 @@ def apply_patch (module, oracle_home, patch_base, patch_id, patch_version, opatc
 
     (rc, stdout, stderr) = module.run_command(command)
     if rc != 0:
-      msg = 'Error - STDOUT: %s, STDERR: %s, COMMAND: %s' % (stdout, stderr, command)
-      module.fail_json(msg=msg, changed=False)
+        msg = 'Error - STDOUT: %s, STDERR: %s, COMMAND: %s' % (stdout, stderr, command)
+        module.fail_json(msg=msg, changed=False)
     elif rc == 0 and 'Opatch version check failed' in stdout: # OPatch version check failed
-        msg = 'STDOUT: %s, COMMAND: %s' % (stdout,command)
+        msg = 'STDOUT: %s, COMMAND: %s' % (stdout, command)
         module.fail_json(msg=msg, changed=False)
     else:
         checks = ['successfully applied' in stdout,
@@ -280,10 +278,10 @@ def apply_patch (module, oracle_home, patch_base, patch_id, patch_version, opatc
             if output == 'short':
                 return True
             else:
-                msg = 'STDOUT: %s, COMMAND: %s' % (stdout,command)
+                msg = 'STDOUT: %s, COMMAND: %s' % (stdout, command)
                 module.exit_json(msg=msg, changed=True)
         else:
-            msg = 'STDOUT: %s, COMMAND: %s' % (stdout,command)
+            msg = 'STDOUT: %s, COMMAND: %s' % (stdout, command)
             module.exit_json(msg=msg, changed=False)
 
 
@@ -481,7 +479,7 @@ def main():
             if apply_patch(module, oracle_home, patch_base, patch_id, patch_version, opatchauto, ocm_response_file
                     , offline, stop_processes, rolling, output):
                 if patch_version is not None:
-                    msg = 'Patch %s (%s) successfully applied to %s' % (patch_id,patch_version, oracle_home)
+                    msg = 'Patch %s (%s) successfully applied to %s' % (patch_id, patch_version, oracle_home)
                 else:
                     msg = 'Patch %s successfully applied to %s' % (patch_id, oracle_home)
                 module.exit_json(msg=msg, changed=True)
