@@ -71,7 +71,7 @@ if __name__ == '__main__':
         description='Describe patches in Oracle PatchSet',
         epilog='Text at the bottom of help')
 
-    parser.add_argument('-d', '--directory')
+    parser.add_argument('-d', '--directory', required=True)
     args = parser.parse_args()
 
     main(os.path.abspath(args.directory))
