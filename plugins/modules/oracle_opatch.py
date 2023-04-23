@@ -140,7 +140,30 @@ def get_file_owner(module, oracle_home):
         module.fail_json(msg=msg)
 
 
-def check_patch_applied(module, msg, oracle_home, patch_id, patch_version, opatchauto):
+def get_patch_id(module, path):
+    from xml.dom import minidom
+    try:
+        inv_tree = minidom.parse(os.path.join(path, 'bundle.xml'))
+        bundles = inv_tree.getElementsByTagName('system_patch_bundle_xml')
+        for bundle in bundles:
+            patch_id = bundle.attributes['patch_id'].value
+            return patch_id
+    except BaseException as e:
+        s = str(e)
+        pass
+
+    try:
+        inv_tree = minidom.parse(os.path.join(path, 'etc', 'config', 'inventory.xml'))
+        patches = inv_tree.getElementsByTagName('patch_id')
+        for patch in patches:
+            patch_id = patch.attributes['number'].value
+            return patch_id
+    except BaseException as e:
+        s = str(e)
+    module.fail_json(msg='Could not determine patch_id from: %s' % path, changed=False)
+
+
+def check_patch_applied(module, oracle_home, patch_id, patch_version, opatchauto):
     '''
     Gets all patches already applied and compares to the
     intended patch
@@ -154,13 +177,13 @@ def check_patch_applied(module, msg, oracle_home, patch_id, patch_version, opatc
     (rc, stdout, stderr) = module.run_command(command)
     #module.exit_json(msg=stdout, changed=False)
     if rc != 0:
-      msg = 'Error - STDOUT: %s, STDERR: %s, COMMAND: %s' % (stdout, stderr, command)
-      module.fail_json(msg=msg, changed=False)
+        msg = 'Error - STDOUT: %s, STDERR: %s, COMMAND: %s' % (stdout, stderr, command)
+        module.fail_json(msg=msg, changed=False)
     else:
         if opatchauto:
             chk = '%s' % patch_version
         elif not opatchauto and patch_id is not None and patch_version is not None:
-            chk = '%s (%s)' % (patch_version,patch_id)
+            chk = '%s (%s)' % (patch_version, patch_id)
         else:
             chk = '%s' % patch_id
 
@@ -171,16 +194,14 @@ def check_patch_applied(module, msg, oracle_home, patch_id, patch_version, opatc
 
 
 def analyze_patch (module, oracle_home, patch_base, opatchauto):
-
     checks = []
-
     if opatchauto:
         if major_version < '12.1':
             oh_owner = get_file_owner(module, oracle_home)
             command = ''
             command += 'sudo -u %s ' % oh_owner
             opatch_cmd = 'opatch '
-            conflcommand = '%s %s/OPatch/opatch prereq CheckConflictAgainstOHWithDetail -ph %s -oh %s' % (command,oracle_home, patch_base, oracle_home)
+            conflcommand = '%s %s/OPatch/opatch prereq CheckConflictAgainstOHWithDetail -ph %s -oh %s' % (command, oracle_home, patch_base, oracle_home)
             spacecommand = '%s %s/OPatch/opatch prereq CheckSystemSpace -ph %s -oh %s' % (command, oracle_home, patch_base, oracle_home)
             checks.append(conflcommand)
             checks.append(spacecommand)
@@ -208,7 +229,7 @@ def analyze_patch (module, oracle_home, patch_base, opatchauto):
             return True
 
 
-def apply_patch (module, msg, oracle_home, patch_base, patch_id, patch_version, opatchauto, ocm_response_file, offline, stop_processes, rolling, output):
+def apply_patch (module, oracle_home, patch_base, patch_id, patch_version, opatchauto, ocm_response_file, offline, stop_processes, rolling, output):
     '''
     Applies the patch
     '''
@@ -232,17 +253,17 @@ def apply_patch (module, msg, oracle_home, patch_base, patch_id, patch_version, 
             if not rolling:
                 opoptions += ' -nonrolling '
 
-        command = '%s/OPatch/%s %s %s %s %s' % (oracle_home,opatch_cmd, opoptions, patch_base,oh,oracle_home)
+        command = '%s/OPatch/%s %s %s %s %s' % (oracle_home, opatch_cmd, opoptions, patch_base, oh, oracle_home)
 
     else:
         if stop_processes:
             stop_process(module, oracle_home)
 
         opatch_cmd = 'opatch'
-        command = '%s/OPatch/%s apply %s -oh %s -silent' % (oracle_home,opatch_cmd, patch_base,oracle_home)
+        command = '%s/OPatch/%s apply %s -oh %s -silent' % (oracle_home, opatch_cmd, patch_base, oracle_home)
 
     if ocm_response_file is not None and (LooseVersion(opatch_version) < LooseVersion(opatch_version_noocm)):
-        command += ' -ocmrf %s' % (ocm_response_file)
+        command += ' -ocmrf %s' % ocm_response_file
 
     (rc, stdout, stderr) = module.run_command(command)
     if rc != 0:
@@ -265,6 +286,7 @@ def apply_patch (module, msg, oracle_home, patch_base, patch_id, patch_version, 
             msg = 'STDOUT: %s, COMMAND: %s' % (stdout,command)
             module.exit_json(msg=msg, changed=False)
 
+
 def stop_process(module, oracle_home):
     '''
     Stop processes in ORACLE_HOME for non GI/Restart Environments
@@ -274,61 +296,59 @@ def stop_process(module, oracle_home):
 
     if os.path.exists(oratabfile):
         with open(oratabfile) as oratab:
+            msg = ''
+            for line in oratab:
+                if line.startswith('#') or line.startswith(' '):
+                    continue
+                elif len(line.split(':')) >= 2 and line.split(':')[1] == oracle_home:
+                    # Find listener for ORACLE_HOME
+                    p = subprocess.Popen('ps -o cmd -C tnslsnr | grep "^%s/bin/tnslsnr "' % line
+                                         , shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                    output, error = p.communicate()
+                    p_status = p.wait()
 
-           msg = ''
+                    if output:
+                        for lline in output.split('\n'):
+                            proclen = len("%s/bin/tnslsnr " % oracle_home)
 
-           for line in oratab:
-               if line.startswith('#') or line.startswith(' '):
-                   continue
-               elif len(line.split(':')) >= 2 and line.split(':')[1] == oracle_home:
+                            # remove executable from ps output, split by ' '
+                            # => 1st element is listener_name
+                            # ps example: /.../bin/tnslsnr LISTENER -inherit
+                            listener_name = lline[proclen:].split(' ')[0]
+                            if len(listener_name) > 0:
+                                lsnrctl_bin = '%s/bin/lsnrctl' % oracle_home
+                                try:
+                                    p = subprocess.check_call([lsnrctl_bin, 'stop', '%s' % listener_name])
+                                except subprocess.CalledProcessError:
+                                    msg += 'Stop of Listener %s failed ' % listener_name
+                    # Stop instances in ORACLE_HOME
+                    # The [0-9] is used to remove the grep itself from the result!
+                    p = subprocess.Popen('ps -elf| grep "[0-9] ora_pmon_%s"' % (line.split(':')[0])
+                                        , shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                    output, error = p.communicate()
+                    p_status = p.wait()
 
-                   # Find listener for ORACLE_HOME
-                   p = subprocess.Popen('ps -o cmd -C tnslsnr | grep "^%s/bin/tnslsnr "' % (line) , shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                   output, error = p.communicate()
-                   p_status = p.wait()
-
-                   if output:
-                       for lline in output.split('\n'):
-
-                           proclen = len("%s/bin/tnslsnr " % (oracle_home))
-
-                           # remove executable from ps output, split by ' '
-                           # => 1st element is listener_name
-                           # ps example: /.../bin/tnslsnr LISTENER -inherit
-                           listener_name = lline[proclen:].split(' ')[0]
-                           if len(listener_name) > 0:
-                               lsnrctl_bin = '%s/bin/lsnrctl' % (oracle_home)
-                               try:
-                                   p = subprocess.check_call([lsnrctl_bin, 'stop', '%s' % listener_name])
-                               except subprocess.CalledProcessError:
-                                   msg += 'Stop of Listener %s failed ' % listener_name
-               
-                   # Stop instances in ORACLE_HOME
-                   # The [0-9] is used to remove the grep itself from the result!
-                   p = subprocess.Popen('ps -elf| grep "[0-9] ora_pmon_%s"' % (line.split(':')[0]) , shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                   output, error = p.communicate()
-                   p_status = p.wait()
-
-                   if output and p.returncode == 0:
-                       os.environ['ORACLE_SID'] = line.split(':')[0]
-                       shutdown_sql = '''connect / as sysdba
+                    if output and p.returncode == 0:
+                        os.environ['ORACLE_SID'] = line.split(':')[0]
+                        shutdown_sql = '''connect / as sysdba
                                          shutdown immediate;
                                          exit'''
-                       sqlplus_bin = '%s/bin/sqlplus' % (oracle_home)
-                       p = subprocess.Popen([sqlplus_bin,'/nolog'],stdin=subprocess.PIPE,
-                       stdout=subprocess.PIPE,stderr=subprocess.PIPE)
-                       (stdout,stderr) = p.communicate(shutdown_sql.encode('utf-8'))
-                       p_status = p.wait()
-                       #module.fail_json(msg=stdout, changed=False)
+                        sqlplus_bin = '%s/bin/sqlplus' % oracle_home
+                        p = subprocess.Popen([sqlplus_bin,'/nolog'],stdin=subprocess.PIPE,
+                        stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+                        (stdout,stderr) = p.communicate(shutdown_sql.encode('utf-8'))
+                        p_status = p.wait()
+                        #module.fail_json(msg=stdout, changed=False)
 
-                       rc = p.returncode
-                       if rc != 0:
-                           msg += 'Stop of Instance %s failed' % line.split(':')[0]
+                        rc = p.returncode
+                        if rc != 0:
+                            msg += 'Stop of Instance %s failed' % line.split(':')[0]
 
-                   if msg:
-                       module.fail_json(msg=msg, changed=False)
+                    if msg:
+                        module.fail_json(msg=msg, changed=False)
 
-def remove_patch (module, msg, oracle_home, patch_base, patch_id, opatchauto, ocm_response_file,output):
+
+def remove_patch (module, oracle_home, patch_base, patch_id, opatchauto, ocm_response_file,output):
     '''
     Removes the patch
     '''
@@ -375,6 +395,7 @@ def main():
     global opatch_version
     global opatch_version_noocm
     global conflict_check
+    global opatch_minversion
 
     module = AnsibleModule(
         argument_spec = dict(
@@ -408,6 +429,9 @@ def main():
     stop_processes      = module.params["stop_processes"]
     output              = module.params["output"]
     state               = module.params["state"]
+
+    if patch_base and not patch_id:
+        patch_id = get_patch_id(module, patch_base)
 
     if oracle_home is not None:
         os.environ['ORACLE_HOME'] = oracle_home
@@ -450,11 +474,12 @@ def main():
         module.fail_json(msg=msg,changed=False)
 
     if state == 'opatchversion':
-        module.exit_json(msg=opatch_version , changed=False)
+        module.exit_json(msg=opatch_version, changed=False)
 
     if state == 'present':
-        if not check_patch_applied(module, msg, oracle_home, patch_id, patch_version, opatchauto):
-            if apply_patch(module, msg, oracle_home, patch_base, patch_id,patch_version, opatchauto,ocm_response_file,offline,stop_processes,rolling,output):
+        if not check_patch_applied(module, oracle_home, patch_id, patch_version, opatchauto):
+            if apply_patch(module, oracle_home, patch_base, patch_id, patch_version, opatchauto, ocm_response_file
+                    , offline, stop_processes, rolling, output):
                 if patch_version is not None:
                     msg = 'Patch %s (%s) successfully applied to %s' % (patch_id,patch_version, oracle_home)
                 else:
@@ -469,8 +494,8 @@ def main():
             module.exit_json(msg=msg, changed=False)
 
     elif state == 'absent':
-        if check_patch_applied(module, msg, oracle_home, patch_id, patch_version, opatchauto):
-            if remove_patch(module, msg, oracle_home, patch_base, patch_id, opatchauto,ocm_response_file, output):
+        if check_patch_applied(module, oracle_home, patch_id, patch_version, opatchauto):
+            if remove_patch(module, oracle_home, patch_base, patch_id, opatchauto,ocm_response_file, output):
                 if patch_version is not None:
                     msg = 'Patch %s (%s) successfully removed from %s' % (patch_id,patch_version, oracle_home)
                 else:
