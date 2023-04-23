@@ -73,4 +73,4 @@ if __name__ == '__main__':
     parser.add_argument('-d', '--directory')
     args = parser.parse_args()
 
-    main(args.directory)
+    main(os.path.abspath(args.directory))
