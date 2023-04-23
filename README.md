@@ -155,13 +155,13 @@ This results into situation when all white-noise characters are omited and resul
 
 - Create/alter/drop database profile
   
-       - name
-         oracle_profile:
-           mode: sysdba
-           profile: unlimited_profile
-           attribute_name:  ["PASSWORD_LIFE_TIME", "PASSWORD_REUSE_MAX"]
-           attribute_value: ["UNLIMITED", "UNLIMITED"]
-           state: present
+        - name
+          oracle_profile:
+            mode: sysdba
+            profile: unlimited_profile
+            attribute_name:  ["PASSWORD_LIFE_TIME", "PASSWORD_REUSE_MAX"]
+            attribute_value: ["UNLIMITED", "UNLIMITED"]
+            state: present
 
 ## **oracle_role**
 
@@ -182,15 +182,15 @@ This results into situation when all white-noise characters are omited and resul
 - Creates & drops a user
 - Does not suppot privileges (use oracle_grants for that)
 
-       - name: sysdg user
-         oracle_user:
-           mode: sysdba
-           schema: sample_user
-           state: present
-           profile: app_profile
-           #schema_password_hash: 'T:BC3BF4B95DBAE1A9B6E633FB90FDB2351ACEFE5871A990806F565AD756D4C5C2312B4D2306A34C5BD0588E49F8AB8F0CBFF0DBE427B373B3E3BFE374904B6E01E2EC5166823A917227492E58556AE1D5' # pw: Xiejfkljfssgdhd123
-           schema_password: Xiejfkljfssgdhd123
-           default_tablespace: users
+        - name: sysdg user
+          oracle_user:
+            mode: sysdba
+            schema: sample_user
+            state: present
+            profile: app_profile
+            #schema_password_hash: 'T:BC3BF4B95DBAE1A9B6E633FB90FDB2351ACEFE5871A990806F565AD756D4C5C2312B4D2306A34C5BD0588E49F8AB8F0CBFF0DBE427B373B3E3BFE374904B6E01E2EC5166823A917227492E58556AE1D5' # pw: Xiejfkljfssgdhd123
+            schema_password: Xiejfkljfssgdhd123
+            default_tablespace: users
 
 
 ## **oracle_tablespace**
@@ -200,7 +200,7 @@ This results into situation when all white-noise characters are omited and resul
 - Manages normal(permanent), temp & undo tablespaces (create, drop, make read only/read write, offline/online)
 - Tablespaces can be created as bigfile, autoextend, ...
 
-       - name: USERS tablespace
+        - name: USERS tablespace
           oracle_tablespace: 
             tablespace: test
             # use: db_create_file_dest parameter
