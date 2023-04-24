@@ -202,16 +202,21 @@ def list_patches(module, oracle_home):
         module.fail_json(msg=msg, changed=False)
 
     retval = dict()
+    msg = 'lspatches'
     for line in stdout.split('\n'):
         line = line.strip()
         if not line:
             continue
         if line.startswith('OPatch succeeded'):
+            msg = line
             break
-        (patch_id, description) = line.split(';')
-        if patch_id and description:
-            retval.update({patch_id: description})
-    return retval
+        if ';' in line:
+            (patch_id, description) = line.split(';')
+            if patch_id and description:
+                retval.update({patch_id: description})
+        else:
+            msg = line
+    module.exit_json(msg=msg, lspatches=retval, changed=False)
 
 
 def analyze_patch (module, oracle_home, patch_base, opatchauto):
@@ -531,8 +536,7 @@ def main():
 
             module.exit_json(msg=msg, changed=False)
     elif state == 'lspatches':
-        patches = list_patches(module, oracle_home)
-        module.exit_json(msg='lspatches', lspatches=patches, changed=False)
+        list_patches(module, oracle_home)
 
     module.exit_json(msg="Unhandled exit", changed=False)
 
