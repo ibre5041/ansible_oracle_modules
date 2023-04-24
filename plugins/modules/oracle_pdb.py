@@ -252,7 +252,6 @@ def ensure_pdb_state(conn, module, current_state):
     default_tablespace = module.params['default_tablespace']
     default_temp_tablespace = module.params['default_temp_tablespace']
     timezone = module.params['timezone']
-    service_name = module.params['service_name']
     save_state = module.params['save_state']
 
     change_db_sql = []
@@ -284,9 +283,6 @@ def ensure_pdb_state(conn, module, current_state):
     if timezone:
         wanted_state.update({'DBTIMEZONE': timezone})
 
-    if service_name:
-        wanted_state.update({'service_name': service_name})
-
     changes = set(wanted_state.items()).difference(current_state)
 
     about_to_open = wanted_state['open_mode'] in ['open', 'restricted', 'read_only'] or dict(current_state)['open_mode'] == 'READ WRITE'
@@ -309,26 +305,6 @@ def ensure_pdb_state(conn, module, current_state):
     if 'DBTIMEZONE' in dict(changes) and about_to_open:
         sql = "alter PLUGGABLE database %s set time_zone = '%s'" % (pdb_name, timezone)
         change_db_sql.append(sql)
-
-    if 'service_name' in dict(changes) and about_to_open:
-        drop_sql = """
-        begin
-        begin DBMS_SERVICE.stop_service('%s', DBMS_SERVICE.ALL_INSTANCES); EXCEPTION WHEN others then null; end;
-        DBMS_SERVICE.delete_service('%s');
-        end;
-        """
-        add_sql = """
-        begin
-        DBMS_SERVICE.create_service('%s' , '%s');
-        DBMS_SERVICE.start_service('%s');
-        end;        
-        """
-        current_services = dict(current_state)['service_name'].split(',')
-        for current_service in current_services:
-            if current_service.lower() != service_name.lower() and current_service.lower() != pdb_name.lower():
-                change_db_sql.append(drop_sql % (current_service, current_service))
-        if service_name.lower() not in [x.lower() for x in current_services] and service_name.lower() != pdb_name.lower():
-            change_db_sql.append(add_sql % (service_name, service_name, service_name))
 
     # TODO: select a.name,b.state from v$pdbs a , dba_pdb_saved_states b where a.con_id = b.con_id;
     if changes and save_state:
