@@ -8,7 +8,7 @@ short_description: Manage patches in an Oracle environment
     - Manages patches (applies/rolls back)
     - Only manages the opatch part of patching (opatch/opatch auto/opatchauto)
     - If opatchauto is true, the task has to be run as root
-version_added: "2.4.0.0"
+version_added: "3.0.1"
 options:
     oracle_home:
         description:
