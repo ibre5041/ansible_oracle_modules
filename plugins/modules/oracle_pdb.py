@@ -351,12 +351,12 @@ def ensure_pdb_state(conn, module, current_state):
 
 def check_pdb_status(conn, module):
     sql = """
-    select name, con_id, con_uid, open_mode,restricted
+    select name, con_id, con_uid, open_mode, restricted
         , to_char(open_time,'HH24:MI:SS YYYY-MM-DD') as open_time
         , recovery_status
         , a.service_name
     from v$pdbs
-    join
+    left outer join
     (
      select PDB, LISTAGG(NETWORK_NAME, ',') WITHIN GROUP(ORDER BY PDB) as service_name
      from cdb_services group by PDB
