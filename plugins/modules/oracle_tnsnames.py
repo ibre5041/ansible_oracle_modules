@@ -8,7 +8,7 @@ short_description: Manipulate Oracle's tnsnames.ora and other .ora files
 description:
     - Manipulate Oracle's tnsnames.ora and other .ora files
     - Must be run on a remote host
-version_added: "2.7"
+version_added: "3.0.1"
 options:
     path:
         description:
