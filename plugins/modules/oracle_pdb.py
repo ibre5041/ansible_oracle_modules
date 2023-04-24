@@ -7,7 +7,7 @@ module: oracle_pdb
 short_description: Manage pluggable databases in Oracle
 description:
     - Manage pluggable databases in Oracle.
-version_added: "3.0.0"
+version_added: "3.0.1"
 options:
     name:
         description:
@@ -151,6 +151,13 @@ def check_pdb_exists(conn, pdb_name):
     prop = conn.execute_select(sql, None, fetchone=False)
     result.update(dict(prop))
 
+    sql = """
+    select LISTAGG(NETWORK_NAME,',') WITHIN GROUP (ORDER BY PDB) as SERVICE_NAME
+    from cdb_services group by PDB having PDB=:pdb_name
+    """
+    prop = conn.execute_select_to_dict(sql, {"pdb_name": pdb_name}, fetchone=True)
+    result.update(prop)
+
     return set(result.items())
 
 
@@ -182,6 +189,7 @@ def create_pdb(conn, module):
 
     datafile_dest = module.params['datafile_dest']
     file_name_convert = module.params['file_name_convert']
+    service_name_convert = module.params['service_name_convert']
     run_sql = []
 
     createsql = 'create pluggable database %s' % pdb_name
@@ -204,8 +212,12 @@ def create_pdb(conn, module):
         createsql += ' roles = (%s)' % ','.join(roles)
 
     if file_name_convert:
-        quoted = ','.join([ "'%s', '%s'" % (x[0], x[1]) for x in zip(file_name_convert.keys(), file_name_convert.values())])
+        quoted = ','.join(["'%s', '%s'" % (x[0], x[1]) for x in zip(file_name_convert.keys(), file_name_convert.values())])
         createsql += ' file_name_convert = (%s)' % quoted
+
+    if service_name_convert:
+        quoted = ','.join(["'%s', '%s'" % (x[0], x[1]) for x in zip(service_name_convert.keys(), service_name_convert.values())])
+        createsql += ' service_name_convert = (%s)' % quoted
 
     if datafile_dest:
         createsql += " create_file_dest = '%s'" % datafile_dest
@@ -240,6 +252,7 @@ def ensure_pdb_state(conn, module, current_state):
     default_tablespace = module.params['default_tablespace']
     default_temp_tablespace = module.params['default_temp_tablespace']
     timezone = module.params['timezone']
+    service_name = module.params['service_name']
     save_state = module.params['save_state']
 
     change_db_sql = []
@@ -271,9 +284,12 @@ def ensure_pdb_state(conn, module, current_state):
     if timezone:
         wanted_state.update({'DBTIMEZONE': timezone})
 
+    if service_name:
+        wanted_state.update({'service_name': service_name})
+
     changes = set(wanted_state.items()).difference(current_state)
 
-    about_to_open = wanted_state['open_mode'] in ['open', 'restricted', 'read_only']
+    about_to_open = wanted_state['open_mode'] in ['open', 'restricted', 'read_only'] or dict(current_state)['open_mode'] == 'READ WRITE'
 
     if 'open_mode' in dict(changes):
         change_db_sql.append(ensure_sql)
@@ -293,6 +309,26 @@ def ensure_pdb_state(conn, module, current_state):
     if 'DBTIMEZONE' in dict(changes) and about_to_open:
         sql = "alter PLUGGABLE database %s set time_zone = '%s'" % (pdb_name, timezone)
         change_db_sql.append(sql)
+
+    if 'service_name' in dict(changes) and about_to_open:
+        drop_sql = """
+        begin
+        begin DBMS_SERVICE.stop_service('%s', DBMS_SERVICE.ALL_INSTANCES); EXCEPTION WHEN others then null; end;
+        DBMS_SERVICE.delete_service('%s');
+        end;
+        """
+        add_sql = """
+        begin
+        DBMS_SERVICE.create_service('%s' , '%s');
+        DBMS_SERVICE.start_service('%s');
+        end;        
+        """
+        current_services = dict(current_state)['service_name'].split(',')
+        for current_service in current_services:
+            if current_service.lower() != service_name.lower() and current_service.lower() != pdb_name.lower():
+                change_db_sql.append(drop_sql % (current_service, current_service))
+        if service_name.lower() not in [x.lower() for x in current_services]:
+            change_db_sql.append(add_sql % (service_name, service_name, service_name))
 
     # TODO: select a.name,b.state from v$pdbs a , dba_pdb_saved_states b where a.con_id = b.con_id;
     if changes and save_state:
@@ -314,10 +350,19 @@ def ensure_pdb_state(conn, module, current_state):
 
 
 def check_pdb_status(conn, module):
-    sql = "select name, con_id, con_uid, open_mode,restricted" \
-          " ,to_char(open_time,'HH24:MI:SS YYYY-MM-DD') as open_time" \
-          " ,recovery_status " \
-          " from v$pdbs where upper(name) = :pdb_name"
+    sql = """
+    select name, con_id, con_uid, open_mode,restricted
+        , to_char(open_time,'HH24:MI:SS YYYY-MM-DD') as open_time
+        , recovery_status
+        , a.service_name
+    from v$pdbs
+    join
+    (
+     select PDB, LISTAGG(NETWORK_NAME, ',') WITHIN GROUP(ORDER BY PDB) as service_name
+     from cdb_services group by PDB
+    ) a on a.pdb = v$pdbs.name
+    where upper(name) = :pdb_name
+    """
     result = conn.execute_select_to_dict(sql, {"pdb_name": module.params['pdb_name'].upper()}, fetchone=True)
     return result
 
