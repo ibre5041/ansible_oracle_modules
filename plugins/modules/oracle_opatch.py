@@ -193,6 +193,27 @@ def check_patch_applied(module, oracle_home, patch_id, patch_version, opatchauto
             return False
 
 
+def list_patches(module, oracle_home):
+    command = '%s/OPatch/opatch lspatches ' % oracle_home
+    (rc, stdout, stderr) = module.run_command(command)
+    #module.exit_json(msg=stdout, changed=False)
+    if rc != 0:
+        msg = 'Error - STDOUT: %s, STDERR: %s, COMMAND: %s' % (stdout, stderr, command)
+        module.fail_json(msg=msg, changed=False)
+
+    retval = dict()
+    for line in stdout.split('\n'):
+        line = line.strip()
+        if not line:
+            continue
+        if line.startswith('OPatch succeeded'):
+            break
+        (patch_id, description) = line.split(';')
+        if patch_id and description:
+            retval.update({patch_id: description})
+    return retval
+
+
 def analyze_patch (module, oracle_home, patch_base, opatchauto):
     checks = []
     if opatchauto:
@@ -410,7 +431,7 @@ def main():
 #            stop_processes      = dict(default='True', type='bool'),
             stop_processes      = dict(default='False', type='bool'),
             output              = dict(default="short", choices=["short", "verbose"]),
-            state               = dict(default="present", choices=["present", "absent", "opatchversion"]),
+            state               = dict(default="present", choices=["present", "absent", "opatchversion", "lspatches"]),
         ),
     )
 
@@ -509,6 +530,10 @@ def main():
                 msg = 'Patch %s is not applied to %s' % (patch_id, oracle_home)
 
             module.exit_json(msg=msg, changed=False)
+    elif state == 'lspatches':
+        patches = list_patches(module, oracle_home)
+        module.exit_json(msg='lspatches', lspatches=patches, changed=False)
+
     module.exit_json(msg="Unhandled exit", changed=False)
 
 
