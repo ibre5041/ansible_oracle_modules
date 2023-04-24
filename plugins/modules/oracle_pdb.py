@@ -327,7 +327,7 @@ def ensure_pdb_state(conn, module, current_state):
         for current_service in current_services:
             if current_service.lower() != service_name.lower() and current_service.lower() != pdb_name.lower():
                 change_db_sql.append(drop_sql % (current_service, current_service))
-        if service_name.lower() not in [x.lower() for x in current_services]:
+        if service_name.lower() not in [x.lower() for x in current_services] and service_name.lower() != pdb_name.lower():
             change_db_sql.append(add_sql % (service_name, service_name, service_name))
 
     # TODO: select a.name,b.state from v$pdbs a , dba_pdb_saved_states b where a.con_id = b.con_id;
