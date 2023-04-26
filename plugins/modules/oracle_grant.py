@@ -364,7 +364,7 @@ def main():
 
             grants        = dict(default=None, type="list", aliases=['privileges']),
             object_privs  = dict(default=None, type="list", aliases=['objprivs', 'objects_privileges']),
-            directory_privs = dict(default=None, type="list", aliases=['dirprivs']),
+            directory_privs = dict(default=None, type="list", aliases=['dirprivs', 'directory_privileges']),
             grant_mode    = dict(default="append", choices=["append", "exact"], aliases=['privs_mode']),
             container     = dict(default=None),
             state         = dict(default="present", choices=["present", "absent", "REMOVEALL"])
