@@ -1,10 +1,17 @@
 ---
+
 - name: "define connection parameters"
   set_fact:
     connection_parameters: &con_param
-      service_name: "{{ service_name }}"
-      username: "SYS"
-      password: "{{ sys_password }}"
+      hostname: "{{ oracle_hostname }}"      
+      port: "{{ oracle_port }}"
+      #service_name: "{{ oracle_service_name }}"
+      #username: "{{ oracle_username }}"
+      #password: "{{ oracle_password }}"
+      # Connect into PDB
+      service_name: "{{ oracle_service_name }}_PDB"
+      username: pdbadmin
+      password: pdbpass
       mode: "sysdba"
 
 - name: grant create session in check mode

@@ -4,9 +4,13 @@
     connection_parameters: &con_param
       hostname: "{{ oracle_hostname }}"      
       port: "{{ oracle_port }}"      
-      service_name: "{{ oracle_service_name }}"
-      username: "{{ oracle_username }}"
-      password: "{{ oracle_password }}"
+      #service_name: "{{ oracle_service_name }}"
+      #username: "{{ oracle_username }}"
+      #password: "{{ oracle_password }}"
+      # Connect into PDB
+      service_name: "{{ oracle_service_name }}_PDB"
+      username: pdbadmin
+      password: pdbpass      
       mode: "sysdba"
 
 - name: remove inexistent privilege from user
@@ -14,8 +18,9 @@
     <<: *con_param
     grantee: "u_foo"
     objects_privileges:
-      dbms_random:
-        - "execute"
+      - execute:dbms_random
+      # dbms_random:
+      #   - "execute"
     state: "absent"
   register: _
   failed_when: _.failed or _.changed
@@ -25,8 +30,9 @@
     <<: *con_param
     grantee: "u_foo"
     objects_privileges:
-      dbms_random:
-        - "execute"
+      - execute:dbms_random      
+      # dbms_random:
+      #   - "execute"
     state: "present"
 
 - name: remove this privilege from user
@@ -34,8 +40,9 @@
     <<: *con_param
     grantee: "u_foo"
     objects_privileges:
-      dbms_random:
-        - "execute"
+      - execute:dbms_random      
+      # dbms_random:
+      #   - "execute"
     state: "absent"
   register: _
   failed_when: _.failed or not _.changed
@@ -45,11 +52,13 @@
     <<: *con_param
     grantee: "u_foo"
     objects_privileges:
-      dbms_random:
-        - "execute"
-      dba_users:
-        - "select"
-        - "read"
+      - execute:dbms_random
+      - read,select:dba_users
+      # dbms_random:
+      #   - "execute"
+      # dba_users:
+      #   - "select"
+      #   - "read"
     state: "present"
 
 - name: remove this privilege from user
@@ -57,20 +66,21 @@
     <<: *con_param
     grantee: "u_foo"
     objects_privileges:
-      dba_users:
-        - "select"
+      - select:dba_users
+      # dba_users:
+      #   - "select"
     state: "absent"
   register: _
   failed_when: |
-    _.failed or (
-    not _.changed and
-    'dbms_random' in _.ddls and
-    'dba_users' not in _.ddls and
-    'read' in _.ddls and
-    'select' not in _.ddls)
+    _.failed or
+    not _.changed or
+    'dbms_random' in _.ddls[0] or
+    'dba_users' not in _.ddls[0] or
+    'read' in _.ddls[0] or 'select' not in _.ddls[0]
 
 - name: reset user's privilege
   oracle_grant:
     <<: *con_param
     grantee: "u_foo"
+    grant_mode: "exact"    
 ...
