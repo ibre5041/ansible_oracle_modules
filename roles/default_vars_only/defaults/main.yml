@@ -1,0 +1,167 @@
+---
+# defaults file for default_vars_only
+
+# default instalation type, possible values are:
+# standalone, restart, rac
+# if you want to override any of these define same variable in
+# inventory host_var (on host level)
+oracle_install_type: standalone
+
+oracle_install_dir_root: /oracle/u01
+oracle_install_dir_temp: "{{ oracle_install_dir_root}}/tmp"
+oracle_install_dir_base: "{{ oracle_install_dir_root}}/base"
+oracle_install_dir_prod: "{{ oracle_install_dir_root}}/product"
+
+oracle_inventory_location: "{{ oracle_install_dir_root}}/oraInventory"
+
+oracle_cluster_name: "CDEFAULT"
+
+# Oracle DB password, override this in inventory/host_vars
+oracle_password: X43ljflkjfslkjslj
+
+oracle_diskgroup: "XDATA"
+oracle_datafiles: "{{ oracle_install_dir_root + '/data'                if oracle_install_type == 'standalone' else '+' + oracle_diskgroup }}"
+oracle_flasharea: "{{ oracle_install_dir_root + '/flash_recovery_area' if oracle_install_type == 'standalone' else '+' + oracle_diskgroup }}"
+
+oracle_os_user: oracle
+oracle_os_uid: 800
+oracle_os_group: oinstall
+oracle_os_groups:
+  - group: oinstall
+    gid: 800
+  - group: dba
+    gid: 801
+  - group: oper
+    gid: 802
+  - group: asmadmin
+    gid: 803
+  - group: asmdba
+    gid: 804
+  - group: asmoper
+    gid: 805
+
+oracle_install_space:
+  21c:
+    oracle_sid:         "TEST21C"
+    oracle_db_name:     "TEST21C"
+    oracle_unique_name: "TEST21C"
+    oracle_gi_response_file: grid.no.comments.21c.rsp
+    oracle_oh_response_file: db.no.comments.21c.rsp
+    oracle_db_response_file: dbca.no.comments.21c.rsp
+    oracle_db_ver_release: 21c
+    oracle_db_ver_path: 21.3.0.0
+    oracle_db_media: LINUX.X64_213000_db_home.zip
+    oracle_gi_media: LINUX.X64_213000_grid_home.zip
+
+  19c:
+    oracle_sid:         "TEST19C"
+    oracle_db_name:     "TEST19C"
+    oracle_unique_name: "TEST19C"
+    oracle_gi_response_file: grid.no.comments.19c.rsp
+    oracle_oh_response_file: db.no.comments.19c.rsp
+    oracle_db_response_file: dbca.no.comments.19c.rsp
+    oracle_db_ver_release: 19c
+    oracle_db_ver_path: 19.17.0.0
+    oracle_db_media: db_home_2022_Oct.zip
+    oracle_gi_media: grid_home_2022_Oct.zip
+    # oracle_gi_media: LINUX.X64_193000_grid_home.zip
+
+  18c:
+    oracle_sid:         "TEST18C"
+    oracle_db_name:     "TEST18C"
+    oracle_unique_name: "TEST18C"
+    oracle_gi_response_file: grid.no.comments.18c.rsp
+    oracle_oh_response_file: db.no.comments.18c.rsp
+    oracle_db_response_file: dbca.no.comments.18c.rsp
+    oracle_db_ver_release: 18c
+    oracle_db_ver_path: 18.0.0.0
+    oracle_db_media: LINUX.X64_180000_db_home.zip
+    oracle_gi_media: LINUX.X64_180000_grid_home.zip
+
+oracle_os_sysctl:
+  - sysctl: kernel.shmmni
+    value: "4096"
+
+  - sysctl: kernel.sem
+    value: "1010 129280 1010 128"
+
+  - sysctl: fs.file-max
+    value: "6815744"
+
+  - sysctl: net.ipv4.ip_local_port_range
+    value: "9000 65501"
+
+  - sysctl: net.core.rmem_default
+    value: "262144"
+
+  - sysctl: net.core.rmem_max
+    value: "4194304"
+
+  - sysctl: net.core.wmem_default
+    value: "262144"
+
+  - sysctl: net.core.wmem_max
+    value: "1048576"
+
+  - sysctl: fs.aio-max-nr
+    value: "4194304"
+
+  - sysctl: kernel.panic_on_oops
+    value: "1"
+
+  - sysctl: kernel.shmall
+    value: "{{ shma }}"
+
+  - sysctl: kernel.shmmax
+    value: "{{ shmm }}"
+
+  # PRCF-2010 : All connections to the remote nodes got refused. 
+  #- sysctl: net.ipv6.bindv6only
+  #  value: '0'
+
+  # https://access.redhat.com/documentation/en-us/reference_architectures/2017/html-single/deploying_oracle_rac_database_12c_release_2_on_red_hat_enterprise_linux_7/index#kernel_parameters
+  - sysctl: vm.swappiness
+    value: '1'
+
+  - sysctl: vm.dirty_background_ratio
+    value: '3'
+
+  - sysctl: vm.dirty_ratio
+    value: '80'
+
+  - sysctl: vm.dirty_expire_centisecs
+    value: '500'
+
+  - sysctl: vm.dirty_writeback_centisecs
+    value: '100'
+
+oracle_os_packages_all:
+  - glibc-devel
+  - libstdc++-devel
+  - libaio-devel
+  - libXtst
+  - perl-Data-Dumper
+  - unzip
+  - libXrender
+  - bc
+  - net-tools
+  - make
+  - gcc
+  - gdb
+  - lsof
+  - strace
+  - ksh
+  - smartmontools
+  
+oracle_os_packages_rhel7:
+  - compat-libstdc++-33
+  - compat-libcap1
+  - ntp
+
+oracle_os_packages_rhel8:
+  - libnsl
+  - policycoreutils-python-utils
+  - chrony
+
+oracle_os_packages_crs:
+  - gcc-c++

@@ -1,0 +1,85 @@
+---
+# tasks file for base.oracle
+
+- debug: var=ansible_memory_mb
+- debug: msg="total RAM is {{ ansible_memory_mb.real.total }} required 4096M "
+- fail: msg="not enough RAM"
+  when: ansible_memory_mb.real.total < 4096
+
+- debug: msg="MEM {{ mem }}"
+- debug: msg="SHMA {{ shma }}"
+- debug: msg="SHMM {{ shmm }}"
+
+- name: System details
+  debug: msg="{{ item }}"
+  with_items: 
+  - "{{ ansible_distribution }}"
+  - "{{ ansible_distribution_version }}"
+  - "{{ ansible_distribution_major_version }}"
+
+- name: Kernel parameters for Oracle 
+  sysctl:
+    name:  "{{ item['sysctl'] }}"
+    value: "{{ item['value'] }}"
+    sysctl_file: /etc/sysctl.d/98-oracle.conf
+  loop: "{{ oracle_os_sysctl }}"
+  tags: [slow]
+
+- name: tuned oracle dir
+  file:
+    path: /usr/lib/tuned/oracle/
+    state: directory
+    recurse: yes
+
+- name: tuned.conf
+  copy:
+    src: tuned.conf
+    dest: /usr/lib/tuned/oracle/tuned.conf
+
+- name: "Ensure Oracle required .rpms are installed: {{ oracle_os_packages | join(' ') }}"
+  yum:
+    name: "{{ oracle_os_packages }}"
+    state: latest
+  tags: [packages,slow]
+  
+# - name: Stop firewall
+#   systemd:
+#     name: firewalld.service
+#     state: stopped
+#     enabled: no
+
+- name: Ensure Oracle required OS groups exist
+  group:
+    name: "{{ item['group'] }}"
+    gid:  "{{ item['gid'] }}"
+  loop: "{{ oracle_os_groups }}"
+
+- name: Add the user "oracle"
+  user:
+    name: oracle
+    shell: /bin/bash
+    uid:    "{{ oracle_os_uid }}"
+    group:  "{{ oracle_os_group }}"
+    groups: "{{ oracle_os_groups | map(attribute='group') | list }}"
+    comment: "Oracle instalation owner"
+    append: yes
+    system: yes
+    # python -c 'import crypt; print crypt.crypt("acror", "$1$SomeSalt$")'
+    password: "$1$SomeSalt$V2yJBnrIRWQytrgM9BB2Y1"
+
+- name: Oracle sudo
+  copy:
+    src: sudoerrs
+    dest: /etc/sudoers.d/oracle
+    mode: '0440'
+
+# TODO, systemd hapily ignores this
+# https://martincarstenbach.wordpress.com/2021/07/23/do-i-really-have-to-set-resource-limits-for-oracle-in-systemd-unit-files/
+# https://martincarstenbach.wordpress.com/2021/06/17/shell-limits-oracle-single-instance-and-systemd-in-oracle-linux-8-4/
+#
+- name: Limits
+  copy:
+    src: 99-oracle-limits.conf
+    dest: /etc/security/limits.d/99-oracle-limits.conf
+
+- include: filesystem.yml
