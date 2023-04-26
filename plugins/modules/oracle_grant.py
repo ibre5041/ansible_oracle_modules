@@ -67,13 +67,16 @@ options:
         choices: ['enforce','append']
     state:
         description:
-            - The intended state of the priv (present=added to the user, absent=removed from the user). REMOVEALL will remove ALL role/sys privileges
+            - The intended state of the priv (present=added to the user, absent=removed from the user). 
+            -  REMOVEALL will remove ALL role/sys privileges
         default: present
         choices: ['present','absent','REMOVEALL']
 notes:
     - cx_Oracle needs to be installed
 requirements: [ "cx_Oracle" ]
-author: Mikael Sandström, oravirt@gmail.com, @oravirt
+author: 
+    - Mikael Sandström, oravirt@gmail.com, @oravirt
+    - Ivan Brezina
 '''
 
 EXAMPLES = '''
@@ -279,50 +282,40 @@ def ensure_grant(module, conn, schema, wanted_grant_list, object_privs, director
 
 
 # Remove grant to the schema
-def remove_grant(module, conn, schema, remove_grant_list, state):
+def remove_grant(module, conn, grantee, grants, object_privs, directory_privs, container):
     sql = ''
 
     # This list will hold all grant/privs the user currently has
-    total_current=[]
+    total_current = []
+    total_sql = []
 
-    # Get the current role grant for the schema.
-    # If any are present, add them to the total
-    curr_role_grant = get_current_role_grant(conn, schema)
-    if any(curr_role_grant):
-        total_current.extend(curr_role_grant)
+    for grant in grants:
+        sql = 'revoke %s from %s' % (grant, grantee)
+        if container:
+            sql += ' container=CURRENT'
+        total_sql.append(sql)
 
-    # Get the current sys privs for the schema
-    # If any are present, add them to the total
-    curr_sys_grant = get_current_sys_grant(conn, schema)
-    if any(curr_sys_grant):
-        total_current.extend(curr_sys_grant)
+    for object_priv in object_privs:
+        privilege = object_priv.split(':')[0].lower()
+        objct = object_priv.split(':')[1].lower()
+        sql = 'revoke %s on %s from %s' % (privilege, objct, grantee)
+        total_sql.append(sql)
 
-    # Get the difference between current grant and wanted grant
-    grant_to_remove = set(remove_grant_list).intersection(total_current)
+    for directory_priv in directory_privs:
+        privilege = directory_priv.split(':')[0].lower()
+        directory = directory_priv.split(':')[1].lower()
+        sql = 'revoke %s on directory %s from %s' % (privilege, directory, grantee)
+        total_sql.append(sql)
 
-    # If state=REMOVEALL is used, all grant/privs will be removed
-    if state == 'REMOVEALL' and any(total_current):
-        remove_all = ','.join(total_current)
-        sql += 'revoke %s from %s' % (remove_all, schema)
-        msg = 'All privileges/grant (%s) are removed from schema/role %s' % (remove_all, schema)
-        conn.execute_ddl(conn, sql)
-        module.exit_json(msg=msg, changed=conn.changed)
+    for sql in total_sql:
+        # Ignore errors:
+        # 01951, 00000,  "ROLE '%s' not granted to '%s'"
+        # 01927, 00000, "cannot REVOKE privileges you did not grant"
+        # 01952, 00000,  "system privileges not granted to '%s'"
+        conn.execute_ddl(sql, ignore_errors=[1927, 1951, 1952])
 
-    # if there are differences, they will be removed.
-    elif not any(grant_to_remove):
-        module.exit_json(msg="The schema/role (%s) doesn't have the grant(s) you want to remove" % schema, changed=False)
-
-    else:
-        # Convert the list of grant to a string & clean it
-        grant_to_remove = ','.join(grant_to_remove)
-        sql += 'revoke %s from %s' % (grant_to_remove, schema)
-        if grant_to_remove:
-            conn.execute_ddl(conn, sql)
-            msg = 'The grant(s) (%s) successfully removed from the schema/role %s' % (grant_to_remove, schema)
-            module.exit_json(msg=msg, changed=conn.changed)
-        else:
-            msg = 'Nothing to do'
-            module.exit_json(msg=msg, changed=conn.changed)
+    msg = 'The grant(s) successfully removed from the schema/role %s' % grantee
+    module.exit_json(msg=msg, changed=conn.changed, ddls=conn.ddls)
 
 
 # Get the current role/sys grant
@@ -378,9 +371,9 @@ def main():
     )
 
     grantee = module.params["grantee"]
-    grants = module.params["grants"]
-    object_privs = module.params["object_privs"]
-    directory_privs = module.params["directory_privs"]
+    grants = module.params["grants"] or []
+    object_privs = module.params["object_privs"] or []
+    directory_privs = module.params["directory_privs"] or []
     grant_mode = module.params["grant_mode"]
     container = module.params["container"]
     state = module.params["state"]
@@ -392,8 +385,10 @@ def main():
 
     if state == 'present':
         ensure_grant(module, oc, grantee, grants, object_privs, directory_privs, grant_mode, container)
-    elif state in ['absent', 'REMOVEALL']:
-        remove_grant(oc, grantee, grantee, state)
+    if state == 'REMOVEALL':
+        ensure_grant(module, oc, grantee, [], [], [], grant_mode='enforce', container=container)
+    elif state in ['absent']:
+        remove_grant(module, oc, grantee, grants, object_privs, directory_privs, container)
 
     module.fail_json(msg='Unknown object', changed=False)
 
