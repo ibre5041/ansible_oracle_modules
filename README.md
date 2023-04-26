@@ -241,13 +241,24 @@ This results into situation when all white-noise characters are omited and resul
 - Handles roles/sys privileges properly. Does NOT yet handle object/directory privs. They can be added but they are not considered while revoking privileges
 - The grants can be added as a string (dba,'select any dictionary','create any table'), or in a list (ie.g for use with with_items)
 
-       - name: sysdg privs
-         oracle_grants:
-         mode: sysdba
-         schema: sysdg
-         grants:
-           - sysdg
-           - select_catalog_role
+        - name: append user privs
+          oracle_grants:
+          mode: sysdba
+          schema: u_foo
+          grants:
+            - sysdg
+            - select_catalog_role
+	  object_privs:
+	    - execute:dbms_random
+	  directory_privs:
+	    - read,write:data_pump_dir
+	  grant_mode: append
+
+        - name: revoke user privs
+          oracle_grants:
+          mode: sysdba
+          schema: u_foo
+	  grant_mode: exact
 
 
 ## **oracle_sql**
@@ -257,23 +268,23 @@ This results into situation when all white-noise characters are omited and resul
 - 2 modes: sql or script
 - Executes arbitrary sql or runs a script
 
-       tasks:
-         - name: Query database
-           oracle_sql:
-             mode: sysdba
-             sql: select host_name, instance_name from v$instance;
-           register: dbinfo
+        tasks:
+          - name: Query database
+            oracle_sql:
+              mode: sysdba
+              sql: select host_name, instance_name from v$instance;
+            register: dbinfo
 
-         - name: dbinfo
-           debug:
-             var: dbinfo
+          - name: dbinfo
+            debug:
+              var: dbinfo
 
-       environment:
-         ORACLE_HOME: "{{ ORACLE_HOME }}"
-         ORACLE_SID:  "{{ ORACLE_SID }}"
-       become: yes
-       become_user: "{{ oracle_owner }}"
-       become_method: sudo
+        environment:
+          ORACLE_HOME: "{{ ORACLE_HOME }}"
+          ORACLE_SID:  "{{ ORACLE_SID }}"
+        become: yes
+        become_user: "{{ oracle_owner }}"
+        become_method: sudo
 
 
 **oracle_parameter**
