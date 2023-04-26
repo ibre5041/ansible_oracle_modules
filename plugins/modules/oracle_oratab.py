@@ -52,6 +52,7 @@ import glob
 import subprocess
 import socket
 from pwd import getpwuid
+from xml.dom import minidom
 
 from ansible.module_utils.basic import AnsibleModule
 
@@ -260,7 +261,33 @@ class oracle_homes():
     def add_home(self, ORACLE_HOME):
         if ORACLE_HOME and ORACLE_HOME not in self.homes:
             ORACLE_BASE = self.base_from_home(ORACLE_HOME)
-            self.homes[ORACLE_HOME] = {'ORACLE_HOME': ORACLE_HOME, 'ORACLE_BASE': ORACLE_BASE}
+
+            try:
+                inventory_path = os.path.join(ORACLE_HOME, 'inventory', 'ContentsXML', 'comps.xml')
+                inv_tree = minidom.parse(inventory_path)
+                components = inv_tree.getElementsByTagName('COMP')
+                oracle_owner = getpwuid(os.stat(inventory_path).st_uid).pw_name
+                for comp in components:
+                    component_name = comp.attributes['NAME'].value
+                    if component_name == "oracle.client":
+                        component_name = 'client'
+                        break
+                    elif component_name == "oracle.server":
+                        component_name = "server"
+                        break
+                    elif component_name == "oracle.crs":
+                        component_name = "crs"
+                        break
+                    elif component_name == "oracle.tg":
+                        component_name = "gateway"
+                        break
+            except:
+                component_name = 'unknown'
+                oracle_owner = 'unknown'
+            self.homes[ORACLE_HOME] = {'ORACLE_HOME': ORACLE_HOME
+                , 'ORACLE_BASE': ORACLE_BASE
+                , 'home_type': component_name
+                , 'owner': oracle_owner}
 
     def add_sid(self, ORACLE_SID, ORACLE_HOME=None, running=False):
         if ORACLE_SID in self.facts_item:
@@ -378,7 +405,8 @@ def main():
             running_only = dict(default=False, type="bool"),
             open_only = dict(default=False, type="bool"),
             writable_only = dict(default=False, type="bool"),
-            facts_item  = dict()
+            homes = dict(default=None, choices=[None, 'all', 'client', 'server', 'crs', 'gateway']),
+            facts_item = dict()
          ),
         supports_check_mode=True
     )
@@ -386,6 +414,7 @@ def main():
     running_only = module.params['running_only']
     open_only = module.params['open_only']
     writable_only = module.params['writable_only']
+    homes = module.params['homes']
 
     h = oracle_homes(module)
     h.list_crs_instances()
@@ -439,7 +468,21 @@ def main():
                 module.warn('ORACLE_SID: {} is not open'.format(sid))
                 
     #module.warn('uid {}'.format(os.getuid()))
-    module.exit_json(oracle_list=h.facts_item, changed=False)
+
+    if homes:
+        for home in list(h.homes):
+            if homes == 'all':
+                continue
+            elif homes == 'client' and h.homes[home]['home_type'] != 'client':
+                del h.homes[home]
+            elif homes == 'server' and h.homes[home]['home_type'] != 'server':
+                del h.homes[home]
+            elif homes == 'crs' and h.homes[home]['home_type'] != 'crs':
+                del h.homes[home]
+            elif homes == 'gateway' and h.homes[home]['home_type'] != 'gateway':
+                del h.homes[home]
+
+    module.exit_json(oracle_list=h.facts_item, oracle_homes=h.homes, changed=False)
 
 
 if __name__ == '__main__':

@@ -8,7 +8,7 @@ short_description: Manage parameters in an Oracle database
 description:
     - Manage init parameters in an Oracle database
 
-version_added: "1.9.1"
+version_added: "2.0.1"
 options:
     hostname:
         description:
@@ -71,13 +71,8 @@ oracle_parameter: hostname=remote-db-server service_name=orcl user=system passwo
 
 
 '''
+
 import re
-try:
-    import cx_Oracle
-except ImportError:
-    cx_oracle_exists = False
-else:
-    cx_oracle_exists = True
 
 
 # Check if the parameter exists

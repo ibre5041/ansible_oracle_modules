@@ -9,7 +9,7 @@ description:
     - Manage grants/privileges in an Oracle database
     - Handles role/sys privileges at the moment.
     - It is possible to add object privileges as well, but they are not considered when removing privs at the moment.
-version_added: "1.9.1"
+version_added: "3.0.1"
 options:
     hostname:
         description:
