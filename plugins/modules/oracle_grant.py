@@ -368,7 +368,9 @@ def main():
             grant_mode    = dict(default="append", choices=["append", "exact"], aliases=['privs_mode']),
             container     = dict(default=None),
             state         = dict(default="present", choices=["present", "absent", "REMOVEALL"])
-        )
+        ),
+        required_together=[['username', 'password']],
+        supports_check_mode=True
     )
 
     grantee = module.params["grantee"]
