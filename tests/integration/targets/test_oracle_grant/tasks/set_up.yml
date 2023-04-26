@@ -13,15 +13,51 @@
 - name: 'Connection paramters - see or use integration_config.yml.template'
   debug:
     var: connection_parameters
-      
+
+- name: drop PDB
+  oracle_pdb:
+    <<: *con_param
+    pdb_name: "{{ oracle_service_name }}_PDB"
+    state: "absent"
+
+- name: create PDB
+  oracle_pdb:
+    <<: *con_param
+    pdb_name: "{{ oracle_service_name }}_PDB"    
+    pdb_admin_username: pdbadmin
+    pdb_admin_password: pdbpass
+    state: "opened"    
+    roles: dba
+  register: _
+  failed_when: _.failed or not _.changed
+
+- name: grant sysdba to pdbadmin
+  oracle_grant:
+    <<: *con_param
+    grantee: pdbadmin
+    privileges:
+      - "create session"
+      - "sysdba"
+    grant_mode: "append"
+    container: "{{ oracle_service_name }}_PDB"
+    state: present
+  
 - name: create u_foo user
   oracle_user:
     <<: *con_param
+    service_name: "{{ oracle_service_name }}_PDB"
+    username: pdbadmin
+    password: pdbpass
     schema_name: "u_foo"
     schema_password: "bar"
 
 - name: create r_foo role
   oracle_role:
     <<: *con_param
+    service_name: "{{ oracle_service_name }}_PDB"
+    username: pdbadmin
+    password: pdbpass
+    mode: sysdba
+    
     role: "r_foo"
 ...

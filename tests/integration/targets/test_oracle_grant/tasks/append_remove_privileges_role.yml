@@ -4,9 +4,13 @@
     connection_parameters: &con_param
       hostname: "{{ oracle_hostname }}"      
       port: "{{ oracle_port }}"      
-      service_name: "{{ oracle_service_name }}"
-      username: "{{ oracle_username }}"
-      password: "{{ oracle_password }}"
+      #service_name: "{{ oracle_service_name }}"
+      #username: "{{ oracle_username }}"
+      #password: "{{ oracle_password }}"
+      # Connect into PDB
+      service_name: "{{ oracle_service_name }}_PDB"
+      username: pdbadmin
+      password: pdbpass
       mode: "sysdba"
 
 - name: grant to role
@@ -15,8 +19,9 @@
     grantee: "r_foo"
     privileges: "create session"
     objects_privileges:
-      dbms_random:
-        - "execute"
+      - execute:dbms_random      
+      # dbms_random:
+      #   - "execute"
 
 - name: grant something different to role
   oracle_grant:
@@ -24,11 +29,13 @@
     grantee: "r_foo"
     privileges: "create table"
     objects_privileges:
-      dba_users:
-        - "read"
+      - read:dba_users      
+      # dba_users:
+      #   - "read"
 
 - name: reset role's privilege
   oracle_grant:
     <<: *con_param
     grantee: "r_foo"
+    grant_mode: "exact"
 ...
