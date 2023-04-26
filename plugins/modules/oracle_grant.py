@@ -90,59 +90,6 @@ oracle_grant: hostname=localhost service_name=orcl user=system password=manager 
 '''
 
 
-def clean_string(item):
-    item = item.replace("'", "").replace(", ", ",").lstrip(" ").rstrip(",").replace("[", "").replace("]", "")
-    return item
-
-
-def clean_list(item):
-    item = [p.replace("'", "").replace(", ", ",").lstrip(" ").rstrip(",").replace("[", "").replace("]", "") for p in item]
-    return item
-
-
-# Check if the user/schema exists
-def check_user_exists(conn, schema):
-    """Check user exists, return user's attributes"""
-    sql = """
-    select username
-        , account_status
-        , default_tablespace
-        , temporary_tablespace
-        , profile
-        , authentication_type
-        , oracle_maintained
-    from dba_users
-    where username = upper(:schema_name)"""
-
-    r = conn.execute_select_to_dict(sql, {"schema_name": schema}, fetchone=True)
-    if r:
-        acs = r['account_status']
-        if acs == 'EXPIRED & LOCKED':
-            r['account_status'] = 'LOCKED'
-            r['password_status'] = 'EXPIRED'
-        elif acs == 'EXPIRED':
-            r['account_status'] = 'OPEN'
-            r['password_status'] = 'EXPIRED'
-        elif acs == 'LOCKED':
-            r['account_status'] = 'LOCKED'
-            r['password_status'] = 'UNEXPIRED'
-        elif acs == 'OPEN':
-            r['account_status'] = 'OPEN'
-            r['password_status'] = 'UNEXPIRED'
-        else:
-            conn.fail_json(msg="Unsupported account state %s" % acs, ddls=conn.ddls, changed=conn.changed)
-
-    return set(r.items())
-
-
-# Check if the user/role exists
-def check_role_exists(conn, role):
-    role = clean_string(role)
-    sql = 'select * from dba_roles where role = upper(:role_name)'
-    r = conn.execute_select_to_dict(sql, {"role_name": role}, fetchone=True)
-    return r
-
-
 def get_dir_privs(conn, schema, directory_privs, grant_mode):
     total_sql_dir = []
     grant_list_dir = []
@@ -284,24 +231,15 @@ def ensure_grant(module, conn, schema, wanted_grant_list, object_privs, director
     dir_privs = get_dir_privs(conn, schema, directory_privs, grant_mode)
     total_sql.extend(dir_privs)
 
-    exceptions_list = ['DBA']
-    exceptions_priv = ['UNLIMITED TABLESPACE']
-
-    # Strip the list of unnecessary quotes etc
-    wanted_grant_list = clean_list(wanted_grant_list)
     wanted_grant_list = [x.lower() for x in wanted_grant_list]
-    wanted_grant_list_upper = [x.upper() for x in wanted_grant_list]
-    schema = clean_string(schema)
 
     # Get the current role grant for the schema. If any are present, add them to the total
     curr_role_grant = get_current_role_grant(conn, schema)
-    if any(curr_role_grant):
-        total_current.extend(curr_role_grant)
+    total_current.extend(curr_role_grant)
 
     # Get the current sys privs for the schema. If any are present, add them to the total
     curr_sys_grant = get_current_sys_grant(conn, schema)
-    if any(curr_sys_grant):
-        total_current.extend(curr_sys_grant)
+    total_current.extend(curr_sys_grant)
 
     # Get the difference between current grant and wanted grant
     grant_to_add = set(wanted_grant_list).difference(total_current)
@@ -311,18 +249,21 @@ def ensure_grant(module, conn, schema, wanted_grant_list, object_privs, director
     # granted -> on the next run, unlimited tablespace is removed from the user
     # since it is not part of the wanted grant.
     # The following removes 'unlimited tablespace' privilege from the grant_to_remove list, if DBA is also granted
-    if any(x in exceptions_list for x in wanted_grant_list_upper):
-        grant_to_remove = [x for x in grant_to_remove if x.upper() not in exceptions_priv]
+    exceptions_list = ['dba']
+    exceptions_priv = ['unlimited tablespace']
+
+    if any(x in exceptions_list for x in wanted_grant_list):
+        grant_to_remove = [x for x in grant_to_remove if x not in exceptions_priv]
 
     if grant_mode.lower() == 'enforce' and any(grant_to_remove):
         grant_to_remove = ','.join(grant_to_remove)
-        grant_to_remove = clean_string(grant_to_remove)
         remove_sql += 'revoke %s from %s' % (grant_to_remove, schema)
+        if container:
+            add_sql += ' container=CURRENT'
         total_sql.append(remove_sql)
 
     if any(grant_to_add):
         grant_to_add = ','.join(grant_to_add)
-        grant_to_add = clean_string(grant_to_add)
         add_sql += 'grant %s to %s' % (grant_to_add, schema)
         if container:
             add_sql += ' container=CURRENT'
@@ -343,10 +284,6 @@ def remove_grant(module, conn, schema, remove_grant_list, state):
 
     # This list will hold all grant/privs the user currently has
     total_current=[]
-
-    # Strip the list of unnecessary quotes etc
-    remove_grant_list = clean_list(remove_grant_list)
-    schema = clean_string(schema)
 
     # Get the current role grant for the schema.
     # If any are present, add them to the total
@@ -369,7 +306,7 @@ def remove_grant(module, conn, schema, remove_grant_list, state):
         sql += 'revoke %s from %s' % (remove_all, schema)
         msg = 'All privileges/grant (%s) are removed from schema/role %s' % (remove_all, schema)
         conn.execute_ddl(conn, sql)
-        module.exit_json(msg=msg, changed=changed)
+        module.exit_json(msg=msg, changed=conn.changed)
 
     # if there are differences, they will be removed.
     elif not any(grant_to_remove):
@@ -378,15 +315,14 @@ def remove_grant(module, conn, schema, remove_grant_list, state):
     else:
         # Convert the list of grant to a string & clean it
         grant_to_remove = ','.join(grant_to_remove)
-        grant_to_remove = clean_string(grant_to_remove)
         sql += 'revoke %s from %s' % (grant_to_remove, schema)
         if grant_to_remove:
             conn.execute_ddl(conn, sql)
             msg = 'The grant(s) (%s) successfully removed from the schema/role %s' % (grant_to_remove, schema)
-            module.exit_json(msg=msg, changed=changed)
+            module.exit_json(msg=msg, changed=conn.changed)
         else:
             msg = 'Nothing to do'
-            module.exit_json(msg=msg, changed=changed)
+            module.exit_json(msg=msg, changed=conn.changed)
 
 
 # Get the current role/sys grant
@@ -398,9 +334,9 @@ def get_current_role_grant(conn, schema):
         curr_role_grant.append(item[0].lower())
 
     sql = 'select * from v$pwfile_users where USERNAME = upper(:schema)'
-    result = conn.execute_select_to_dict(sql, {'schema': schema}, fetchone=False)
+    result = conn.execute_select_to_dict(sql, {'schema': schema}, fetchone=True)
     if result:
-        for role in ['SYSDBA', 'SYSOPER', 'SYSASM', 'SYSBACKUP', 'SYSDG', 'SYSKM']:
+        for role in ['sysdba', 'sysoper', 'sysasm', 'sysbackup', 'sysdg', 'syskm']:
             if role in result and result[role] == 'TRUE':
                 curr_role_grant.append(role.lower())
 
@@ -455,20 +391,9 @@ def main():
         oc.execute_ddl('alter session set container = %s' % container)
 
     if state == 'present':
-        if check_user_exists(oc, grantee):
-            ensure_grant(module, oc, grantee, grants, object_privs, directory_privs, grant_mode, container)
-        elif check_role_exists(oc, grantee):
-            ensure_grant(module, oc, grantee, grants, object_privs, directory_privs, grant_mode, container)
-        else:
-            msg = "Schema/Role %s doesn't exist" % grantee
-            module.fail_json(msg=msg, changed=False)
+        ensure_grant(module, oc, grantee, grants, object_privs, directory_privs, grant_mode, container)
     elif state in ['absent', 'REMOVEALL']:
-        if check_user_exists(oc, grantee):
-            remove_grant(module, oc, grantee, grantee, state)
-        elif check_role_exists(oc, grantee):
-            remove_grant(oc, grantee, grantee, state)
-        else:
-            module.exit_json(msg="Schema/Role (%s) doesn't exist" % grantee, changed=False)
+        remove_grant(oc, grantee, grantee, state)
 
     module.fail_json(msg='Unknown object', changed=False)
 
