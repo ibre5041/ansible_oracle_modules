@@ -299,7 +299,7 @@ def ensure_grant(module, conn, schema, wanted_grant_list, object_privs, director
         total_current.extend(curr_role_grant)
 
     # Get the current sys privs for the schema. If any are present, add them to the total
-    curr_sys_grant=get_current_sys_grant(conn, schema)
+    curr_sys_grant = get_current_sys_grant(conn, schema)
     if any(curr_sys_grant):
         total_current.extend(curr_sys_grant)
 
@@ -325,7 +325,7 @@ def ensure_grant(module, conn, schema, wanted_grant_list, object_privs, director
         grant_to_add = clean_string(grant_to_add)
         add_sql += 'grant %s to %s' % (grant_to_add, schema)
         if container:
-            add_sql += ' container=%s' % container
+            add_sql += ' container=CURRENT'
         total_sql.append(add_sql)
 
     if total_sql:
@@ -420,7 +420,6 @@ def get_current_sys_grant(conn, schema):
 
 
 def main():
-    global changed
     module = AnsibleModule(
         argument_spec = dict(
             oracle_home   = dict(required=False, aliases=['oh']),
@@ -451,6 +450,10 @@ def main():
     state = module.params["state"]
 
     oc = oracleConnection(module)
+
+    if container:
+        oc.execute_ddl('alter session set container = %s' % container)
+
     if state == 'present':
         if check_user_exists(oc, grantee):
             ensure_grant(module, oc, grantee, grants, object_privs, directory_privs, grant_mode, container)
