@@ -8,7 +8,7 @@ short_description: Manage parameters in an Oracle database
 description:
     - Manage init parameters in an Oracle database
 
-version_added: "3.0.1"
+version_added: "2.0.1"
 options:
     hostname:
         description:
