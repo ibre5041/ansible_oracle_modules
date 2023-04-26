@@ -166,7 +166,8 @@ def get_obj_privs(conn, schema, wanted_privs_list, grant_mode):
     wanted_privs_d = dict(zip(w_object_name_l, w_object_priv_l))
 
     currsql_all = """
-    select listagg(p.privilege,',') within group (order by p.privilege), p.owner||'.'||p.table_name
+    select listagg(p.privilege,',') within group (order by p.privilege)
+        , CASE WHEN p.owner = 'SYS' THEN '' ELSE p.OWNER||'.' END || p.table_name
     from dba_tab_privs p, dba_objects o
     where p.grantee = upper(:schema)
     and p.table_name = o.object_name
