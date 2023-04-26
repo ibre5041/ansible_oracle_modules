@@ -61,10 +61,10 @@ options:
     grant_mode:
         description:
             - Should the list of grant be enforced, or just appended to.
-            - enforce: Whatever is in the list of grant will be enforced, i.e grant/privileges will be removed if they are not in the list
+            - exact: Whatever is in the list of grant will be enforced, i.e grant/privileges will be removed if they are not in the list
             - append: Grant/privileges are just appended, nothing is removed
         default: append
-        choices: ['enforce','append']
+        choices: ['exact','append']
     state:
         description:
             - The intended state of the priv (present=added to the user, absent=removed from the user). 
@@ -146,7 +146,7 @@ def get_dir_privs(conn, schema, directory_privs, grant_mode):
             rdsql = "revoke %s on directory %s from %s" % (','.join(old_grants), directory, schema)
             revoke_list_dir.append(rdsql)
 
-    if grant_mode.lower() == 'enforce':
+    if grant_mode.lower() == 'exact':
         total_sql_dir.extend(revoke_list_dir)
 
     total_sql_dir.extend(grant_list_dir)
@@ -203,7 +203,7 @@ def get_obj_privs(conn, schema, wanted_privs_list, grant_mode):
             rsql = "revoke %s on %s from %s" % (','.join(old_grants), obj, schema)
             revoke_list.append(rsql)
 
-    if grant_mode.lower() == 'enforce':
+    if grant_mode.lower() == 'exact':
         total_sql_obj.extend(revoke_list)
 
     total_sql_obj.extend(grant_list)
@@ -258,7 +258,7 @@ def ensure_grant(module, conn, schema, wanted_grant_list, object_privs, director
     if any(x in exceptions_list for x in wanted_grant_list):
         grant_to_remove = [x for x in grant_to_remove if x not in exceptions_priv]
 
-    if grant_mode.lower() == 'enforce' and any(grant_to_remove):
+    if grant_mode.lower() == 'exact' and any(grant_to_remove):
         grant_to_remove = ','.join(grant_to_remove)
         remove_sql += 'revoke %s from %s' % (grant_to_remove, schema)
         if container:
@@ -362,9 +362,9 @@ def main():
             grantee       = dict(required=True, type='str', aliases=['name', 'schema_name', 'role', 'role_name']),
 
             grants        = dict(default=None, type="list", aliases=['privileges']),
-            object_privs  = dict(default=None, type="list", aliases=['objprivs']),
+            object_privs  = dict(default=None, type="list", aliases=['objprivs', 'objects_privileges']),
             directory_privs = dict(default=None, type="list", aliases=['dirprivs']),
-            grant_mode    = dict(default="append", choices=["append", "enforce"], aliases=['privs_mode']),
+            grant_mode    = dict(default="append", choices=["append", "exact"], aliases=['privs_mode']),
             container     = dict(default=None),
             state         = dict(default="present", choices=["present", "absent", "REMOVEALL"])
         )
@@ -386,7 +386,7 @@ def main():
     if state == 'present':
         ensure_grant(module, oc, grantee, grants, object_privs, directory_privs, grant_mode, container)
     if state == 'REMOVEALL':
-        ensure_grant(module, oc, grantee, [], [], [], grant_mode='enforce', container=container)
+        ensure_grant(module, oc, grantee, [], [], [], grant_mode='exact', container=container)
     elif state in ['absent']:
         remove_grant(module, oc, grantee, grants, object_privs, directory_privs, container)
 
