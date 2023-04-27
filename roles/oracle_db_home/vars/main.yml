@@ -1,0 +1,4 @@
+---
+# vars file for oracle.db.home
+
+first_rac_node: "{{ ansible_play_batch | sort() | first }}"

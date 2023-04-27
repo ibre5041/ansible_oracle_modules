@@ -1,0 +1,65 @@
+---
+# tasks file for oracledatabase 19c
+
+- name: oracle_oh_response_file 
+  debug:
+    var: oracle_oh_response_file 
+
+- name: delete response file
+  file:
+    path:  "{{ oracle_install_dir_temp }}/{{ oracle_oh_response_file }}"
+    state: absent
+
+- name: check if oracle home installed
+  stat:
+    path: "{{ oracle_home }}/bin/extjob"
+  register: oracle_home_installed
+
+- debug:
+    msg: "Oracle home installed: {{ oracle_home_installed.stat.exists }}"
+
+- name: check if install package exists
+  stat: 
+    path: "{{ oracle_home }}/bin"
+  register: install_package
+  
+- debug:
+    msg: "Install package exists: {{ install_package.stat.exists }}"
+
+- name: "Directory {{ oracle_home }}"
+  file:
+    path:  "{{ oracle_home }}"
+    owner: "{{ oracle_os_user }}"
+    group: "{{ oracle_os_group }}"
+    mode: '0775'
+    state: directory
+
+- name: Include Role oracle.download.package
+  include_role:
+    name: oracle_download_package
+  vars:
+    # Pass these variables to included role
+    # oracle_home: "{{ oracle_home }}"    
+    # oracle_dir_base: "/tmp/"
+    # oracle_url_base:   "{{ oracle_media_url_base }}"
+    oracle_image_name: "{{ oracle_db_media }}"
+    #oracle_install_dir_temp:
+  when: oracle_home_installed.stat.exists != True and install_package.stat.exists != True and ( first_rac_node is not defined or first_rac_node == ansible_hostname)
+
+- include: setup.db.yml
+  when: oracle_home_installed.stat.exists != True and ( first_rac_node is not defined or first_rac_node == ansible_hostname)
+
+- name: "Check ownership of {{ oracle_home }}/bin/extjob"
+  stat: 
+    path: "{{ oracle_home }}/bin/extjob"
+  register: extjob_permissions
+
+- name: extjob_permissions
+  debug:
+    var: extjob_permissions
+
+- name: db root.sh
+  shell: "{{ oracle_home }}/root.sh"
+  args:
+    chdir: "/"
+  when: extjob_permissions.stat.exists == false or extjob_permissions.stat.uid != 0
