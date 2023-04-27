@@ -1,0 +1,131 @@
+---
+# tasks file for oraclerestart 19c
+
+- name: check if ~oracle/.crsbuild exists
+  stat:
+    path: "/home/{{ oracle_os_user }}/.crsbuild"
+  register: crsbuild_present
+
+- include_role:
+    name: ibre5041.ansible_oracle_modules.oracle_asm_disks_ec2
+    public: yes
+  when: crsbuild_present.stat.exists != True
+
+- name: CRS HOME
+  file:
+    path: "{{ oracle_home }}"
+    owner: "{{ oracle_os_user }}"
+    group: "{{ oracle_os_group }}"
+    mode: '0775'
+    state: directory
+
+- name: wait for oracle-ohasd.service
+  systemd:
+    name: oracle-ohasd.service
+  register: oracle_ohasd_service
+
+- debug:
+    msg: "oracle-ohasd.service {{ oracle_ohasd_service.status.LoadState }}"
+
+- name: check if Oracle CRS unpacked
+  stat: 
+    path: "{{ oracle_home }}/bin/"
+  register: crs_unpacked
+  
+- debug:
+    msg: "Install package exists: {{ crs_unpacked.stat.exists }}"
+
+- name: Include Role oracle.download.package
+  include_role:
+    name: oracle_download_package
+  vars:
+    # Pass these variables to included role
+    # dir_base: "/tmp/"
+    # oracle_url_base:   "{{ oracle_url_base }}"
+    oracle_image_name: "{{ oracle_gi_media }}"
+    #oracle_install_dir_temp:
+    #oracle_home:
+  when: crs_unpacked.stat.exists != True and oracle_ohasd_service.status.LoadState == "not-found"
+
+- name: check if Oracle CRS set up
+  stat: 
+    path: "{{ oracle_inventory_location }}/ContentsXML"
+  register: crs_set_up
+
+- debug:
+    msg: "Install oraInventory exists: {{ crs_set_up }} "
+
+- name: setup.grid.yml
+  include: setup.grid.yml
+  when: crs_set_up.stat.exists != True and oracle_ohasd_service.status.LoadState == "not-found"
+  
+- name: orainstRoot.sh
+  shell: "{{ oracle_inventory_location }}/orainstRoot.sh"
+  args:
+    creates: /etc/oraInst.loc
+
+- name: root.sh   
+  shell: "{{ oracle_home }}/root.sh"
+  when: oracle_ohasd_service.status.LoadState == "not-found"
+
+- name: wait for oracle-ohasd.service
+  systemd:
+    name: oracle-ohasd.service
+    state: started
+    enabled: yes
+  register: oracle_ohasd_service
+
+- debug:
+    msg: "oracle-ohasd.service {{ oracle_ohasd_service.status.LoadState }}"
+
+- name: Check asm configured
+  command: "sh -c '{{ oracle_home }}/bin/crsctl status res ora.asm | grep ONLINE'"
+  register: oracle_asm_status
+  failed_when: false
+
+- debug:
+    msg: "{{ oracle_asm_status }}"
+
+- name: "Execute Config Tools gridSetup.sh (part II)"
+  block:
+    - name: Grid Setup ASM
+      shell: "./gridSetup.sh -executeConfigTools -responseFile {{ oracle_install_dir_temp}}/{{ oracle_gi_response_file }} -silent"
+      args:
+        chdir: "{{ oracle_home }}"
+      ignore_errors: true
+      register: grid_setup_out2
+    - debug:
+        msg: "gridSetup.sh (part II) {{ grid_setup_out2 }}"
+      when: grid_setup_out2.rc >= 0
+    - debug:
+        msg: "Return code is {{ grid_setup_out2.rc }}"
+      when: grid_setup_out2.rc >= 0
+    - fail:
+        msg: "./gridSetup.sh -executeConfigTools failed"
+      when: grid_setup_out2.rc > 6
+
+  become: yes
+  become_user: "{{ oracle_os_user }}"
+  when: oracle_asm_status.stdout is not match(".*ONLINE")
+
+# - name: file perm fixup
+#   file:
+#     path:  "{{ oracle_home }}/bin/oracle"
+#     owner: "{{ oracle_os_user }}"
+#     group: "{{ oracle_os_group }}"
+#     mode: '6755'
+
+# - name: file perm fixup
+#   file:
+#     path:  "{{ oracle_home }}"
+#     owner: root
+#     group: "{{ oracle_os_group }}"
+#     mode: '0755'
+
+- name: Create ~oracle/.crsbuild
+  block:
+    - name: Create ~oracle/.crsbuild
+      copy: content="{{ ansible_date_time.iso8601 }}" dest="/home/oracle/.crsbuild"
+  become: yes
+  become_user: "{{ oracle_os_user }}"
+  when: crsbuild_present.stat.exists != True

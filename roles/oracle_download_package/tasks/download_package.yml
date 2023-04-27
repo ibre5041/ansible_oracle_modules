@@ -1,0 +1,24 @@
+---
+
+- block:
+    - name: Download install package {{ oracle_image_name }}
+      get_url:
+        url: "{{ oracle_url_base }}/{{ oracle_image_name }}"
+        dest: "{{ oracle_install_dir_temp }}/"
+        mode: '0640'
+      tags: [download]
+      
+    - name: unzip install package {{ oracle_image_name }}
+      unarchive:
+        src:  "{{ oracle_install_dir_temp }}/{{ oracle_image_name | basename }}"
+        dest: "{{ oracle_home }}/"
+        remote_src: yes
+
+    - name: delete install .zip package {{ oracle_image_name }}
+      file:
+        path: "{{ oracle_install_dir_temp }}/{{ oracle_image_name | basename }}"
+        state: absent
+      tags: [download,cleanup]
+
+  become: yes
+  become_user: "{{ oracle_os_user }}"

@@ -1,0 +1,9 @@
+---
+# defaults file for oracle restart
+
+oracle_db_ver_path:      "{{ oracle_install_space[oracle_release]['oracle_db_ver_path'] }}"
+oracle_db_media:         "{{ oracle_install_space[oracle_release]['oracle_gi_media'] }}"
+oracle_gi_media:         "{{ oracle_install_space[oracle_release]['oracle_gi_media'] }}"
+oracle_home:             "{{ oracle_install_dir_root }}/gi/{{ oracle_db_ver_path }}"
+
+oracle_gi_response_file: "{{ oracle_install_space[oracle_release]['oracle_gi_response_file'] }}"

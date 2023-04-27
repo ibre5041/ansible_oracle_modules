@@ -1,0 +1,11 @@
+---
+# tasks file for oracle_download_package
+
+- name: Download and unpack packages
+  include: download_package.yml
+  when: oracle_url_base | default('') | length > 0
+
+- name: Download and unpack packages
+  include: copy_package.yml
+  when: oracle_dir_base | default('') |  length > 0
+  

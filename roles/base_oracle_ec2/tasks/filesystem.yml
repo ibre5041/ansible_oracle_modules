@@ -1,0 +1,126 @@
+---
+
+- name: Create partition for PV
+  parted:
+    device: /dev/nvme1n1
+    part_type: primary
+    number: 1
+    flags: [ lvm ]
+    state: present
+    part_start: 1MiB
+    part_end: 100%
+  when: oracle_create_vg
+
+- name: Create LVM volume group "{{ oracle_vg }}"
+  lvg:
+    pvs: /dev/nvme1n1p1
+    state: present
+    vg: "{{ oracle_vg }}"
+  when: oracle_create_vg
+  
+- name: Create swap volume
+  lvol:
+    vg: "{{ oracle_vg }}"
+    lv: swap
+    size: 1G
+    shrink: no
+  when: oracle_create_swap
+  
+- name: Create swap on /dev/{{ oracle_vg }}/swap
+  filesystem:
+    fstype: swap
+    dev: "/dev/{{ oracle_vg }}/swap"
+  when: oracle_create_swap
+
+# NOTE: this wont execute swapon -a. This ansible bug is from 2017. #23632
+- name: swapon
+  mount:
+    name: none
+    src: "/dev/{{ oracle_vg }}/swap"
+    fstype: swap
+    opts: sw
+    passno: 0
+    dump: 0
+    state: present
+  when: oracle_create_swap
+
+- name: Execute swapon -a
+  command: swapon -a
+  changed_when: false
+  failed_when: false
+  when: oracle_create_swap
+    
+- name: Create a logical volume u01
+  lvol:
+    vg: "{{ oracle_vg }}"
+    lv: u01
+    size: 80%VG
+    shrink: no
+  when: oracle_create_fs
+
+- name: Create filesystem on /dev/{{ oracle_vg }}/u01
+  filesystem:
+    fstype: ext4
+    dev: /dev/{{ oracle_vg }}/u01
+  when: oracle_create_fs
+  
+- name: Mount filesystem on /dev/{{ oracle_vg }}/u01
+  mount:
+    path: /oracle
+    src:  "/dev/{{ oracle_vg }}/u01"
+    state: mounted
+    fstype: auto
+  when: oracle_create_fs
+
+# # NOTE: this has to be split into two tasks, otherwise recurse=yes will change perms recursively
+- name: Create u01 sub-directory (mkdir -p)
+  file:
+    path: "{{ item }}"
+    recurse: yes
+    state: directory
+  loop:
+    - "{{ oracle_install_dir_root }}"
+    - "{{ oracle_install_dir_base }}"
+    - "{{ oracle_install_dir_temp }}"
+    - "{{ oracle_install_dir_prod }}"
+    - "{{ oracle_inventory_location }}"
+  when: oracle_create_fs
+
+- name: Change permissions on u01 sub-directory
+  file:
+    path:  "{{ item }}"
+    owner: "{{ oracle_os_user }}"
+    group: "{{ oracle_os_group }}"
+    mode: '0775'
+    state: directory
+  loop:
+    - "{{ oracle_install_dir_root }}"
+    - "{{ oracle_install_dir_base }}"
+    - "{{ oracle_install_dir_temp }}"
+    - "{{ oracle_install_dir_prod }}"
+    - "{{ oracle_inventory_location }}"
+
+- name: Extend the u01 mountpoint
+  lvol:
+    vg: "{{ oracle_vg }}"
+    lv: u01
+    size: 29G
+    shrink: no
+    resizefs: yes
+  when: oracle_create_fs
+
+# - name: Extend the / (root) filesystem
+#   lvol:
+#     vg: vg00
+#     lv: lv_root
+#     size: 10g
+#     shrink: no
+#     resizefs: yes
+
+# - name: Extend the /tmp filesystem
+#   lvol:
+#     vg: vg00
+#     lv: lv_tmp
+#     size: 2g
+#     shrink: no
+#     resizefs: yes

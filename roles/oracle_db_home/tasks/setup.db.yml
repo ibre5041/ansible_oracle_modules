@@ -1,0 +1,39 @@
+# oracle database 18c
+
+- name: DB Home Setup
+  block:
+
+    - name: install db.rsp
+      template:
+        src:  "{{ oracle_oh_response_file }}"
+        dest: "{{ oracle_install_dir_temp }}/{{ oracle_oh_response_file }}"
+        mode: '0640'
+        owner: oracle
+        group: oinstall
+
+    - name: Uncomment .rsp parameter oracle.install.db.CLUSTER_NODES (for RAC)
+      replace:
+        path: "{{ oracle_install_dir_temp }}/{{ oracle_oh_response_file }}"
+        regexp: '^#(oracle.install.db.CLUSTER_NODES.*)'
+        replace: '\1'
+      when: first_rac_node is defined
+
+    - shell: "./runInstaller -responseFile {{ oracle_install_dir_temp }}/{{ oracle_oh_response_file }} -silent -ignorePrereqFailure"
+      args:
+        chdir: "{{ oracle_home }}"
+        creates: "{{ oracle_home }}/oraInst.loc"
+      environment:
+        CV_ASSUME_DISTID: OEL7.8
+      register: db_setup_out
+      failed_when: db_setup_out.rc > 6
+
+    - debug: 
+        msg: "Return code is {{ db_setup_out }}"
+
+  become: yes
+  become_user: "{{ oracle_os_user }}"
+
+- name: "delete install {{ oracle_oh_response_file }}"
+  file:
+    path: "{{ oracle_install_dir_temp }}/{{ oracle_oh_response_file }}"
+    state: absent

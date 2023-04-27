@@ -1,0 +1,242 @@
+#################################################################################
+#
+#    File name : .profile
+#      Version : 2.0.0. (Oct 19, 2021)
+#     Location : in oracle user's home directory
+#                /home/oracle/.bash_profile
+#
+#    Platforms : Red Hat Enterprise Linux 7AS and newer
+#
+#  Description : Sets session and terminal settings for oracle user.
+#                Displays a table with list of Oracle databases
+#                available on the host and optionally loads Oracle
+#                specific environment variables and custom aliases to
+#                ease work with selected instance.
+#
+#                Requires Oracle version 9 or later
+#
+#        Notes : Width of generated table follows "historical" standard of
+#                80 columns.
+#
+#      Authors : Jan Juza
+#                Ivan Brezina
+#
+#################################################################################
+
+# setup shell options
+set +aeu -o nolog
+trap "printf 'Goodbye.'; echo " 0
+trap 1 2 3
+shopt -s direxpand
+
+SCRIPT_DIR="$(cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd)"
+
+# function to export variables and aliases only after the instance number is known
+export_env () {
+    if [[ -n "${ORACLE_HOME}" ]]; then
+	export OLD_HOME=`dirname $ORACLE_HOME`
+    fi
+    export ORACLE_SID="${1}"
+    export ORACLE_HOME="${2}"
+    export ORACLE_BASE="${3}"
+
+    get_instance
+
+    export ALERT_LOG="$ora_alert_log"
+
+    export NLS_DATE_FORMAT='dd/mm/yyyy hh24:mi'
+    if [[ -z "${OLD_HOME}" ]]; then
+	export PATH=$PATH:$ORACLE_HOME/bin
+    else
+	export PATH=$(echo $PATH | sed "s:\\:${OLD_HOME}[^:]*::g"):$ORACLE_HOME/bin
+    fi
+    # set NLS_LANG to AL32UTF8 (note NLS_DATE_FORMAT is ignored unless NLS_LANG is set)
+    export NLS_LANG=_.AL32UTF8
+
+    alias cdl="cd $ALERT_LOG && ls -ltr && pwd"
+    alias goal="cd $ALERT_LOG && ls -ltr && pwd"
+
+    alias oramenu=". ~oracle/.bash_profile"
+
+    if [[ "${TERM}" =~ ^xterm* || "${TERM}" =~ ^screen* ]]; then
+	TERM_TITLE="${HOSTNAME%%.*}  ${ORACLE_SID}"
+	echo -ne "\033]0;${TERM_TITLE}\007"
+    fi
+
+    case $TERM in
+	xterm*|vte*)
+            PROMPT_COMMAND='printf "\033]0;%s %s %s\007" "${HOSTNAME%%.*}" "${ORACLE_SID}" "${PWD/#$HOME/~}"'
+	    ;;
+	screen*)
+            PROMPT_COMMAND='printf "\033k%s %s %s\033\\" "${HOSTNAME%%.*}" "${ORACLE_SID}" "${PWD/#$HOME/~}"'
+	    ;;
+    esac
+}
+
+get_instance () {
+    eval `${SCRIPT_DIR}/profile.py -i`
+    ora_product=$(echo "$ora_banner" | sed 's/ Release .*$//g')
+
+    status="Up ($ora_status) $ora_uptime"
+    
+    if [ -n "${ora_dg_on}" ]; then
+	if [ "${ora_dg_on}" -ge 1 -a "$ora_rac_on" = "FALSE" ]; then
+	    ext_status="($ora_dg_role)"
+	    ora_type="DG"
+	elif [ "${ora_dg_on}" -eq 0 -a "$ora_rac_on" = "TRUE" ]; then
+	    ext_status="(${ora_rac_nodes}-RAC)"
+	    ora_type="RAC"
+	elif [ "${ora_dg_on}" -ge 1 -a "$ora_rac_on" = "TRUE" ]; then
+	    ext_status="($ora_dg_role in ${ora_rac_nodes}-RAC)"
+	    ora_type="DGRAC"
+	fi
+    else
+	ext_status=""
+	ora_type=""
+    fi
+}
+
+print_status () {
+    if [[ -n "${ORACLE_SID}" ]]; then
+	if [ $(echo "$ext_status" | grep -q ERROR; echo $?) -ne 0 ]; then
+	    eval `${SCRIPT_DIR}/profile.py -s`
+	    printf "\n\
+%s SGA/PGA(%s)\n\
+ORACLE_SID=%s\n\
+ORACLE_HOME=%s\n\
+PATH=%s\n\
+ALERT_LOG=%s\n\
+DBID %s\n\n"\
+		"$ora_product Version $ora_version -- ${status} ${ext_status} --" \
+		"${ora_sgapga}"  \
+		"${ORACLE_SID}" \
+		"${ORACLE_HOME}" \
+		"${PATH}" \
+		"${ALERT_LOG}/alert_${ORACLE_SID}.log" \
+		"${ora_dbid}" 
+	else
+	    printf "\n%s\n\n" "$ora_product Version $ora_version -- ${status} ${ext_status} -- ? " 2> /dev/null
+	fi
+    elif [[ "${ora_type}" = '-CLI-' ]]; then
+	printf "ORACLE_HOME=%s\n\n" "${ORACLE_HOME}"
+    else
+	printf "ORA-01034: ORACLE not available\n"
+    fi
+}
+
+# export oracle user's homedir ($HOME is not used intentionally)
+export ORACLE_HOMEDIR=$(grep ^oracle: /etc/passwd 2> /dev/null | awk -F: '{print $6}')
+
+# setup shell environment
+HISTSIZE=1000
+TMOUT=0
+PS1="\w\$ "
+
+# setup limits (hard as current)
+ora_nproc=$(ulimit -H -u)
+ora_nofile=$(ulimit -H -n)
+ulimit -u $ora_nproc -n $ora_nofile
+umask 022
+
+# menu is show only for sessions with assigned tty
+if [ -t 0 ] && [ tty ]; then  
+    # resize terminal if possible and clear the screen
+    [ -x /usr/bin/resize ] && /usr/bin/resize
+
+    # if we have our homebrew script to gather hw/os information in place, run it
+    [ -x $ORACLE_HOMEDIR/dbadm/bin/hw_os_info.sh ] && $ORACLE_HOMEDIR/dbadm/bin/hw_os_info.sh; printf "\n"
+
+    # display table with available Oracle Database and ASM instances
+    printf "                              Oracle Database List\n"
+    printf "                              ********************\n\n"
+    printf "p=======================================================================================q\n"
+    printf "| No Type  ORACLE_SID    Version           Status                                       |\n"
+    printf "|---------------------------------------------------------------------------------------|\n"
+    num=0
+    declare -A HOMES
+
+    while read ORACLE_SID ORACLE_HOME ORACLE_BASE; do
+	num=$[ $num + 1]
+	HOMES["${ORACLE_SID}_NUM"]=${num}
+	HOMES["${ORACLE_SID}_HOME"]="${ORACLE_HOME}"
+	HOMES["${ORACLE_SID}_BASE"]="${ORACLE_BASE}"
+	HOMES["${num}"]=${ORACLE_SID}
+        # Oracle Database or Oracle Client?
+        if [ ! -n "$ORACLE_SID" -a ! -x $ORACLE_HOME/bin/oracle ]; then
+            ORACLE_SID=""
+            if [ -x $ORACLE_HOME/bin/sqlplus ]; then
+		ora_type="-CLI-"
+		ora_version=$($ORACLE_HOME/bin/sqlplus -V | awk '/SQL\*Plus:/{print $3}')
+		status="Oracle Database Client"
+            else
+		ora_version="N/A"
+		status="ERROR:"
+		ext_status="sqlplus binary not executable"
+            fi 
+        else 
+            export ORACLE_SID ORACLE_BASE ORACLE_HOME
+            get_instance "${ORACLE_SID}" "${ORACLE_HOME}" "${ORACLE_BASE}"
+        fi
+	#rintf "| No   Type  ORACLE_SID    Version           Status                                       |\n"
+        printf "|%3.3s %5.5s %-10.10s    %-17.17s %-45.45s|\n" "$num" "$ora_type" "$ORACLE_SID" "$ora_version" "$status $ext_status"
+        alias X-${ORACLE_SID}="export_env '$ORACLE_SID' '$ORACLE_HOME' '$ORACLE_BASE' && print_status"
+        unset ORACLE_SID ORACLE_BASE ORACLE_HOME ora_version status ext_status ora_type
+    done < <(${SCRIPT_DIR}/profile.py -l)
+    printf "b=======================================================================================d\n\n"
+
+    # do we have only 1 instance or do we have more?
+    if [ "${num}" -eq 0 ]; then
+	printf "  No Oracle database has been found. No environment loaded.\n\n"	
+    elif [ "${num}" -eq 1 ]; then
+	export ORACLE_SID="${HOMES[$num]}"
+	H="${ORACLE_SID}_HOME"
+	B="${ORACLE_SID}_BASE"
+	export ORACLE_HOME="${HOMES[$H]}" 
+	export ORACLE_BASE="${HOMES[$B]}" 
+	printf "  Found only one instance. Loading environment...\n\n"
+	export_env "$ORACLE_SID" "$ORACLE_HOME" "$ORACLE_BASE" && print_status
+    else
+	printf "  Found $num database instances. Please select one [$num]: "
+	read -t 30 choice
+	if [[ -z "$choice" ]]; then
+            choice=$num
+	fi 
+	
+	choice_num="${choice}_NUM"
+	if [[ -n "${HOMES[$choice]}" ]]; then
+	    # numberic choice entered
+	    export ORACLE_SID="${HOMES[$choice]}"
+	    H="${ORACLE_SID}_HOME"
+	    B="${ORACLE_SID}_BASE"
+	    export ORACLE_HOME="${HOMES[$H]}"
+	    export ORACLE_BASE="${HOMES[$B]}"
+	elif [[ -n "${HOMES[$choice_num]}" ]]; then
+	    # actual ORACLE_SID entered
+            export ORACLE_SID="${choice}"
+	    H="${ORACLE_SID}_HOME"
+	    B="${ORACLE_SID}_BASE"
+	    export ORACLE_HOME="${HOMES[$H]}"
+	    export ORACLE_BASE="${HOMES[$B]}"
+	else
+	    unset ORACLE_SID ORACLE_HOME ORACLE_BASE
+	    printf "\n  Invalid instance selection. No environment loaded.\n\n"
+	fi
+
+        if [[ -n "${ORACLE_SID}" ]]; then
+            printf "\n  Loading environment for selected instance...${ORACLE_SID} ${ORACLE_HOME}\n\n"
+            export_env "${ORACLE_SID}" "${ORACLE_HOME}" "${ORACLE_BASE}" && print_status
+	fi
+    fi
+
+  # Oracle sqlplus enhancements - sqlpath, history, auto-completion
+  if [ -x /bin/rlwrap ]; then
+      alias SVRMGRL="rlwrap -if ~/dbadm/share/sqlplus.dict --forget-matching '.*(conn|CONN|identified|IDENTIFIED)' sqlplus '/ as sysdba'"
+      alias DGMGRL="rlwrap  -if ~/dbadm/share/dgmgrl.dict  --forget-matching '.*(conn)' dgmgrl"
+      alias RMAN="rlwrap --forget-matching '.*(conn)'  rman"
+      alias ASMCMD="rlwrap asmcmd"
+  fi
+  if [ -r ${ORACLE_HOMEDIR}/dbadm/share/login.sql ]; then
+      export ORACLE_PATH=${ORACLE_HOMEDIR}/dbadm/share/
+      export SQLPATH=${ORACLE_HOMEDIR}/dbadm/share/
+  fi
+fi
