@@ -1,0 +1,67 @@
+---
+# post instalation tasks 
+
+# - name: python2 cx_Oracle drivers
+#   yum:
+#     name=python2-cx_Oracle
+#     state=latest
+#     disable_gpg_check=yes
+- name: Python cx_Oracle drivers
+  pip:
+    name: cx_Oracle
+    extra_args: --user
+  become: yes
+  become_user: "{{ oracle_os_user }}"
+
+- name: Oracles bash_profile
+  template: 
+    src: profile
+    dest: "/home/{{ oracle_os_user }}/.bash_profile"
+    owner: "{{ oracle_os_user }}"
+    group: "{{ oracle_os_group }}"
+
+- name: Oracles bash_profile helper script
+  template: 
+    src: profile.py
+    dest: "/home/{{ oracle_os_user }}/"
+    owner: "{{ oracle_os_user }}"
+    group: "{{ oracle_os_group }}"
+    mode:  "0755"
+
+- name: mkdir -p ~/dbadm/ directory
+  file:
+    path: "{{ item }}"
+    recurse: yes
+    state: directory
+    owner: "{{ oracle_os_user }}"
+    group: "{{ oracle_os_group }}"    
+  loop:
+    - "/home/{{ oracle_os_user }}/dbadm/"    
+    - "/home/{{ oracle_os_user }}/dbadm/share/"
+    - "/home/{{ oracle_os_user }}/dbadm/bin/"
+  
+- name: Oracles bash_profile helper script
+  template: 
+    src: "{{ item }}"
+    dest: "/home/{{ oracle_os_user }}/dbadm/share/"
+    owner: "{{ oracle_os_user }}"
+    group: "{{ oracle_os_group }}"
+    mode:  "0644"
+  loop:
+    - login.sql
+    - sqlplus.dict
+    
+- name: "Install Epel package rlwrap"
+  yum:
+    name: rlwrap
+    state: latest
+    enablerepo: epel-el8
+  when: epel_repo_mirror | default('') | length > 0    
+  tags: [packages,slow]
+  ignore_errors: true
+
+- name: "Delete all files in: {{ oracle_install_dir_temp }}"
+  shell: "find {{ oracle_install_dir_temp }} -type f -delete"
+  args:
+    chdir: "{{ oracle_install_dir_temp }}"
+  changed_when: false
