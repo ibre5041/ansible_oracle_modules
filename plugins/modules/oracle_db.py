@@ -529,11 +529,8 @@ def create_db(module):
         elif major_version == '11.2':
             if amm:
                 command += ' -automaticMemoryManagement '
-        elif major_version.startswith('19'):
-            if amm:
-                command += ' -memoryMgmtType AUTO '
-            else:
-                command += ' -memoryMgmtType AUTO_SGA '
+    elif not amm and major_version.startswith('19'):
+        command += ' -memoryMgmtType AUTO_SGA '
             
     if customscripts:
         scriptlist = ",".join(customscripts)
