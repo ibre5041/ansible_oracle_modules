@@ -1,0 +1,5 @@
+---
+# vars file for oracle.asm.disks
+
+asm_disks: []
+asm_disk_partitions: []

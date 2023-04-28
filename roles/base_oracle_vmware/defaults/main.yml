@@ -1,0 +1,8 @@
+---
+# defaults file for oraclebase
+
+
+mem: "{{ ansible_memory_mb.real.total * 1024 * 1024 }}"
+
+shma: "{{ ((mem | int) / 4096) | round | int }}"
+shmm: "{{ ((mem | int) * 0.8)  | round | int }}"

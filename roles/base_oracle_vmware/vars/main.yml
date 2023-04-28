@@ -1,0 +1,7 @@
+---
+# vars file for base.oracle variables
+
+oracle_os_packages: "{{ oracle_os_packages_all \
+                    + (oracle_os_packages_rhel7 if ansible_distribution_major_version == '7' else [] ) \
+                    + (oracle_os_packages_rhel8 if ansible_distribution_major_version == '8' else [] ) \
+                    + ([] if oracle_install_type == 'standalone' else oracle_os_packages_crs ) }}"
