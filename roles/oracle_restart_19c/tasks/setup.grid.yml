@@ -13,7 +13,9 @@
       args:
         chdir: "{{ oracle_home }}"
         creates: "{{ oracle_inventory_location }}/oraInst.loc"
-      #ignore_errors: true      
+      #ignore_errors: true
+      environment:
+        CV_ASSUME_DISTID: OEL7.8
       register: grid_setup_out
       failed_when: grid_setup_out.rc > 6
     - debug: 

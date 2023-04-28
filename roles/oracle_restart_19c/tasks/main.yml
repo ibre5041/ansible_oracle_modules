@@ -120,8 +120,11 @@
       shell: "./gridSetup.sh -executeConfigTools -responseFile {{ oracle_install_dir_temp}}/{{ oracle_gi_response_file }} -silent"
       args:
         chdir: "{{ oracle_home }}"
-      ignore_errors: true
+      environment:
+        CV_ASSUME_DISTID: OEL7.8
+      #ignore_errors: true
       register: grid_setup_out2
+      failed_when: grid_setup_out2.rc > 6
     - debug:
         msg: "gridSetup.sh (part II) {{ grid_setup_out2 }}"
       when: grid_setup_out2.rc >= 0
