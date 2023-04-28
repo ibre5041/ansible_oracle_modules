@@ -1,0 +1,21 @@
+---
+# tasks file for oracle.asm.disks
+
+# vmkfstools -c 4G  -d eagerzeroedthick RAC_SSD_6.vmdk
+#
+# RAC1.vmx
+# scsi1:8.deviceType = "scsi-hardDisk"
+# scsi1:8.sharing = "multi-writer"
+# scsi1:8.fileName = "/vmfs/volumes/5aac1d3e-fbb5d662-3735-d050993b42a1/SHARED/RAC_SSD_1.vmdk"
+# scsi1:8.present = "TRUE"
+# scsi1:8.redo = ""
+#
+# reboot.
+#
+# mklabel gpt
+# (parted) mklabel gpt
+# (parted) mkpart P1 ext3 1MiB 100%
+# (parted) align-check optimal 1
+
+- include: udev.yaml
+- include: disks.yaml

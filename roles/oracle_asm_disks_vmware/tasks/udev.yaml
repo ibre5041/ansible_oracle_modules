@@ -1,0 +1,32 @@
+
+- name: udev 55
+  copy:
+    src: 55-usm.rules
+    dest: /etc/udev/rules.d/55-usm.rules
+
+- name: udev 12
+  copy:
+    src: 12-dm-permissions.rules
+    dest: /etc/udev/rules.d/12-dm-permissions.rules
+
+- name: udev 10
+  copy:
+    src: 10-scsi-asm.rules
+    dest: /etc/udev/rules.d/10-scsi-asm.rules
+
+- name: install udevasm.sh
+  copy:
+    src: udevasm.sh
+    dest: /etc/udev/udevasm.sh
+    mode: '0750'
+
+- name: reload udev
+  command: udevadm trigger
+
+- name: Wait for ASM DISK detection
+  wait_for:
+    # disk LUNs are assigned in order 15,14,...
+    path: /dev/asmshared0115
+    delay: 0
+    timeout: 30
+    state: present

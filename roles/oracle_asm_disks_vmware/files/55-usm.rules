@@ -1,0 +1,9 @@
+#
+# ADVM devices
+KERNEL=="asm/*",      GROUP="asmadmin", MODE="0770"
+KERNEL=="asm/.*",     GROUP="asmadmin", MODE="0770"
+#
+# ACFS devices
+KERNEL=="ofsctl",     GROUP="asmadmin", MODE="0664"
+
+

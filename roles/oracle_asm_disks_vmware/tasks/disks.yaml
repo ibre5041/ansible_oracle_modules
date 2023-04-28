@@ -1,0 +1,56 @@
+
+- name: List ASM disks (Part I)
+  find:
+    paths: /dev/
+    patterns: "asmshared[0-9][0-9][0-9][0-9]"
+    file_type: link
+  register: _asm_disks
+
+- name: List ASM disks (Part II)
+  debug:
+    msg: "{{ item.path }}"
+  with_items: "{{ _asm_disks.files }}"
+
+- name: Build a list of all ASM disks
+  set_fact:
+    asm_disks : "{{ asm_disks }} + [ '{{ item.path }}' ]"
+  with_items: "{{ _asm_disks.files }}"
+
+- debug:
+    var: asm_disks
+
+- name: ASM disks detected
+  debug: 
+    msg: "ASM DISKs {{ asm_disks }}"
+
+- name: Create ASM disk partitions
+  parted:
+    device: "{{item}}"
+    label: gpt
+    number: 1
+    state: present
+  with_items: "{{ asm_disks }}"
+  when: first_rac_node is not defined or ansible_hostname == first_rac_node
+
+- name: List ASM partitions (Part I)
+  find:
+    paths: /dev/
+    patterns: "asmshared[0-9][0-9][0-9][0-9]p1"
+    file_type: link
+  register: _asm_disk_partitions
+  when: first_rac_node is not defined or ansible_hostname == first_rac_node
+
+- name: Build a list of all ASM partitions
+  set_fact:
+    asm_disk_partitions : "{{ asm_disk_partitions }} + [ '{{ item.path }}' ]"
+  with_items: "{{ _asm_disk_partitions.files }}"
+  when: first_rac_node is not defined or ansible_hostname == first_rac_node
+
+- debug:
+    var: asm_disk_partitions
+  when: first_rac_node is not defined or ansible_hostname == first_rac_node
+
+- name: Detect ASM disk partitions(partprobe)
+  shell:
+    cmd: "/usr/sbin/partprobe {{ item}}"
+  with_items: "{{ asm_disks }}"
