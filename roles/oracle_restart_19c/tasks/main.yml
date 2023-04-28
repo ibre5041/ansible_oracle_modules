@@ -1,6 +1,29 @@
 ---
 # tasks file for oraclerestart 19c
 
+- name: Check if inside AWS.
+  uri:
+    url: http://169.254.169.254/latest/meta-data
+    timeout: 2
+  register: aws_uri_check
+  failed_when: False
+  changed_when: False
+
+- name: set_fact is_aws_environment
+  set_fact:
+    is_aws_environment: "{{ aws_uri_check.status == 200 }}"
+
+- name: Check if inside VMware
+  shell: virt-what
+  register: vmware_virt_check
+  failed_when: False
+  changed_when: False
+
+- name: set_fact is_vmware_environment
+  set_fact:
+    is_vmware_environment: "{{ vmware_virt_check.stdout == 'vmware' }}"
+
+
 - name: check if ~oracle/.crsbuild exists
   stat:
     path: "/home/{{ oracle_os_user }}/.crsbuild"
@@ -9,7 +32,12 @@
 - include_role:
     name: ibre5041.ansible_oracle_modules.oracle_asm_disks_ec2
     public: yes
-  when: crsbuild_present.stat.exists != True
+  when: crsbuild_present.stat.exists != True and is_aws_environment
+
+- include_role:
+    name: ibre5041.ansible_oracle_modules.oracle_asm_disks_vmware
+    public: yes
+  when: crsbuild_present.stat.exists != True and is_vmware_environment
 
 - name: CRS HOME
   file:
