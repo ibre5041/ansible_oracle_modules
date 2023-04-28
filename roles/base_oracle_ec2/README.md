@@ -8,7 +8,6 @@ Requirements
 
 VM should have at least 8GB RAM and one unallocated disk for Oracle binaries.
 
-
 Role Variables
 --------------
 

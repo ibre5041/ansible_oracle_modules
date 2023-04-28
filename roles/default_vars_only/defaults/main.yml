@@ -152,6 +152,7 @@ oracle_os_packages_all:
   - strace
   - ksh
   - smartmontools
+  - virt-what
   
 oracle_os_packages_rhel7:
   - compat-libstdc++-33
