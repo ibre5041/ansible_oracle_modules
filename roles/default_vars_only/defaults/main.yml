@@ -163,6 +163,7 @@ oracle_os_packages_rhel8:
   - libnsl
   - policycoreutils-python-utils
   - chrony
+  - python39
 
 oracle_os_packages_crs:
   - gcc-c++
