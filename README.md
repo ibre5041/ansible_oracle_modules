@@ -256,9 +256,9 @@ This results into situation when all white-noise characters are omited and resul
 
         - name: revoke user privs
           oracle_grants:
-          mode: sysdba
-          schema: u_foo
-	  grant_mode: exact
+            mode: sysdba
+            schema: u_foo
+            grant_mode: exact
 
 
 ## **oracle_sql**
