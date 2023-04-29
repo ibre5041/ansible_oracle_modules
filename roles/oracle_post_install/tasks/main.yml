@@ -6,6 +6,13 @@
 #     name=python2-cx_Oracle
 #     state=latest
 #     disable_gpg_check=yes
+
+- name: Python cx_Oracle platform drivers
+  shell: "/usr/libexec/platform-python -m pip install --user cx_Oracle"
+  failed_when: False             # install cx_Oracle drivers for platform python
+  become: yes
+  become_user: "{{ oracle_os_user }}"
+
 - name: Python cx_Oracle drivers
   pip:
     name: cx_Oracle

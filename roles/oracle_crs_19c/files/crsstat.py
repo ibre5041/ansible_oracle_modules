@@ -1,4 +1,5 @@
-#!/usr/bin/env python3
+#!/usr/bin/env /usr/libexec/platform-python 
+##!/usr/bin/env python3
 from __future__ import print_function
 import re
 import os
