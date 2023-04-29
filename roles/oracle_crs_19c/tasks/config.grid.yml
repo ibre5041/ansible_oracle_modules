@@ -1,0 +1,31 @@
+
+- name: "Execute Config Tools gridSetup.sh (part II)"
+  block:
+    - name: install grid.rsp
+      template:
+        src: grid.no.comments.rsp
+        dest: "{{ oracle_install_dir_temp }}/grid.rsp"
+        mode: '0640'
+        owner: "{{ oracle_os_user }}"
+
+    - name: Grid Setup ASM
+      shell: "./gridSetup.sh -executeConfigTools -responseFile {{ oracle_install_dir_temp }}/grid.rsp -silent"
+      args:
+        chdir: "{{ oracle_home }}"
+      ignore_errors: true
+      environment:
+        CV_ASSUME_DISTID: OEL7.8
+      register: grid_setup_out2 
+      failed_when: grid_setup_out2.rc > 6
+    - debug: 
+        msg: "gridSetup.sh (part II) {{ grid_setup_out2 }}"
+      when: grid_setup_out2.rc >= 0
+    - debug: 
+        msg: "Return code is {{ grid_setup_out2.rc }}"
+      when: grid_setup_out2.rc >= 0
+      
+  become: yes
+  become_user: oracle
+  # Condition to be set on caller level
+  # when: ansible_hostname == first_rac_node and crsbuild_present.stat.exists != True
+

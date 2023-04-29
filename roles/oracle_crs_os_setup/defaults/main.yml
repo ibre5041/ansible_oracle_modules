@@ -1,0 +1,4 @@
+---
+# defaults file for oracle.crs.os.setup
+
+first_rac_node: "{{ ansible_play_batch | sort() | first }}"

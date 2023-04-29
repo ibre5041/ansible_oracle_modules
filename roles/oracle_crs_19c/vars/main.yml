@@ -1,0 +1,18 @@
+---
+# vars file for oracle crs
+
+#oracle_major_version: "19"
+
+# Golden Image HOWTO:
+# http://www.ludovicocaldara.net/dba/2018/11/
+# mv OPatch OPatch.old
+# wget http://192.168.8.200/oracle/OPatch/p6880880_190000_Linux-x86-64.zip
+# unzip p6880880_190000_Linux-x86-64.zip
+# rm p6880880_190000_Linux-x86-64.zip
+# ./gridSetup.sh -applyRU /home/oracle/30783556/30805684
+# ./gridSetup.sh -applyRU /home/oracle/30783556/30899722
+# ./gridSetup.sh -silent -responseFile /home/oracle/grid.swonly.rsp ORACLE_HOME_NAME=crs1907
+# lvextend /oracle/u01/gi/ (+30g)
+# ./gridSetup.sh -createGoldImage -destinationLocation /oracle/u01/gi/ -silent
+
+first_rac_node: "{{ ansible_play_batch | sort() | first }}"

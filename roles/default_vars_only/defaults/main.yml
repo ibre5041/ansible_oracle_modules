@@ -63,8 +63,8 @@ oracle_install_space:
     oracle_db_ver_release: 19c
     oracle_db_ver_path: 19.17.0.0
     oracle_db_media: db_home_2022_Oct.zip
-    oracle_gi_media: grid_home_2022_Oct.zip
-    # oracle_gi_media: LINUX.X64_193000_grid_home.zip
+    # oracle_gi_media: grid_home_2022_Oct.zip
+    oracle_gi_media: LINUX.X64_193000_grid_home.zip
 
   18c:
     oracle_sid:         "TEST18C"
@@ -153,6 +153,7 @@ oracle_os_packages_all:
   - ksh
   - smartmontools
   - virt-what
+  - patch
   
 oracle_os_packages_rhel7:
   - compat-libstdc++-33

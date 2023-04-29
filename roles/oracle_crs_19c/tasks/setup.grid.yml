@@ -1,0 +1,42 @@
+
+- name: "Grid Setup gridSetup.sh (part I)"
+  block:
+    - name: ACFS Centos path
+      copy:
+        src: acfs.centos.patch
+        dest: "{{ oracle_home }}/lib/"
+
+    - name: Apply patch ACFS Centos patch
+      patch:
+        src: acfs.centos.patch
+        basedir: "{{ oracle_home }}/lib/"
+        strip: 0
+
+    - name: install grid.rsp
+      template:
+        src:  "{{ oracle_gi_response_file }}"
+        dest: "{{ oracle_install_dir_temp }}/"
+        mode: '0640'
+        owner: "{{ oracle_os_user }}"
+
+    - name: "gridSetup.sh (part I)"
+      shell: "./gridSetup.sh -silent -responseFile {{ oracle_install_dir_temp }}/{{ oracle_gi_response_file }}"
+      args:
+        chdir: "{{ oracle_home }}"
+        creates: "{{ oracle_inventory_location }}/oraInst.loc"
+      #ignore_errors: true
+      environment:
+        CV_ASSUME_DISTID: OEL7.8
+      register: grid_setup_out
+      failed_when: grid_setup_out.rc > 6
+    - debug: 
+        msg: "gridSetup.sh (part I) {{ grid_setup_out }}"
+      when: grid_setup_out.rc >= 0
+    - debug: 
+        msg: "Return code is {{ grid_setup_out.rc }}"
+      when: grid_setup_out.rc >= 0
+
+  become: yes
+  become_user: oracle
+  # Condition to be set on caller level
+  # when: ansible_hostname == first_rac_node

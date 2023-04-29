@@ -1,0 +1,10 @@
+--- osds_acfslib.pm.orig	2018-11-01 06:09:18.000000000 +0100
++++ osds_acfslib.pm	2020-01-25 17:15:38.488351953 +0100
+@@ -455,6 +455,7 @@
+   if ((defined($release)) &&                     # Redhat or OEL if defined
+       (($release =~ /^redhat-release/) ||        # straight RH
+        ($release =~ /^enterprise-release/) ||    # Oracle Enterprise Linux
++       ($release =~ /^centos-release/) ||        # CentOS hack 
+        ($release =~ /^oraclelinux-release/)))    # Oracle Linux
+   {
+     my ($major, $minor, $patch, $vendor, $variation) = split /\./, $kver;

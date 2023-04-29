@@ -1,0 +1,38 @@
+
+---
+# tasks file for oracle.crs.os.setup
+
+- include: os.setup.yml
+
+- shell: "hostname -d"
+  register: domain
+- debug: var=domain.stdout_lines
+- set_fact:
+    domain_name : "{{ domain.stdout_lines[0] }}"
+- debug: var=domain_name
+
+
+- name: Build crs node list
+  set_fact:
+    crs_node_list : "{{ crs_node_list + [ item + '.' + domain_name + ':' + hostvars[item].listener + '.' +  domain_name] }}"
+  with_items: "{{ ansible_play_batch }}"
+- name: crs node list
+  debug:
+    var: crs_node_list
+
+- name: CRS node list
+  debug:
+    msg: "{{ crs_node_list|join(',') }}"
+
+
+- name: Build db node list
+  set_fact:
+    db_node_list : "{{ db_node_list + [ item ] }}"
+  with_items: "{{ ansible_play_batch }}"
+- name: dbnode list
+  debug:
+    var: db_node_list
+
+- name: DB node list
+  debug:
+    msg: "{{ db_node_list|join(',') }}"
