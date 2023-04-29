@@ -372,15 +372,20 @@ def main():
 
 from ansible.module_utils.basic import *
 
-try:
-    from ansible.module_utils.oracle_utils import oracle_connect
-except:
-    from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_utils import oracle_connect
+# In these we do import from local project sub-directory <project-dir>/module_utils
+# While this file is placed in <project-dir>/library
+# No collections are used                              
+#try:
+#    from ansible.module_utils.oracle_utils import oracle_connect
+#    from ansible.module_utils.oracle_homes import oracle_homes
+#except:
+#    pass
 
 try:
-    from ansible.module_utils.oracle_homes import oracle_homes
-except:    
+    from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_utils import oracle_connect
     from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_homes import oracle_homes
+except:    
+    pass
 
 
 if __name__ == '__main__':

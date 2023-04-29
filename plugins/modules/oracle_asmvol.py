@@ -258,10 +258,10 @@ from ansible.module_utils.basic import *
 # In thise we do import from local project project sub-directory <project-dir>/module_utils
 # While this file is placed in <project-dir>/library
 # No colletions are used
-try:
-    from ansible.module_utils.oracle_utils import oracle_connect
-except:
-    pass
+#try:
+#    from ansible.module_utils.oracle_utils import oracle_connect
+#except:
+#    pass
 
 # In thise we do import from collections
 try:
