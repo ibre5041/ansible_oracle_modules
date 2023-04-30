@@ -2,16 +2,14 @@
 # tasks file for oraclerestart 19c
 
 - name: Check if inside AWS.
-  uri:
-    url: http://169.254.169.254/latest/meta-data
-    timeout: 2
+  shell: "virt-what | grep aws"
   register: aws_uri_check
   failed_when: False
   changed_when: False
 
 - name: set_fact is_aws_environment
   set_fact:
-    is_aws_environment: "{{ aws_uri_check.status == 200 }}"
+    is_aws_environment: "{{ aws_uri_check.stdout == 'aws' }}"
 
 - name: Check if inside VMware
   shell: virt-what
@@ -23,7 +21,11 @@
   set_fact:
     is_vmware_environment: "{{ vmware_virt_check.stdout == 'vmware' }}"
 
-
+- name: platform check
+  fail:
+    msg: 'Only VMware and AWS are supported'
+  when: not is_aws_environment and not is_vmware_environment
+    
 - name: check if ~oracle/.crsbuild exists
   stat:
     path: "/home/{{ oracle_os_user }}/.crsbuild"
