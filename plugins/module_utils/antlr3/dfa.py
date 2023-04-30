@@ -64,10 +64,10 @@ class DFA(object):
     def predict(self, input):
         """
         From the input stream, predict what alternative will succeed
-	using this DFA (representing the covering regular approximation
-	to the underlying CFL).  Return an alternative number 1..n.  Throw
-	 an exception upon error.
-	"""
+        using this DFA (representing the covering regular approximation
+        to the underlying CFL).  Return an alternative number 1..n.
+        Throw an exception upon error.
+        """
         mark = input.mark()
         s = 0 # we always start at s0
         try:

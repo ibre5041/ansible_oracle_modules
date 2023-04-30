@@ -68,16 +68,16 @@ class TreePatternLexer(object):
         ## The tree pattern to lex like "(A B C)"
         self.pattern = pattern
 
-	## Index into input string
+        ## Index into input string
         self.p = -1
 
-	## Current char
+        ## Current char
         self.c = None
 
-	## How long is the pattern in char?
+        ## How long is the pattern in char?
         self.n = len(pattern)
 
-	## Set when token type is ID or ARG
+        ## Set when token type is ID or ARG
         self.sval = None
 
         self.error = False
@@ -538,7 +538,7 @@ class TreeWizard(object):
         structure and token types in t1.  Check text if the pattern has
         text arguments on nodes.  Fill labels map with pointers to nodes
         in tree matched against nodes in pattern with labels.
-	"""
+        """
         
         # make sure both are non-null
         if t1 is None or tpattern is None:

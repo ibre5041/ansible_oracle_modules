@@ -64,9 +64,9 @@ class IntStream(object):
         """Get int at current input pointer + i ahead where i=1 is next int.
 
         Negative indexes are allowed.  LA(-1) is previous token (token
-	just matched).  LA(-i) where i is before first token should
-	yield -1, invalid char / EOF.
-	"""
+        just matched).  LA(-i) where i is before first token should
+        yield -1, invalid char / EOF.
+        """
         
         raise NotImplementedError
         
@@ -113,7 +113,7 @@ class IntStream(object):
         and rewind(i) should balance still. It is
         like invoking rewind(last marker) but it should not "pop"
         the marker off.  It's like seek(last marker's input position).       
-	"""
+        """
 
         raise NotImplementedError
 
@@ -127,7 +127,7 @@ class IntStream(object):
         This must throw away resources for all markers back to the marker
         argument.  So if you're nested 5 levels of mark(), and then release(2)
         you have to release resources for depths 2..5.
-	"""
+        """
 
         raise NotImplementedError
 
@@ -164,7 +164,7 @@ class IntStream(object):
         Only makes sense for streams that buffer everything up probably, but
         might be useful to display the entire stream or for testing.  This
         value includes a single EOF.
-	"""
+        """
 
         raise NotImplementedError
 
@@ -259,7 +259,7 @@ class TokenStream(IntStream):
         two tokens ago. LT(0) is undefined.  For i>=n, return Token.EOFToken.
         Return null for LT(0) and any index that results in an absolute address
         that is negative.
-	"""
+        """
 
         raise NotImplementedError
 
@@ -281,7 +281,7 @@ class TokenStream(IntStream):
         """
         Where is this stream pulling tokens from?  This is not the name, but
         the object that provides Token objects.
-	"""
+        """
 
         raise NotImplementedError
 
@@ -298,7 +298,7 @@ class TokenStream(IntStream):
         indicate the start/end location.  Most often this will just delegate
         to the other toString(int,int).  This is also parallel with
         the TreeNodeStream.toString(Object,Object).
-	"""
+        """
 
         raise NotImplementedError
 
@@ -332,24 +332,24 @@ class ANTLRStringStream(CharStream):
         
         CharStream.__init__(self)
         
-  	# The data being scanned
+        # The data being scanned
         self.strdata = data.decode('utf-8')
         self.data = [ord(c) for c in self.strdata]
         
-	# How many characters are actually in the buffer
+        # How many characters are actually in the buffer
         self.n = len(data)
 
- 	# 0..n-1 index into string of next char
+        # 0..n-1 index into string of next char
         self.p = 0
 
-	# line number 1..n within the input
+        # line number 1..n within the input
         self.line = 1
 
- 	# The index of the character relative to the beginning of the
+        # The index of the character relative to the beginning of the
         # line 0..n-1
         self.charPositionInLine = 0
 
-	# A list of CharStreamState objects that tracks the stream state
+        # A list of CharStreamState objects that tracks the stream state
         # values line, charPositionInLine, and p that can change as you
         # move through the input stream.  Indexed from 0..markDepth-1.
         self._markers = [ ]
@@ -619,23 +619,23 @@ class CommonTokenStream(TokenStream):
         
         self.tokenSource = tokenSource
 
-	# Record every single token pulled from the source so we can reproduce
+        # Record every single token pulled from the source so we can reproduce
         # chunks of it later.
         self.tokens = []
 
-	# Map<tokentype, channel> to override some Tokens' channel numbers
+        # Map<tokentype, channel> to override some Tokens' channel numbers
         self.channelOverrideMap = {}
 
-	# Set<tokentype>; discard any tokens with this type
+        # Set<tokentype>; discard any tokens with this type
         self.discardSet = set()
 
-	# Skip tokens on any channel but this one; this is how we skip whitespace...
+        # Skip tokens on any channel but this one; this is how we skip whitespace...
         self.channel = channel
 
-	# By default, track all incoming tokens
+        # By default, track all incoming tokens
         self.discardOffChannelTokens = False
 
-	# The index into the tokens list of the current token (next token
+        # The index into the tokens list of the current token (next token
         # to consume).  p==-1 indicates that the tokens list is empty
         self.p = -1
 
@@ -660,7 +660,7 @@ class CommonTokenStream(TokenStream):
     def fillBuffer(self):
         """
         Load all tokens from the token source and put in tokens.
-	This is done upon first LT request because you might want to
+        This is done upon first LT request because you might want to
         set some token type / channel overrides before filling buffer.
         """
         
@@ -748,7 +748,7 @@ class CommonTokenStream(TokenStream):
         when interpreting, we cannot exec actions so we need to tell
         the stream to force all WS and NEWLINE to be a different, ignored
         channel.
-	"""
+        """
         
         self.channelOverrideMap[ttype] = channel
 
@@ -1059,7 +1059,7 @@ class TokenRewriteStream(CommonTokenStream):
         self.programs = {}
         self.programs[self.DEFAULT_PROGRAM_NAME] = []
         
- 	# Map String (program name) -> Integer index
+        # Map String (program name) -> Integer index
         self.lastRewriteTokenIndexes = {}
         
 

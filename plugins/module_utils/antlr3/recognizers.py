@@ -92,7 +92,7 @@ class RecognizerSharedState(object):
         # constantly in generated code and Lexer object) :(
 
 
-	## The goal of all lexer rules/methods is to create a token object.
+        ## The goal of all lexer rules/methods is to create a token object.
         # This is an instance variable as multiple rules may collaborate to
         # create a single token.  nextToken will return this object after
         # matching lexer rule(s).  If you subclass to allow multiple token
@@ -420,7 +420,7 @@ class BaseRecognizer(object):
         an error and next valid token match
 
         See also reportError()
-	"""
+        """
         return self._state.syntaxErrors
 
 
