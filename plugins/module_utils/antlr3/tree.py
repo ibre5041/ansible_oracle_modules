@@ -1723,7 +1723,7 @@ class TreeNodeStream(IntStream):
     # REWRITING TREES (used by tree parser)
     def replaceChildren(self, parent, startChildIndex, stopChildIndex, t):
         """
- 	Replace from start to stop child index of parent with t, which might
+        Replace from start to stop child index of parent with t, which might
         be a list.  Number of children may be different
         after this call.  The stream is notified because it is walking the
         tree and might need to know you are monkeying with the underlying

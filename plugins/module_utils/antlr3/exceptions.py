@@ -75,27 +75,27 @@ class RecognitionException(Exception):
     def __init__(self, input=None):
         Exception.__init__(self)
 
-	# What input stream did the error occur in?
+        # What input stream did the error occur in?
         self.input = None
 
         # What is index of token/char were we looking at when the error
         # occurred?
         self.index = None
 
-	# The current Token when an error occurred.  Since not all streams
-	# can retrieve the ith Token, we have to track the Token object.
-	# For parsers.  Even when it's a tree parser, token might be set.
+        # The current Token when an error occurred.  Since not all streams
+        # can retrieve the ith Token, we have to track the Token object.
+        # For parsers.  Even when it's a tree parser, token might be set.
         self.token = None
 
-	# If this is a tree parser exception, node is set to the node with
-	# the problem.
+        # If this is a tree parser exception, node is set to the node with
+        # the problem.
         self.node = None
 
-	# The current char when an error occurred. For lexers.
+        # The current char when an error occurred. For lexers.
         self.c = None
 
-	# Track the line at which the error occurred in case this is
-	# generated from a lexer.  We need to track this since the
+        # Track the line at which the error occurred in case this is
+        # generated from a lexer.  We need to track this since the
         # unexpected char doesn't carry the line info.
         self.line = None
 
