@@ -46,7 +46,7 @@ Including an example of how to use your role (for instance, with variables passe
          - role: oracle_db_home
            oracle_db_media: "db_home_2022_Oct.zip"
            oracle_url_base: "http://imageserver/oracle/"	   
-	   oracle_release: 19c
+           oracle_release: 19c
            tags: [ oracle, oracledbhome ]
 
 
