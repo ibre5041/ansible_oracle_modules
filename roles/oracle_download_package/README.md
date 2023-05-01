@@ -33,8 +33,8 @@ This role should not be used directly
       roles:
          - role: oracle_download_package
            oracle_url_base: http://localserver/oracle/
-	   oracle_image_name: LINUX.X64_193000_db_home.zip
-	   oracle_home: /u01/oracle/product/19.0.0.0
+           oracle_image_name: LINUX.X64_193000_db_home.zip
+           oracle_home: /u01/oracle/product/19.0.0.0
 
 License
 -------
