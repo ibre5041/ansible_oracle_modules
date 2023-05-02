@@ -166,6 +166,7 @@ oracle_os_packages_rhel8:
   - chrony
 #  - python39
   - platform-python-pip
-
+  - nvme-cli
+  
 oracle_os_packages_crs:
   - gcc-c++
