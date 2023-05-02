@@ -19,7 +19,7 @@ To use this collection place this in requirements.yml
 And then execute: `ansible-galaxy collection install -r requirements.yml`
 
 Most (if not all) requires `cx_Oracle` either on your on the managed node "control machine".
-To install `cx_Oracle` you can use: `pip3 install --user cx_Oracle`.
+To install `cx_Oracle` you can use: `pip3 install --user cx_Oracle` (`/usr/libexec/platform-python -m pip install --user cx_Oracle` on RHEL8)
 
 The default behaviour for the modules using `cx_Oracle` is this:
 
