@@ -82,11 +82,11 @@ The default behaviour for the modules using `cx_Oracle` is this:
         tasks:
           - oracle_oratab:
             register: sid_list
- 	   
+
           - name: Print Facts
             debug:
               var: sid_list
- 	     
+
           - oracle_role:
             mode: sysdba
               role: SOME_ROLE
@@ -243,16 +243,16 @@ This results into situation when all white-noise characters are omited and resul
 
         - name: append user privs
           oracle_grants:
-          mode: sysdba
-          schema: u_foo
-          grants:
-            - sysdg
-            - select_catalog_role
-	  object_privs:
-	    - execute:dbms_random
-	  directory_privs:
-	    - read,write:data_pump_dir
-	  grant_mode: append
+            mode: sysdba
+            schema: u_foo
+            grants:
+              - sysdg
+              - select_catalog_role
+            object_privs:
+              - execute:dbms_random
+            directory_privs:
+              - read,write:data_pump_dir
+            grant_mode: append
 
         - name: revoke user privs
           oracle_grants:
