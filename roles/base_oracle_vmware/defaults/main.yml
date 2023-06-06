@@ -6,3 +6,8 @@ mem: "{{ ansible_memory_mb.real.total * 1024 * 1024 }}"
 
 shma: "{{ ((mem | int) / 4096) | round | int }}"
 shmm: "{{ ((mem | int) * 0.8)  | round | int }}"
+
+oracle_vg: vg01
+oracle_create_vg: true
+oracle_create_swap: true
+oracle_create_fs: true

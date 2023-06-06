@@ -2,22 +2,25 @@
 
 - name: Create a logical volume u01
   lvol:
-    vg: vg01
+    vg: "{{ oracle_vg }}"
     lv: u01
     size: 80%VG
     shrink: no
+  when: oracle_create_fs
 
-- name: Create filesystem on /dev/vg01/u01
+- name: Create filesystem on /dev/{{ oracle_vg }}/u01
   filesystem:
     fstype: ext4
-    dev: /dev/vg01/u01
+    dev: /dev/{{ oracle_vg }}/u01
+  when: oracle_create_fs
 
 - name: Mount filesystem on /dev/vg01/u01
   mount:
     path: /oracle
-    src:  /dev/vg01/u01
+    src:  /dev/{{ oracle_vg }}/u01
     state: mounted
     fstype: auto
+  when: oracle_create_fs
 
 # NOTE: this has to be split into two tasks, otherwise recurse=yes will change perms recursively
 - name: Create u01 sub-directory (mkdir -p)
@@ -48,24 +51,25 @@
 
 - name: Extend the u01 mountpoint
   lvol:
-    vg: vg01
+    vg: "{{ oracle_vg }}"
     lv: u01
     size: 29G
     shrink: no
     resizefs: yes
+  when: oracle_create_fs
 
-- name: Extend the / (root) filesystem
-  lvol:
-    vg: vg00
-    lv: lv_root
-    size: 10g
-    shrink: no
-    resizefs: yes
+# - name: Extend the / (root) filesystem
+#   lvol:
+#     vg: vg00
+#     lv: lv_root
+#     size: 10g
+#     shrink: no
+#     resizefs: yes
 
-- name: Extend the /tmp filesystem
-  lvol:
-    vg: vg00
-    lv: lv_tmp
-    size: 1g
-    shrink: no
-    resizefs: yes
+# - name: Extend the /tmp filesystem
+#   lvol:
+#     vg: vg00
+#     lv: lv_tmp
+#     size: 1g
+#     shrink: no
+#     resizefs: yes
