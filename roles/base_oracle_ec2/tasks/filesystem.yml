@@ -84,7 +84,6 @@
     - "{{ oracle_install_dir_temp }}"
     - "{{ oracle_install_dir_prod }}"
     - "{{ oracle_inventory_location }}"
-  when: oracle_create_fs
 
 - name: Change permissions on u01 sub-directory
   file:

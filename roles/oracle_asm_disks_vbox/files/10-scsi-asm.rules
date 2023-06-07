@@ -1,0 +1,13 @@
+# Skip other actions other than add/change
+ACTION!="add|change", GOTO="asm_end"
+
+# If this is a block device, call udevasm.sh and possibly set ASMNAME variable
+SUBSYSTEM=="block", IMPORT{program}="/etc/udev/udevasm.sh"
+
+# IF ASMNAME is not set, skip
+ENV{ASMNAME}!="?*", GOTO="asm_end"
+
+# Otherwise set user, group, privs and also creat a symlink
+OWNER:="oracle", GROUP:="asmadmin", MODE:="660",SYMLINK+="$env{ASMNAME}"
+
+LABEL="asm_end"

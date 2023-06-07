@@ -1,0 +1,8 @@
+
+ACTION!="add|change", GOTO="dm_end"
+ENV{DM_UDEV_RULES_VSN}!="?*", GOTO="dm_end"
+
+ENV{DM_NAME}=="asmshared*p1", OWNER:="oracle", GROUP:="asmadmin", MODE:="660"
+
+LABEL="dm_end"
+

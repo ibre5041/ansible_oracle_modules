@@ -52,7 +52,7 @@ Including an example of how to use your role (for instance, with variables passe
         - { role: ibre5041.ansible_oracle_modules.base_oracle_ec2, oracle_vg: vg02, oracle_create_vg: false, oracle_create_swap: false }      
 
       roles:
-        - role: ibre5041.ansible_oracle_modules.base_oracle_vmware
+        - role: ibre5041.ansible_oracle_modules.base_oracle_vbox
 	    - oracle_vg: vg02
 	    - oracle_create_vg: false
 	    - oracle_create_swap: false	    

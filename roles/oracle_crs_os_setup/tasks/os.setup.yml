@@ -1,16 +1,17 @@
 
-- name: cvuqdisk
-  yum:
-    name: cvuqdisk
-    disable_gpg_check: yes
+# - name: cvuqdisk
+#   yum:
+#     name: cvuqdisk
+#     disable_gpg_check: yes
 
 - name: Extend the u01 mountpoint
   lvol:
-    vg: vg01
+    vg: "{{ oracle_vg }}"
     lv: u01
     size: 80G
     shrink: no
     resizefs: yes
+  when: oracle_create_fs
 
 - name: Mount /dev/shm ASM uses AMM
   mount:
