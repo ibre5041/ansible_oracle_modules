@@ -102,6 +102,29 @@ Prepare two VMs according this [article](https://balazspapp.wordpress.com/2020/0
     4.14.35-1902.300.11.el7uek.x86_64.
     # umount /mnt
 
+- Add shared data disks
+
+
+    VboxManage createmedium disk --filename "%HOMEDRIVE%%HOMEPATH%\VirtualBox VMs\rac\rac_DATA1.vdi" --format VDI --variant Fixed --size 10240
+    VboxManage createmedium disk --filename "%HOMEDRIVE%%HOMEPATH%\VirtualBox VMs\rac\rac_DATA2.vdi" --format VDI --variant Fixed --size 10240
+
+    VBoxManage modifymedium disk "%HOMEDRIVE%%HOMEPATH%\VirtualBox VMs\rac\rac_DATA1.vdi" --type shareable
+    VBoxManage modifymedium disk "%HOMEDRIVE%%HOMEPATH%\VirtualBox VMs\rac\rac_DATA2.vdi" --type shareable
+    VboxManage storageattach rac1 --storagectl rac1 --port 2 --type hdd --medium "%HOMEDRIVE%%HOMEPATH%\VirtualBox VMs\rac\rac_DATA1.vdi"
+    VboxManage storageattach rac1 --storagectl rac1 --port 3 --type hdd --medium "%HOMEDRIVE%%HOMEPATH%\VirtualBox VMs\rac\rac_DATA2.vdi"
+    VboxManage storageattach rac2 --storagectl rac2 --port 2 --type hdd --medium "%HOMEDRIVE%%HOMEPATH%\VirtualBox VMs\rac\rac_DATA1.vdi"
+    VboxManage storageattach rac2 --storagectl rac2 --port 3 --type hdd --medium "%HOMEDRIVE%%HOMEPATH%\VirtualBox VMs\rac\rac_DATA2.vdi"
+
+
+- Attach Oracle binaries to VMs
+
+
+    VboxManage sharedfolder add rac1 --name install --hostpath I:\Oracle
+    VboxManage sharedfolder add rac2 --name install --hostpath I:\Oracle
+
+    mkdir /install
+    mount -t vboxsf install /install
+
 
 
 Role Variables
