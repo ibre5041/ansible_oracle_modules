@@ -26,7 +26,7 @@
 - name: Create u01 sub-directory (mkdir -p)
   file:
     path: "{{ item }}"
-    recurse: yes
+    #recurse: yes
     state: directory
   loop:
     - "{{ oracle_install_dir_root }}"
