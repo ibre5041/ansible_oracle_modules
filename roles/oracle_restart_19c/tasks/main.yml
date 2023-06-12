@@ -21,10 +21,20 @@
   set_fact:
     is_vmware_environment: "{{ vmware_virt_check.stdout == 'vmware' }}"
 
+- name: Check if inside VirtualBox
+  shell: "virt-what | grep virtualbox"
+  register: vbox_virt_check
+  failed_when: False
+  changed_when: False
+
+- name: set_fact is_vbox_environment
+  set_fact:
+    is_vbox_environment: "{{ vbox_virt_check.stdout == 'virtualbox' }}"
+    
 - name: platform check
   fail:
-    msg: 'Only VMware and AWS are supported'
-  when: not is_aws_environment and not is_vmware_environment
+    msg: 'Only VMware AWS and VirtualBox are supported'
+  when: not is_aws_environment and not is_vmware_environment and not is_vbox_environment
     
 - name: check if ~oracle/.crsbuild exists
   stat:
@@ -41,6 +51,11 @@
     public: yes
   when: crsbuild_present.stat.exists != True and is_vmware_environment
 
+- include_role:
+    name: ibre5041.ansible_oracle_modules.oracle_asm_disks_vbox
+    public: yes
+  when: crsbuild_present.stat.exists != True and is_vbox_environment
+  
 - name: CRS HOME
   file:
     path: "{{ oracle_home }}"

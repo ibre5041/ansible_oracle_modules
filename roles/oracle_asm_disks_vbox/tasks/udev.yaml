@@ -25,8 +25,7 @@
 
 - name: Wait for ASM DISK detection
   wait_for:
-    # disk LUNs are assigned in order 15,14,...
-    path: /dev/asmshared0100
+    path: /dev/asmshared00001
     delay: 0
     timeout: 30
     state: present

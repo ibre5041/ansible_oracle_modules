@@ -45,8 +45,10 @@ Prepare two VMs according this [article](https://balazspapp.wordpress.com/2020/0
     VboxManage modifyvm rac1 --cpus 2 --memory 10240 --nic1 natnetwork --nat-network1 rac_public --nic2 natnetwork --nat-network2 rac_private
     VboxManage modifyvm rac1 --cpus 2 --memory 10240 --nic1 natnetwork --nat-network1 rac_public --nic2 natnetwork --nat-network2 rac_private
 
-    VBoxManage storagectl rac1 --name rac1 --add sata
-    VBoxManage storagectl rac2 --name rac2 --add sata
+    VBoxManage storagectl rac1 --name sata --add sata
+    VBoxManage storagectl rac2 --name sata --add sata    
+    VBoxManage storagectl rac1 --name datacrtl --add pcie
+    VBoxManage storagectl rac2 --name datacrtl --add pcie
 
     VBoxManage createmedium --filename "%HOMEDRIVE%%HOMEPATH%\VirtualBox VMs\rac\rac1\rac1.vdi" --size 102400 --variant Standard
 
@@ -58,10 +60,10 @@ Prepare two VMs according this [article](https://balazspapp.wordpress.com/2020/0
     0%...10%...20%...30%...40%...50%...60%...70%...80%...90%...100%
     Medium created. UUID: d0fbfeaf-58f0-41d2-83f9-f2d492339fb0
 
-    VBoxManage storageattach rac1 --storagectl rac1 --port 0 --type hdd --medium "%HOMEDRIVE%%HOMEPATH%\VirtualBox VMs\rac\rac1\rac1.vdi"
-    VBoxManage storageattach rac2 --storagectl rac2 --port 0 --type hdd --medium "%HOMEDRIVE%%HOMEPATH%\VirtualBox VMs\rac\rac2\rac2.vdi"
-    VBoxManage storageattach rac1 --storagectl rac1 --port 1 --type dvddrive --medium emptydrive
-    VBoxManage storageattach rac2 --storagectl rac2 --port 1 --type dvddrive --medium emptydrive
+    VBoxManage storageattach rac1 --storagectl datacrtl --port 0 --type hdd --medium "%HOMEDRIVE%%HOMEPATH%\VirtualBox VMs\rac\rac1\rac1.vdi"
+    VBoxManage storageattach rac2 --storagectl datacrtl --port 0 --type hdd --medium "%HOMEDRIVE%%HOMEPATH%\VirtualBox VMs\rac\rac2\rac2.vdi"
+    VBoxManage storageattach rac1 --storagectl datacrtl --port 1 --type dvddrive --medium emptydrive
+    VBoxManage storageattach rac2 --storagectl datacrtl --port 1 --type dvddrive --medium emptydrive
 
 - Install base minimal OS
 
@@ -69,8 +71,8 @@ Prepare two VMs according this [article](https://balazspapp.wordpress.com/2020/0
 - Mount VBOX drivers iso
 
 
-    VboxManage storageattach rac1 --storagectl rac1 --port 1 --medium additions
-    VboxManage storageattach rac2 --storagectl rac2 --port 1 --medium additions
+    VboxManage storageattach rac1 --storagectl sata --port 1 --medium additions
+    VboxManage storageattach rac2 --storagectl sata --port 1 --medium additions
 
 - Install drivers(on both nodes)
 
@@ -103,6 +105,12 @@ Prepare two VMs according this [article](https://balazspapp.wordpress.com/2020/0
     # umount /mnt
 
 
+- Share Downloaded images
+
+
+    VboxManage sharedfolder add rac1 --name Downloads --hostpath "%HOMEDRIVE%%HOMEPATH%\Downloads"
+    as this into /etc/fstab
+    Downloads /install     vboxsf rw,nodev,relatime,iocharset=utf8,uid=0,dmode=0775,fmode=0644 0 0
 
 Role Variables
 --------------

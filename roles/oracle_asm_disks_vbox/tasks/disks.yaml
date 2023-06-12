@@ -2,7 +2,7 @@
 - name: List ASM disks (Part I)
   find:
     paths: /dev/
-    patterns: "asmshared[0-9][0-9][0-9][0-9]"
+    patterns: "asmshared[0-9][0-9][0-9][0-9][0-9]"
     file_type: link
   register: _asm_disks
 
@@ -35,7 +35,7 @@
 - name: List ASM partitions (Part I)
   find:
     paths: /dev/
-    patterns: "asmshared[0-9][0-9][0-9][0-9]p1"
+    patterns: "asmshared[0-9][0-9][0-9][0-9][0-9]*p1"
     file_type: link
   register: _asm_disk_partitions
   when: first_rac_node is not defined or ansible_hostname == first_rac_node
@@ -52,5 +52,5 @@
 
 - name: Detect ASM disk partitions(partprobe)
   shell:
-    cmd: "/usr/sbin/partprobe {{ item}}"
+    cmd: "/usr/sbin/partprobe {{ item }}"
   with_items: "{{ asm_disks }}"
