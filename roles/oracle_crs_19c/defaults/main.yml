@@ -6,3 +6,7 @@ oracle_gi_media:         "{{ oracle_install_space[oracle_release]['oracle_gi_med
 oracle_home:             "{{ oracle_install_dir_root }}/gi"
 
 oracle_gi_response_file: "{{ oracle_install_space[oracle_release]['oracle_gi_response_file'] }}"
+
+oracle_crs_public_iface: "{{ ansible_default_ipv4.interface }}"
+oracle_crs_public_net:   "{{ ansible_default_ipv4.network }}"
+

@@ -12,6 +12,11 @@ oracle_install_dir_temp: "{{ oracle_install_dir_root}}/tmp"
 oracle_install_dir_base: "{{ oracle_install_dir_root}}/base"
 oracle_install_dir_prod: "{{ oracle_install_dir_root}}/product"
 
+oracle_vg: vg01
+oracle_create_vg: false
+oracle_create_swap: false
+oracle_create_fs: false
+
 oracle_inventory_location: "{{ oracle_install_dir_root}}/oraInventory"
 
 oracle_cluster_name: "CDEFAULT"
@@ -166,7 +171,10 @@ oracle_os_packages_rhel8:
   - chrony
 #  - python39
   - platform-python-pip
+  - python3-pip  
   - nvme-cli
   
 oracle_os_packages_crs:
   - gcc-c++
+
+  

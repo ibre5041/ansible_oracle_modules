@@ -9,16 +9,27 @@ Requirements
 VM should have at least 8GB RAM and free space for Oracle binaries.
 Prepare two VMs according this [article](https://balazspapp.wordpress.com/2020/04/05/installing-oracle-19c-rac-on-virtualbox-silent-installation-part-1/).
 
-- Prepare IP address plan:
+- Install necesare packages
+
+
+    yum install -y bind-utils net-tools dnsmasq
+    cp /etc/resolv.conf /etc/dnsmasq-resolv.conf
+    sed -i -e 's:#resolv-file=.*:resolv-file=/etc/dnsmasq-resolv.conf:g' /etc/dnsmasq.conf
+    systemctl start dnsmasq
+    systemctl enable dnsmasq
+
+- Prepare IP address plan, configure these IPs on nodes, add this into /etc/hosts on both servers and on client too. Use nmtui, also set DNS server to 127.0.0.1
 	
 
-    192.168.8.101    rac1       # public address of the first node
-    192.168.8.102    rac2       # public address of the second node
-    192.168.8.103    rac1-vip   # virtual address of the first node
-    192.168.8.104    rac2-vip   # virtual address of the second node
-    192.168.8.105    rac-scan   # SCAN address of the cluster
-    10.0.1.101      rac1-priv  # private address of the first node
-    10.0.1.102      rac1-priv  # private address of the second node
+    192.168.8.101    rac1.vbox      rac1       # public address of the first node(enp0s3)
+    192.168.8.102    rac2.vbox      rac2       # public address of the second node
+    192.168.8.103    rac1-vip.vbox  rac1-vip   # virtual address of the first node
+    192.168.8.104    rac2-vip.vbox  rac2-vip   # virtual address of the second node
+    192.168.8.105    rac-scan.vbox  rac-scan   # SCAN address of the cluster
+    192.168.8.106    rac-scan.vbox  rac-scan   # SCAN address of the cluster
+    192.168.8.107    rac-scan.vbox  rac-scan   # SCAN address of the cluster
+    10.0.1.101       rac1-priv.vbox rac1-priv  # private address of the first node(enp0s8)
+    10.0.1.102       rac2-priv.vbox rac2-priv  # private address of the second node
 
 - Create two VBox networks:
 

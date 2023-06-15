@@ -19,7 +19,8 @@ fi
 if [[ $DEVPATH =~ /devices/pci0000:00/0000:00:1[d-z].0/nvme/nvme([0-9]{1,2})/nvme([0-9]{1,2})n./nvme.n.p1$ ]]; then
     # NVME disk 0-1 are reserved for OS, 2-3-4-... are DATA disks
     if [[ "${BASH_REMATCH[1]}" -ge 2 ]]; then
-        export V=`/usr/sbin/nvme id-ctrl ${DEVNAME} | grep ^sn | cut -d: -f2 | tr -d ' ' `
+        #export V=`/usr/sbin/nvme id-ctrl ${DEVNAME} | grep ^sn | cut -d: -f2 | tr -d ' ' `
+        export V=`/usr/bin/lsblk -o serial -d -n ${DEVNAME}`
         export S=`/bin/lsblk ${DEVNAME} --output SIZE -n | tr -d ' '`
         printf '%s => ASMNAME=asmshared0%02dp1-%s-%s\n' "${DEVPATH}"    "${BASH_REMATCH[1]}" "${V}" "${S}" >> /tmp/udevtest2.out
         printf       'ASMNAME=asmshared0%02dp1-%s-%s\n'                 "${BASH_REMATCH[1]}" "${V}" "${S}"

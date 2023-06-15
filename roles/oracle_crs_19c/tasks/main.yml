@@ -11,7 +11,7 @@
     public: yes
 
 - include_role:
-    name: oracle_asm_disks_vmware
+    name: oracle_asm_disks_vbox
     public: yes
   when: crsbuild_present.stat.exists != True
 

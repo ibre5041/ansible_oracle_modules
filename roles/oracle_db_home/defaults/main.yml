@@ -9,3 +9,4 @@ oracle_db_ver_path:      "{{ oracle_install_space[oracle_release]['oracle_db_ver
 oracle_db_media:         "{{ oracle_install_space[oracle_release]['oracle_db_media'] }}"
 oracle_home:             "{{ oracle_install_dir_prod }}/{{ oracle_db_ver_path }}"
 
+oracle_home_name:        "DB{{ oracle_db_ver_path | replace('.', '') }}"
