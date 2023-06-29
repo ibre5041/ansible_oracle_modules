@@ -1,6 +1,8 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
+TODO: opatch util deleteinactivepatches
+
 DOCUMENTATION = '''
 ---
 module: oracle_opatch

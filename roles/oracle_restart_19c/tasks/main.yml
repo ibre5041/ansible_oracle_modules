@@ -1,30 +1,10 @@
 ---
 # tasks file for oraclerestart 19c
 
-- name: Check if inside AWS.
-  shell: "virt-what | grep aws"
-  register: aws_uri_check
-  failed_when: False
-  changed_when: False
-
-- name: set_fact is_aws_environment
-  set_fact:
-    is_aws_environment: "{{ aws_uri_check.stdout == 'aws' }}"
-
-- name: Check if inside VMware
-  shell: virt-what
-  register: vmware_virt_check
-  failed_when: False
-  changed_when: False
-
-- name: set_fact is_vmware_environment
-  set_fact:
-    is_vmware_environment: "{{ vmware_virt_check.stdout == 'vmware' }}"
-
 - name: platform check
   fail:
-    msg: 'Only VMware and AWS are supported'
-  when: not is_aws_environment and not is_vmware_environment
+    msg: 'Only VMware AWS and VirtualBox are supported'
+  when: not is_aws_environment and not is_vmware_environment and not is_vbox_environment
     
 - name: check if ~oracle/.crsbuild exists
   stat:
@@ -41,6 +21,11 @@
     public: yes
   when: crsbuild_present.stat.exists != True and is_vmware_environment
 
+- include_role:
+    name: ibre5041.ansible_oracle_modules.oracle_asm_disks_vbox
+    public: yes
+  when: crsbuild_present.stat.exists != True and is_vbox_environment
+  
 - name: CRS HOME
   file:
     path: "{{ oracle_home }}"

@@ -1,4 +1,19 @@
 
+- name: set_fact | figure out network device of private network
+  set_fact:
+    oracle_crs_priv_iface: "{{ hostvars[inventory_hostname]['ansible_' + item]['device'] }}"
+    oracle_crs_priv_net:   "{{ hostvars[inventory_hostname]['ansible_' + item]['ipv4']['network'] }}"
+  when:
+    - hostvars[inventory_hostname]['ansible_' + item].ipv4 is defined
+    - hostvars[inventory_hostname]['ansible_' + item].device != 'lo'
+    - hostvars[inventory_hostname]['ansible_' + item].device != oracle_crs_public_iface
+  with_items: "{{ ansible_interfaces }}"
+
+- name: fail when private network was not found
+  fail:
+    msg: "private network was not found"
+  when: oracle_crs_priv_iface is not defined
+
 - name: "Grid Setup gridSetup.sh (part I)"
   block:
     - name: ACFS Centos path
