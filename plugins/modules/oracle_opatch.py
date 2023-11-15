@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-TODO: opatch util deleteinactivepatches
+# TODO: opatch util deleteinactivepatches
 
 DOCUMENTATION = '''
 ---
@@ -15,7 +15,7 @@ options:
     oracle_home:
         description:
             - The home which will be patched
-        required: True
+        required: False (If env ORACLE_HOME is set)
         aliases: ['oh']
     patch_base:
         description:
@@ -80,7 +80,7 @@ options:
             - Should a patch be applied or removed
             - present = applied, absent = removed, opatchversion = returns the version of opatch
         default: present
-        choices: ['present','absent','opatchversion']
+        choices: ['present','absent','opatchversion', 'lspatches']
 
 notes:
     -
@@ -425,7 +425,7 @@ def main():
 
     module = AnsibleModule(
         argument_spec = dict(
-            oracle_home         = dict(required=True, aliases=['oh']),
+            oracle_home         = dict(required=False, aliases=['oh']),
             patch_base          = dict(default=None, aliases=['path', 'source', 'patch_source', 'phBaseDir']),
             patch_id            = dict(default=None, aliases=['id']),
             patch_version       = dict(required=None, aliases=['version']),
@@ -459,7 +459,7 @@ def main():
     if patch_base and not patch_id:
         patch_id = get_patch_id(module, patch_base)
 
-    if oracle_home is not None:
+    if oracle_home:
         os.environ['ORACLE_HOME'] = oracle_home
     elif 'ORACLE_HOME' in os.environ:
         oracle_home = os.environ['ORACLE_HOME']
