@@ -49,16 +49,14 @@ except ImportError:  # pragma: no cover
         if 'stdout' in kwargs:  # pragma: no cover
             raise ValueError('stdout argument not allowed, '
                              'it will be overridden.')
-        process = subprocess.Popen(stdout=subprocess.PIPE,
-                                   *popenargs, **kwargs)
+        process = subprocess.Popen(stdout=subprocess.PIPE, *popenargs, **kwargs)
         output, _ = process.communicate()
         retcode = process.poll()
         if retcode:
             cmd = kwargs.get("args")
             if cmd is None:
                 cmd = popenargs[0]
-            raise subprocess.CalledProcessError(retcode, cmd,
-                                                output=output)
+            raise subprocess.CalledProcessError(retcode, cmd, output=output)
         return output
     subprocess.check_output = check_output
 
@@ -76,13 +74,15 @@ except ImportError:  # pragma: no cover
                 self.cmd, self.returncode)
     subprocess.CalledProcessError = CalledProcessError
 
+
 def is_executable(fpath):
     return os.path.isfile(fpath) and os.access(fpath, os.X_OK)
+
 
 def exec_program_lines(arguments):
     try:
         output = check_output(arguments)
-        return output.splitlines()
+        return [line.strip().decode() for line in output.splitlines()]
     except CalledProcessError:
         # Just ignore the error
         return ['']
@@ -105,9 +105,9 @@ def local_listener():
     re_listener_name = re.compile('Listener (.+) is enabled')
     listeners = []
     out = []
-    for l in listeners_out:
-        if "is enabled" in l:
-            m = re_listener_name.search(l)
+    for line in listeners_out:
+        if "is enabled" in line:
+            m = re_listener_name.search(line)
             listeners.append(m.group(1))
     for l in listeners:
         config = {}
@@ -130,6 +130,7 @@ def local_listener():
             config['ipv6'] = vips[config['network']]['ipv6']
         out.append(config)
     return out
+
 
 def scan_listener():
     global srvctl, shorthostname, iscrs, networks, scans
@@ -196,7 +197,8 @@ def get_vips():
     if "network" in vip.keys():
         out[vip['network']] = vip
     return out
-    
+
+
 def get_scans():
     global srvctl, shorthostname, iscrs
     out = {}
@@ -216,14 +218,15 @@ def get_scans():
     if "network" in item.keys():
         out[item['network']] = item
     return out
-    
+
+
 # Ansible code
 def main():
     global module, shorthostname, hostname, srvctl, crsctl, cemutlo, iscrs, vips, networks, scans
     msg = ['']
     module = AnsibleModule(
-        argument_spec = dict(
-            oracle_home = dict(required=False)
+        argument_spec=dict(
+            oracle_home=dict(required=False)
         ),
         supports_check_mode=True
     )
@@ -236,36 +239,38 @@ def main():
     cemutlo = os.path.join(os.environ['ORACLE_HOME'], 'bin', 'cemutlo')
     if not is_executable(srvctl) or not is_executable(crsctl):
         module.fail_json(changed=False, msg="Are you sure ORACLE_HOME=%s points to GI home? I can't find executables srvctl or crsctl under bin/." % os.environ['ORACLE_HOME'])
-    iscrs = True # This needs to be dynamically set if it is full clusterware or Oracle restart
+
+    olsnodes = os.path.join(os.environ['ORACLE_HOME'], 'bin', 'olsnodes')
+    # Lets assume that empty output form olsnodes means we're on Oracle Restart
+    iscrs = bool(exec_program_lines([olsnodes]))
+
     hostname = gethostname()
     shorthostname = hostname.split('.')[0]
     #
     if module.check_mode:
         module.exit_json(changed=False)
     # Cluster name
-    if iscrs:
-        facts.update({'clustername': exec_program([cemutlo, '-n'])})
-    else:
-        facts.update({'clustername': 'ORACLE_RESTART'})
+    facts.update({'clustername': exec_program([cemutlo, '-n'])})
+
     # Cluster version
     if iscrs:
-        version = exec_program([crsctl, 'query','crs','activeversion'])
+        version = exec_program([crsctl, 'query', 'crs', 'activeversion'])
     else:
-        version = exec_program([crsctl, 'query','has','releaseversion'])
+        version = exec_program([crsctl, 'query', 'has', 'releaseversion'])
     m = re.search('\[([0-9\.]+)\]$', version)
     facts.update({'version': m.group(1)})
     # VIPS
     vips = get_vips()
-    facts.update({'vip': vips.values()})
+    facts.update({'vip': list(vips.values())})
     # Networks
     networks = get_networks()
-    facts.update({'network': networks.values()})
+    facts.update({'network': list(networks.values())})
     # SCANs
     scans = get_scans()
-    facts.update({'scan': scans.values()})
+    facts.update({'scan': list(scans.values())})
     # Listener
     facts.update({'local_listener': local_listener()})
-    facts.update({'scan_listener': scan_listener().values() if iscrs else []})
+    facts.update({'scan_listener': list(scan_listener().values()) if iscrs else []})
     # Databases
     facts.update({'database_list': exec_program_lines([srvctl, 'config', 'database'])})
     # Output
