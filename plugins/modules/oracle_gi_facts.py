@@ -256,9 +256,15 @@ def main():
     if iscrs:
         version = exec_program([crsctl, 'query', 'crs', 'activeversion'])
     else:
-        version = exec_program([crsctl, 'query', 'has', 'releaseversion'])
-    m = re.search('\[([0-9\.]+)\]$', version)
-    facts.update({'version': m.group(1)})
+        for i in ['releaseversion', 'releasepatch', 'softwareversion', 'softwarepatch']:
+            version = exec_program([crsctl, 'query', 'has', i])
+            m = re.search('\[([0-9\.]+)\]$', version)
+            if m:
+                facts.update({i: m.group(1)})
+                facts.update({"version": m.group(1)}) # for backward compatibility
+            else:
+                facts.update({i: version})
+
     # VIPS
     vips = get_vips()
     facts.update({'vip': list(vips.values())})
