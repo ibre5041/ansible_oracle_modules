@@ -246,9 +246,7 @@ def main():
 
     hostname = gethostname()
     shorthostname = hostname.split('.')[0]
-    #
-    if module.check_mode:
-        module.exit_json(changed=False)
+
     # Cluster name
     facts.update({'clustername': exec_program([cemutlo, '-n'])})
 
@@ -280,7 +278,7 @@ def main():
     # Databases
     facts.update({'database_list': exec_program_lines([srvctl, 'config', 'database'])})
     # Output
-    module.exit_json(msg=", ".join(msg), changed=False, ansible_facts=facts)
+    module.exit_json(msg=", ".join(msg), changed=False, ansible_facts={"oracle_gi_facts": facts})
 
 
 from ansible.module_utils.basic import *
