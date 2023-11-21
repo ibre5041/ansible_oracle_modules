@@ -29,7 +29,7 @@ def oracle_connect(module):
         cx_oracle_exists = True
 
     if not cx_oracle_exists:
-        module.fail_json(msg="The cx_Oracle module is required. 'pip install cx_Oracle' should do the trick. If cx_Oracle is installed, make sure ORACLE_HOME & LD_LIBRARY_PATH is set")
+        module.fail_json(msg="The cx_Oracle module is required. 'pip install cx_Oracle' should do the trick. If cx_Oracle is installed, make sure ORACLE_HOME is set")
         
     if "oracle_home" in module.params:
         oracle_home = module.params["oracle_home"]
@@ -71,7 +71,7 @@ def oracle_connect(module):
 
         elif (not(user) or not(password)):
             module.fail_json(msg='Missing username or password for cx_Oracle')
-
+            
     except cx_Oracle.DatabaseError as exc:
         error, = exc.args
         msg = 'Could not connect to database - %s, connect descriptor: %s' % (error.message, connect)
@@ -135,6 +135,8 @@ class oracleConnection:
             msg = 'Could not connect to database - %s, connect descriptor: %s' % (error.message, connect)
             module.fail_json(msg=msg, changed=False)
         self.conn = conn
+        self.conn.autocommit = True
+        self.version = self.conn.version
         self.ddls = []
         self.changed = False
 
@@ -205,7 +207,48 @@ class oracleConnection:
             else:
                 pass
 
+            
+    def execute_statement(self, statement):
+        """Execute a statement, can be a query or a procedure and return lines of dbms_output.put_line().
 
+        statement -- SQL request or PL/SQL block
+
+        In check mode, statement is not executed.
+        If PL/SQL block contains put_line, the output will be returned.
+        """
+        output_lines = []
+        try:
+            if not self.module.check_mode:
+                if 'dbms_output.put_line' in statement.lower():
+                    with self.conn.cursor() as cursor:
+                        cursor.callproc('dbms_output.enable', [None])
+                        cursor.execute(statement)
+
+                        chunk_size = 100  # Get lines by batch of 100
+                        # create variables to hold the output
+                        lines_var = cursor.arrayvar(str, chunk_size)  # out variable
+                        num_lines_var = cursor.var(int)  # in/out variable
+                        num_lines_var.setvalue(0, chunk_size)
+
+                        # fetch the text that was added by PL/SQL
+                        while True:
+                            cursor.callproc('dbms_output.get_lines', (lines_var, num_lines_var))
+                            num_lines = num_lines_var.getvalue()
+                            output_lines.extend(lines_var.getvalue()[:num_lines])
+                            if num_lines < chunk_size:  # if less lines than the chunk value was fetched, it's the end
+                                break
+                else:
+                    with self.conn.cursor() as cursor:                    
+                        cursor.execute(statement)
+                self.ddls.append(statement)
+            else:
+                self.ddls.append('--' + statement)
+            return output_lines
+        except cx_Oracle.DatabaseError as e:
+            error = e.args[0]
+            self.module.fail_json(msg=error.message, code=error.code, request=statement)
+
+            
 class dictcur(object):
     # need to monkeypatch the built-in execute function to always return a dict
     def __init__(self, cursor):

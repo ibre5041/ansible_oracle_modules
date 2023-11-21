@@ -1,0 +1,25 @@
+---
+- name: define connection parameters
+  set_fact:
+    connection_parameters: &con_param
+      hostname: "{{ oracle_hostname }}"      
+      port: "{{ oracle_port }}"      
+      service_name: "{{ oracle_service_name }}"
+      username: "{{ oracle_username }}"
+      password: "{{ oracle_password }}"
+      mode: "sysdba"
+
+- name: prepare test
+  oracle_sql:
+    <<: *con_param
+    script: "@{{ role_path }}/files/sql_file_test.sql"
+  register: _
+  failed_when: _.failed or _.ddls | length != 2
+
+- name: execute inexistent SQL file
+  oracle_sql:
+    <<: *con_param
+    script: "@{{ role_path }}/files/inexistent.sql"
+  register: _
+  failed_when: not _.failed
+...
