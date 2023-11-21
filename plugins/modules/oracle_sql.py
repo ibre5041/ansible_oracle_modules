@@ -73,7 +73,7 @@ EXAMPLES = '''
     service_name: one.world
     script: /u01/scripts/create-tables-and-insert-default-values.sql
 '''
-import os
+import os, re
 from ansible.module_utils.basic import AnsibleModule
 
 # In thise we do import from local project project sub-directory <project-dir>/module_utils
@@ -86,7 +86,7 @@ from ansible.module_utils.basic import AnsibleModule
 
 # In thise we do import from collections
 try:
-    from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_utils import oracle_connect
+    from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_utils import oracleConnection
 except:
     pass
 
@@ -170,28 +170,26 @@ def main():
             script=dict(required=False),
 
         ),
-        mutually_exclusive=[['sql', 'script']]
+        required_if=[('mode', 'normal', ('username', 'password', 'service_name'))],
+        required_one_of=[('sql', 'script')],
+        mutually_exclusive=[('sql', 'script')],
+        required_together=[('username', 'password')],
+        supports_check_mode=True
     )
 
-    oracle_home = module.params["oracle_home"]
-    user = module.params["user"]
-    password = module.params["password"]
-    mode = module.params["mode"]
-    service_name = module.params["service_name"]
-    hostname = module.params["hostname"]
-    port = module.params["port"]
     sql = module.params["sql"]
     script = module.params["script"]
-    
 
     if not cx_oracle_exists:
-        msg = "The cx_Oracle module is required. Also set LD_LIBRARY_PATH & ORACLE_HOME"
+        msg = "The cx_Oracle module is required. Also set ORACLE_HOME"
         module.fail_json(msg=msg)
 
-    conn = oracle_connect(module)
-    cursor = conn.cursor()
+    conn = oracleConnection(module)
 
     if sql:
+        if re.match(r'^\s*(select|with)\s+', sql, re.IGNORECASE):
+            result = conn.execute_select(sql)
+            module.exit_json(msg='Select statement executed.', changed=False, data=result)
         if sql.lower().startswith('begin '):
             execute_sql(module, cursor, conn, sql)
             msg = 'SQL executed: %s' % (sql)
