@@ -1,4 +1,4 @@
-# $ANTLR 3.1.3 Mar 18, 2009 10:09:25 OracleNetServicesV3.g 2021-09-20 11:12:38
+# $ANTLR 3.1.3 Mar 18, 2009 10:09:25 OracleNetServicesV3.g 2023-11-22 22:34:15
 
 import sys
 from .antlr3 import *
@@ -178,136 +178,136 @@ class oraclenetservicesv3lexer(Lexer):
             _type = WORD
             _channel = DEFAULT_CHANNEL
 
-            # OracleNetServicesV3.g:101:5: ( ( 'A' .. 'Z' | 'a' .. 'z' | '0' .. '9' ) ( 'A' .. 'Z' | 'a' .. 'z' | '0' .. '9' | '<' | '>' | '/' | '.' | ':' | ';' | '-' | '_' | '$' | '+' | '*' | '&' | '!' | '%' | '?' | '@' | '\\\\' . )* )
-            # OracleNetServicesV3.g:101:7: ( 'A' .. 'Z' | 'a' .. 'z' | '0' .. '9' ) ( 'A' .. 'Z' | 'a' .. 'z' | '0' .. '9' | '<' | '>' | '/' | '.' | ':' | ';' | '-' | '_' | '$' | '+' | '*' | '&' | '!' | '%' | '?' | '@' | '\\\\' . )*
+            # OracleNetServicesV3.g:101:5: ( ( 'A' .. 'Z' | 'a' .. 'z' | '0' .. '9' | '/' | '+' ) ( 'A' .. 'Z' | 'a' .. 'z' | '0' .. '9' | '<' | '>' | '/' | '.' | ':' | ';' | '-' | '_' | '$' | '+' | '*' | '&' | '!' | '%' | '?' | '@' | '\\\\' . )* )
+            # OracleNetServicesV3.g:101:7: ( 'A' .. 'Z' | 'a' .. 'z' | '0' .. '9' | '/' | '+' ) ( 'A' .. 'Z' | 'a' .. 'z' | '0' .. '9' | '<' | '>' | '/' | '.' | ':' | ';' | '-' | '_' | '$' | '+' | '*' | '&' | '!' | '%' | '?' | '@' | '\\\\' . )*
             pass 
-            if (48 <= self.input.LA(1) <= 57) or (65 <= self.input.LA(1) <= 90) or (97 <= self.input.LA(1) <= 122):
+            if self.input.LA(1) == 43 or (47 <= self.input.LA(1) <= 57) or (65 <= self.input.LA(1) <= 90) or (97 <= self.input.LA(1) <= 122):
                 self.input.consume()
             else:
                 mse = MismatchedSetException(None, self.input)
                 self.recover(mse)
                 raise mse
 
-            # OracleNetServicesV3.g:105:7: ( 'A' .. 'Z' | 'a' .. 'z' | '0' .. '9' | '<' | '>' | '/' | '.' | ':' | ';' | '-' | '_' | '$' | '+' | '*' | '&' | '!' | '%' | '?' | '@' | '\\\\' . )*
+            # OracleNetServicesV3.g:107:7: ( 'A' .. 'Z' | 'a' .. 'z' | '0' .. '9' | '<' | '>' | '/' | '.' | ':' | ';' | '-' | '_' | '$' | '+' | '*' | '&' | '!' | '%' | '?' | '@' | '\\\\' . )*
             while True: #loop4
                 alt4 = 21
                 alt4 = self.dfa4.predict(self.input)
                 if alt4 == 1:
-                    # OracleNetServicesV3.g:105:9: 'A' .. 'Z'
+                    # OracleNetServicesV3.g:107:9: 'A' .. 'Z'
                     pass 
                     self.matchRange(65, 90)
 
 
                 elif alt4 == 2:
-                    # OracleNetServicesV3.g:106:9: 'a' .. 'z'
+                    # OracleNetServicesV3.g:108:9: 'a' .. 'z'
                     pass 
                     self.matchRange(97, 122)
 
 
                 elif alt4 == 3:
-                    # OracleNetServicesV3.g:107:9: '0' .. '9'
+                    # OracleNetServicesV3.g:109:9: '0' .. '9'
                     pass 
                     self.matchRange(48, 57)
 
 
                 elif alt4 == 4:
-                    # OracleNetServicesV3.g:108:9: '<'
+                    # OracleNetServicesV3.g:110:9: '<'
                     pass 
                     self.match(60)
 
 
                 elif alt4 == 5:
-                    # OracleNetServicesV3.g:109:9: '>'
+                    # OracleNetServicesV3.g:111:9: '>'
                     pass 
                     self.match(62)
 
 
                 elif alt4 == 6:
-                    # OracleNetServicesV3.g:110:9: '/'
+                    # OracleNetServicesV3.g:112:9: '/'
                     pass 
                     self.match(47)
 
 
                 elif alt4 == 7:
-                    # OracleNetServicesV3.g:111:9: '.'
+                    # OracleNetServicesV3.g:113:9: '.'
                     pass 
                     self.match(46)
 
 
                 elif alt4 == 8:
-                    # OracleNetServicesV3.g:112:9: ':'
+                    # OracleNetServicesV3.g:114:9: ':'
                     pass 
                     self.match(58)
 
 
                 elif alt4 == 9:
-                    # OracleNetServicesV3.g:113:9: ';'
+                    # OracleNetServicesV3.g:115:9: ';'
                     pass 
                     self.match(59)
 
 
                 elif alt4 == 10:
-                    # OracleNetServicesV3.g:114:9: '-'
+                    # OracleNetServicesV3.g:116:9: '-'
                     pass 
                     self.match(45)
 
 
                 elif alt4 == 11:
-                    # OracleNetServicesV3.g:115:9: '_'
+                    # OracleNetServicesV3.g:117:9: '_'
                     pass 
                     self.match(95)
 
 
                 elif alt4 == 12:
-                    # OracleNetServicesV3.g:116:9: '$'
+                    # OracleNetServicesV3.g:118:9: '$'
                     pass 
                     self.match(36)
 
 
                 elif alt4 == 13:
-                    # OracleNetServicesV3.g:117:9: '+'
+                    # OracleNetServicesV3.g:119:9: '+'
                     pass 
                     self.match(43)
 
 
                 elif alt4 == 14:
-                    # OracleNetServicesV3.g:118:9: '*'
+                    # OracleNetServicesV3.g:120:9: '*'
                     pass 
                     self.match(42)
 
 
                 elif alt4 == 15:
-                    # OracleNetServicesV3.g:119:9: '&'
+                    # OracleNetServicesV3.g:121:9: '&'
                     pass 
                     self.match(38)
 
 
                 elif alt4 == 16:
-                    # OracleNetServicesV3.g:120:9: '!'
+                    # OracleNetServicesV3.g:122:9: '!'
                     pass 
                     self.match(33)
 
 
                 elif alt4 == 17:
-                    # OracleNetServicesV3.g:121:9: '%'
+                    # OracleNetServicesV3.g:123:9: '%'
                     pass 
                     self.match(37)
 
 
                 elif alt4 == 18:
-                    # OracleNetServicesV3.g:122:9: '?'
+                    # OracleNetServicesV3.g:124:9: '?'
                     pass 
                     self.match(63)
 
 
                 elif alt4 == 19:
-                    # OracleNetServicesV3.g:123:9: '@'
+                    # OracleNetServicesV3.g:125:9: '@'
                     pass 
                     self.match(64)
 
 
                 elif alt4 == 20:
-                    # OracleNetServicesV3.g:124:9: '\\\\' .
+                    # OracleNetServicesV3.g:126:9: '\\\\' .
                     pass 
                     self.match(92)
                     self.matchAny()
@@ -336,8 +336,8 @@ class oraclenetservicesv3lexer(Lexer):
             _type = LEFT_PAREN
             _channel = DEFAULT_CHANNEL
 
-            # OracleNetServicesV3.g:129:5: ( '(' )
-            # OracleNetServicesV3.g:129:7: '('
+            # OracleNetServicesV3.g:131:5: ( '(' )
+            # OracleNetServicesV3.g:131:7: '('
             pass 
             self.match(40)
 
@@ -361,8 +361,8 @@ class oraclenetservicesv3lexer(Lexer):
             _type = RIGHT_PAREN
             _channel = DEFAULT_CHANNEL
 
-            # OracleNetServicesV3.g:133:5: ( ')' )
-            # OracleNetServicesV3.g:133:7: ')'
+            # OracleNetServicesV3.g:135:5: ( ')' )
+            # OracleNetServicesV3.g:135:7: ')'
             pass 
             self.match(41)
 
@@ -386,8 +386,8 @@ class oraclenetservicesv3lexer(Lexer):
             _type = EQUALS
             _channel = DEFAULT_CHANNEL
 
-            # OracleNetServicesV3.g:137:5: ( '=' )
-            # OracleNetServicesV3.g:137:7: '='
+            # OracleNetServicesV3.g:139:5: ( '=' )
+            # OracleNetServicesV3.g:139:7: '='
             pass 
             self.match(61)
 
@@ -411,8 +411,8 @@ class oraclenetservicesv3lexer(Lexer):
             _type = COMMA
             _channel = DEFAULT_CHANNEL
 
-            # OracleNetServicesV3.g:141:5: ( ',' )
-            # OracleNetServicesV3.g:141:7: ','
+            # OracleNetServicesV3.g:143:5: ( ',' )
+            # OracleNetServicesV3.g:143:7: ','
             pass 
             self.match(44)
 
@@ -436,8 +436,8 @@ class oraclenetservicesv3lexer(Lexer):
             _type = SINGLE_QUOTE
             _channel = DEFAULT_CHANNEL
 
-            # OracleNetServicesV3.g:145:5: ( '\\'' )
-            # OracleNetServicesV3.g:145:7: '\\''
+            # OracleNetServicesV3.g:147:5: ( '\\'' )
+            # OracleNetServicesV3.g:147:7: '\\''
             pass 
             self.match(39)
 
@@ -461,8 +461,8 @@ class oraclenetservicesv3lexer(Lexer):
             _type = DOUBLE_QUOTE
             _channel = DEFAULT_CHANNEL
 
-            # OracleNetServicesV3.g:149:5: ( '\"' )
-            # OracleNetServicesV3.g:149:7: '\"'
+            # OracleNetServicesV3.g:151:5: ( '\"' )
+            # OracleNetServicesV3.g:151:7: '\"'
             pass 
             self.match(34)
 
@@ -486,11 +486,11 @@ class oraclenetservicesv3lexer(Lexer):
             _type = COMMENT
             _channel = DEFAULT_CHANNEL
 
-            # OracleNetServicesV3.g:153:5: ( '#' (~ ( '\\n' ) )* )
-            # OracleNetServicesV3.g:153:7: '#' (~ ( '\\n' ) )*
+            # OracleNetServicesV3.g:155:5: ( '#' (~ ( '\\n' ) )* )
+            # OracleNetServicesV3.g:155:7: '#' (~ ( '\\n' ) )*
             pass 
             self.match(35)
-            # OracleNetServicesV3.g:153:11: (~ ( '\\n' ) )*
+            # OracleNetServicesV3.g:155:11: (~ ( '\\n' ) )*
             while True: #loop5
                 alt5 = 2
                 LA5_0 = self.input.LA(1)
@@ -500,7 +500,7 @@ class oraclenetservicesv3lexer(Lexer):
 
 
                 if alt5 == 1:
-                    # OracleNetServicesV3.g:153:13: ~ ( '\\n' )
+                    # OracleNetServicesV3.g:155:13: ~ ( '\\n' )
                     pass 
                     if (0 <= self.input.LA(1) <= 9) or (11 <= self.input.LA(1) <= 65535):
                         self.input.consume()
@@ -537,8 +537,8 @@ class oraclenetservicesv3lexer(Lexer):
             _type = WHITESPACE
             _channel = DEFAULT_CHANNEL
 
-            # OracleNetServicesV3.g:157:5: ( ( '\\t' | ' ' ) )
-            # OracleNetServicesV3.g:157:7: ( '\\t' | ' ' )
+            # OracleNetServicesV3.g:159:5: ( ( '\\t' | ' ' ) )
+            # OracleNetServicesV3.g:159:7: ( '\\t' | ' ' )
             pass 
             if self.input.LA(1) == 9 or self.input.LA(1) == 32:
                 self.input.consume()
@@ -571,17 +571,17 @@ class oraclenetservicesv3lexer(Lexer):
             _type = NEWLINE
             _channel = DEFAULT_CHANNEL
 
-            # OracleNetServicesV3.g:163:5: ( ( '\\r' )? '\\n' )
-            # OracleNetServicesV3.g:163:7: ( '\\r' )? '\\n'
+            # OracleNetServicesV3.g:165:5: ( ( '\\r' )? '\\n' )
+            # OracleNetServicesV3.g:165:7: ( '\\r' )? '\\n'
             pass 
-            # OracleNetServicesV3.g:163:7: ( '\\r' )?
+            # OracleNetServicesV3.g:165:7: ( '\\r' )?
             alt6 = 2
             LA6_0 = self.input.LA(1)
 
             if (LA6_0 == 13) :
                 alt6 = 1
             if alt6 == 1:
-                # OracleNetServicesV3.g:163:9: '\\r'
+                # OracleNetServicesV3.g:165:9: '\\r'
                 pass 
                 self.match(13)
 
@@ -770,8 +770,8 @@ class oraclenetservicesv3lexer(Lexer):
             
     DFA7_transition = [
         DFA.unpack(u"\1\11\1\12\2\uffff\1\12\22\uffff\1\11\1\uffff\1\2\1"
-        u"\10\3\uffff\1\1\1\4\1\5\2\uffff\1\7\3\uffff\12\3\3\uffff\1\6\3"
-        u"\uffff\32\3\6\uffff\32\3"),
+        u"\10\3\uffff\1\1\1\4\1\5\1\uffff\1\3\1\7\2\uffff\13\3\3\uffff\1"
+        u"\6\3\uffff\32\3\6\uffff\32\3"),
         DFA.unpack(u"\0\14"),
         DFA.unpack(u"\0\14"),
         DFA.unpack(u""),

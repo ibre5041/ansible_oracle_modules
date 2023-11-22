@@ -92,10 +92,6 @@ Prepare two VMs according this [article](https://balazspapp.wordpress.com/2020/0
     # yum install epel-release
     # yum install dkms
 
-    # echo "blacklist vboxvideo" >> /etc/modprobe.d/local-dontload.conf
-    # echo "install vboxvideo /bin/false" >> /etc/modprobe.d/local-dontload.conf
-    # dracut --omit-drivers vboxvideo -f
-
     # mount /dev/cdrom /mnt/
     mount: /dev/sr0 is write-protected, mounting read-only
     # /mnt/VBoxLinuxAdditions.run --nox11
@@ -114,6 +110,10 @@ Prepare two VMs according this [article](https://balazspapp.wordpress.com/2020/0
     VirtualBox Guest Additions: Building the modules for kernel
     4.14.35-1902.300.11.el7uek.x86_64.
     # umount /mnt
+
+    # echo "blacklist vboxvideo" >> /etc/modprobe.d/local-dontload.conf
+    # echo "install vboxvideo /bin/false" >> /etc/modprobe.d/local-dontload.conf
+    # dracut --omit-drivers vboxvideo -f
 
 - Add shared data disks
 
