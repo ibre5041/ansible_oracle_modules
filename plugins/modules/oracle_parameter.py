@@ -133,7 +133,15 @@ def modify_parameter(conn, module, parameter):
     if parameter_name.startswith("_"):
         parameter_name = '"{}"'.format(parameter_name)
 
-    sql = 'alter system set {}="{}" '.format(parameter_name, value)
+    # Oracle doesn't accept string for all parameters.
+    if value in ['TRUE', 'FALSE']:
+        o_value = value
+    elif re.search('[^0-9]', value):
+        o_value = "'%s'" % value
+    else:
+        o_value = value
+
+    sql = 'alter system set {}={} '.format(parameter_name, o_value)
     if comment:
         sql += " comment='%s'" % comment
     sql += " scope=%s sid='%s'" % (scope, sid)
