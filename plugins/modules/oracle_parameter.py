@@ -208,7 +208,7 @@ def main():
         if parameter.spfile_value and scope in ['spfile', 'both']:
             m = reset_parameter(conn, module, parameter)
             msg.append(m)
-        elif parameter.display_value:
+        elif parameter.display_value != parameter.current_value and scope in ['memory', 'both']:
             m = reset_parameter(conn, module, parameter)
             msg.append(m)
         else:
