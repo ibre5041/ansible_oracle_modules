@@ -101,6 +101,7 @@ def check_parameter_exists(conn, parameter_name):
         value as CURRENT_VALUE, 
         ISMODIFIED,-- was modified since startup
         ISDEFAULT,
+        DEFAULT_VALUE,
         DISPLAY_VALUE  
         from v$parameter where name = lower(:parameter_name)
         """
@@ -207,7 +208,7 @@ def main():
     if state in ['reset', 'absent']:
         if parameter.spfile_value and scope in ['spfile', 'both']:
             reset_parameter(conn, module, parameter)
-        elif parameter.display_value != parameter.current_value and scope in ['memory', 'both']:
+        elif parameter.default_value != parameter.current_value and scope in ['memory', 'both']:
             reset_parameter(conn, module, parameter)
         else:
             module.exit_json(msg="Nothing to do for: {}".format(str(parameter)), changed=False)
