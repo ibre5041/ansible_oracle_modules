@@ -8,7 +8,7 @@ short_description: Manage parameters in an Oracle database
 description:
     - Manage init parameters in an Oracle database
 
-version_added: "2.0.1"
+version_added: "3.0.2"
 options:
     hostname:
         description:
@@ -56,7 +56,9 @@ options:
 notes:
     - cx_Oracle needs to be installed
 requirements: [ "cx_Oracle","re" ]
-author: Mikael Sandström, oravirt@gmail.com, @oravirt
+author: 
+    - Mikael Sandström, oravirt@gmail.com, @oravirt
+    - Ivan Brezina
 '''
 
 EXAMPLES = '''
@@ -72,143 +74,20 @@ oracle_parameter: hostname=remote-db-server service_name=orcl user=system passwo
 
 '''
 
-import re
-
 
 # Check if the parameter exists
-def check_parameter_exists(module, mode, msg, cursor, name):
+def check_parameter_exists(conn, parameter_name):
+    mode = conn.module.params['mode']
+    scope = conn.module.params['scope']
 
-
-    if not(name):
-        module.fail_json(msg='Error: Missing parameter name', changed=False)
-        return False
-
-    if name.startswith('_') and mode != 'sysdba':
-        module.fail_json(msg='You need sysdba privs to verify underscore parameters (%s), mode: (%s)' % (name, mode), changed=False)
-
-    elif name.startswith('_') and mode == 'sysdba':
-        sql = 'select lower(ksppinm) from sys.x$ksppi where ksppinm = lower(\'%s\')' % name
-
+    if parameter_name.startswith('_') and mode != 'sysdba':
+        msg = 'You need sysdba privs to verify underscore parameters (%s), mode: (%s)' % (parameter_name, mode)
+        conn.module.fail_json(msg=msg, changed=False)
+    elif parameter_name.startswith('_') and mode == 'sysdba':
+        sql = "select lower(ksppinm) from sys.x$ksppi where ksppinm = lower(:parameter_name)"
     else:
-        sql = 'select lower(name) from v$parameter where name = lower(\'%s\')' % name
-
-
-    try:
-            cursor.execute(sql)
-            result = cursor.fetchone()[0]
-    except cx_Oracle.DatabaseError as exc:
-            error, = exc.args
-            msg = error.message+ 'sql: ' + sql
-            return False
-
-    if result:
-        return True
-    else:
-        msg = 'The parameter (%s) doesn\'t exist' % name
-        return False
-
-
-def modify_parameter(module, mode, msg, cursor, name, value, comment, scope, sid):
-
-    contains = re.compile(r'[?*$%#()!\s,._/=+-]')
-    starters = ('+','_','"','"_','/')
-
-    if not(name) or not (value) or name is None or value is None:
-        module.fail_json(msg='Error: Missing parameter name or value. (If value is supposed to be an empty string, make sure it\'s quoted)', changed=False)
-        return False
-
-
-    currval = get_curr_value(module, mode, msg, cursor, name, scope)
-
-    if currval == value.lower() or not currval and value == "''":
-        module.exit_json(msg='The parameter (%s) is already set to %s' % (name, value), changed=False)
-        return True
-
-    if module.check_mode:
-        msg = '%s will be changed, new: %s, old: %s' % (name,value, currval.upper())
-        module.exit_json(msg=msg, changed=True)
-
-    if name.startswith(starters):
-        name = quote_name(name)
-
-    if contains.search(value):
-        value = quote_value(value)
-
-    sql = 'alter system set %s=%s ' % (name, value)
-    if comment is not None:
-        sql += ' comment=\'%s\'' % (comment)
-    # module.fail_json(msg=sql)
-    sql += 'scope=%s sid=\'%s\'' % (scope,sid)
-    try:
-        cursor.execute(sql)
-    except cx_Oracle.DatabaseError as exc:
-        error, = exc.args
-        msg = 'Blergh, something went wrong while changing the value - %s sql: %s' % (error.message, sql)
-        module.fail_json(msg=msg, changed=False)
-
-    name = clean_string(name)
-    msg = 'The parameter (%s) has been changed successfully, new: %s, old: %s' % (name, value, currval)
-    module.exit_json(msg=msg, changed=True)
-    return True
-
-
-def quote_value(value):
-
-    if len(value) > 0:
-        return "'%s'" % (value)
-    else:
-        return value
-
-
-def quote_name(name):
-
-    if len(name) > 0:
-        return '"%s"' % (name)
-    else:
-        return name
-
-def clean_string(item):
-    item = item.replace("""\"""","")
-
-    return item
-
-
-def reset_parameter(module, mode, msg, cursor, name, value, comment, scope, sid):
-
-    starters = ('+','_','"','"_')
-    if not(name):
-        module.fail_json(msg='Error: Missing parameter name', changed=False)
-        return False
-
-    if module.check_mode:
-        module.exit_json(changed=True)
-
-    if name.startswith(starters):
-        name = quote_name(name)
-
-    sql = 'alter system reset %s scope=%s sid=\'%s\'' % (name,scope,sid)
-
-    try:
-        cursor.execute(sql)
-    except cx_Oracle.DatabaseError as exc:
-        error, = exc.args
-        if error.code == 32010:
-            name = clean_string(name)
-            msg = 'The parameter (%s) is already set to its default value' % (name)
-            module.exit_json(msg=msg, changed=False)
-            return True
-
-        msg = 'Blergh, something went wrong while resetting the parameter - %s sql: %s' % (error.message, sql)
-        return False
-
-    name = clean_string(name)
-    msg = 'The parameter (%s) has been reset to its default value' % (name)
-    return True
-
-
-def get_curr_value(module, mode, msg, cursor, name, scope):
-
-    name = clean_string(name)
+        sql = "select lower(name) from v$parameter where name = lower(:parameter_name)"
+    r1 = conn.execute_select(sql, {"parameter_name": parameter_name}, fetchone=True)
 
     if scope == 'spfile':
         parameter_source = 'v$spparameter'
@@ -217,105 +96,101 @@ def get_curr_value(module, mode, msg, cursor, name, scope):
 
     if mode == 'sysdba':
         if scope == 'spfile':
-            sql = 'select lower(KSPSPFFTCTXSPDVALUE) from x$kspspfile where lower(KSPSPFFTCTXSPNAME) = lower(\'%s\')' % (name)
+            sql = "select lower(KSPSPFFTCTXSPDVALUE) from x$kspspfile where lower(KSPSPFFTCTXSPNAME) = lower(:parameter_name)"
         else:
-            sql = 'select lower(y.ksppstdvl) from sys.x$ksppi x, sys.x$ksppcv y where x.indx = y.indx and x.ksppinm = lower(\'%s\')' % (name)
+            sql = "select lower(y.ksppstdvl) from sys.x$ksppi x, sys.x$ksppcv y where x.indx = y.indx and x.ksppinm = lower(:parameter_name)"
     else:
-        sql = 'select lower(display_value) from %s where name = lower(\'%s\')' % (parameter_source, name)
+        sql = "select lower(display_value) from %s where name = lower(:parameter_name)" % parameter_source
+    r2 = conn.execute_select(sql, {"parameter_name": parameter_name}, fetchone=True)
 
-    try:
-        cursor.execute(sql)
-        result = (cursor.fetchall()[0][0])
+    return r1, r2
 
-    except cx_Oracle.DatabaseError as exc:
-        error, = exc.args
-        msg = 'Blergh, something went wrong while getting current value - %s sql: %s' % (error.message, sql)
-        module.fail_json(msg=msg, changed=False)
 
-    if result is None:
-        result = 'NULL'
+def modify_parameter(conn, module, current_parameter):
+    parameter_name = module.params['parameter_name']
+    value = module.params['value']
+    comment = module.params['comment']
+    scope = module.params['scope']
+    sid = module.params['sid']
 
-    return result
+    if current_parameter == value.lower() or not current_parameter and value == "''":
+        module.exit_json(msg='The parameter (%s) is already set to %s' % (parameter_name, value), changed=False)
+        return True
+
+    sql = 'alter system set %s=%s ' % (parameter_name, value)
+    if comment:
+        sql += " comment='%s'" % comment
+
+    sql += " scope=%s sid='%s'" % (scope, sid)
+    conn.execute_ddl(sql)
+    msg = 'The parameter (%s) has been changed successfully, new: %s, old: %s' % (parameter_name, value, current_parameter)
+    module.exit_json(msg=msg, changed=conn.changed, ddls=conn.ddls)
+
+
+def reset_parameter(conn, module):
+    parameter_name = module.params['parameter_name']
+    scope = module.params['scope']
+    sid = module.params['sid']
+
+    sql = "alter system reset %s scope=%s sid='%s'" % (parameter_name, scope, sid)
+    conn.execute_ddl(sql)
+    msg = 'The parameter (%s) has been reset to its default value' % parameter_name
+    module.exit_json(msg=msg, changed=conn.changed, ddls=conn.ddls)
 
 
 def main():
-
-    msg = ['']
     module = AnsibleModule(
         argument_spec = dict(
-            oracle_home   = dict(required=False, aliases=['oh']),
-            hostname      = dict(default='localhost'),
+            user          = dict(required=False, aliases=['un', 'username']),
+            password      = dict(required=False, no_log=True, aliases=['pw']),
+            mode          = dict(default='normal', choices=["normal", "sysdba"]),
+            hostname      = dict(required=False, default='localhost', aliases=['host']),
             port          = dict(required=False, default=1521, type='int'),
-            service_name  = dict(required=False),
-            user          = dict(required=False),
-            password      = dict(required=False, no_log=True),
-            mode          = dict(default='normal', choices=["normal","sysdba"]),
-
-            name          = dict(default=None, aliases = ['parameter']),
+            service_name  = dict(required=False, aliases=['sn']),
+            oracle_home   = dict(required=False, aliases=['oh']),
+            parameter_name = dict(default=None, aliases=['parameter', 'name']),
             value         = dict(default=None),
             comment       = dict(default=None),
-            state         = dict(default="present", choices=["present", "absent","reset"]),
+            state         = dict(default="present", choices=["present", "absent", "reset"]),
             scope         = dict(default="both", choices=["both", "spfile", "memory"]),
             sid           = dict(default="*"),
         ),
+        required_if=[('mode', 'normal', ('username', 'password', 'service_name')),
+                     ('state', 'present', ['value'])],
+        required_together=[['user', 'password']],
         supports_check_mode=True
     )
 
-    hostname = module.params["hostname"]
-    port = module.params["port"]
-    service_name = module.params["service_name"]
-    user = module.params["user"]
-    password = module.params["password"]
-    mode = module.params["mode"]
-    name = module.params["name"]
-    value = module.params["value"]
-    comment = module.params["comment"]
+    parameter_name = module.params["parameter_name"]
     state = module.params["state"]
-    scope = module.params["scope"]
-    sid = module.params["sid"]
 
-    if not cx_oracle_exists:
-        module.fail_json(msg="The cx_Oracle module is required. 'pip install cx_Oracle' should do the trick. If cx_Oracle is installed, make sure ORACLE_HOME is set")
+    oc = oracleConnection(module)
 
-    conn = oracle_connect(module)
-    cursor = conn.cursor()
-
+    parameter = check_parameter_exists(oc, parameter_name)
     if state == 'present':
-        if check_parameter_exists(module, mode, msg, cursor, name):
-            if modify_parameter(module, mode, msg, cursor, name, value, comment, scope, sid):
-                module.exit_json(msg=msg, changed=True)
-            else:
-                module.fail_json(msg=msg, changed=False)
-        else:
-            module.fail_json(msg=msg, changed=False)
-
+        if parameter:
+            modify_parameter(oc, module)
     elif state == 'reset' or state == 'absent':
-        if check_parameter_exists(module, mode, msg, cursor, name):
-            if reset_parameter(module, mode, msg, cursor, name, value, comment, scope, sid):
-                module.exit_json(msg=msg, changed=True)
-            else:
-                module.fail_json(msg=msg, changed=False)
+        if parameter:
+            reset_parameter(oc, module)
         else:
-            module.fail_json(msg=msg, changed=False)
-
-
-
-    module.exit_json(msg=msg, changed=False)
+            module.fail_json(msg="Parameter %s doesn't exist or sysdba privileges needed.", changed=False)
+    module.fail_json(msg='Unhandled exit', changed=False)
 
 
 from ansible.module_utils.basic import *
 
-# In thise we do import from local project project sub-directory <project-dir>/module_utils
+# In this case we do import from local project sub-directory <project-dir>/module_utils
 # While this file is placed in <project-dir>/library
-# No colletions are used
+# No collections are used
 #try:
 #    from ansible.module_utils.oracle_utils import oracle_connect
 #except:
 #    pass
 
-# In thise we do import from collections
+# In this case we do import from collections
 try:
-    from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_utils import oracle_connect
+    from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_utils import oracleConnection
 except:
     pass
 
