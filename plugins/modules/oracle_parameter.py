@@ -206,11 +206,9 @@ def main():
     parameter = check_parameter_exists(conn, parameter_name)
     if state in ['reset', 'absent']:
         if parameter.spfile_value and scope in ['spfile', 'both']:
-            m = reset_parameter(conn, module, parameter)
-            msg.append(m)
+            reset_parameter(conn, module, parameter)
         elif parameter.display_value != parameter.current_value and scope in ['memory', 'both']:
-            m = reset_parameter(conn, module, parameter)
-            msg.append(m)
+            reset_parameter(conn, module, parameter)
         else:
             module.exit_json(msg="Nothing to do for: {}".format(str(parameter)), changed=False)
     elif state == 'present':
