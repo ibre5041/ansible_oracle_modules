@@ -1,0 +1,28 @@
+---
+
+- name: "define pdb connection parameters"
+  set_fact:
+    connection_parameters: &pdb_con_param
+      service_name: "{{ oracle_pdb_service_name }}"
+      username: "{{ oracle_pdb_username }}"
+      password: "{{ oracle_pdb_password }}"
+      mode: "normal"
+      port: "{{ oracle_port }}"
+      host: "{{ oracle_hostname }}"
+      
+- name: "change _disable_directory_link_check (cdb only)"
+  oracle_parameter:
+    <<: *pdb_con_param
+    name: "_disable_directory_link_check"
+    value: "TRUE"
+    state: "present"
+    scope: "spfile"
+  register: _
+  failed_when: not _.failed or 'sysdba privileges' not in _.msg
+
+- name: "reset open_cursors"
+  oracle_parameter:
+    <<: *pdb_con_param
+    name: "open_cursors"
+    state: "reset"
+...

@@ -1,0 +1,5 @@
+---
+- include_tasks: "parameters_modification.yml"
+- include_tasks: "parameters_reset.yml"
+- include_tasks: "no_sysdba.yml"
+...
