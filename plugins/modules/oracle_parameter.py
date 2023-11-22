@@ -116,7 +116,7 @@ def check_parameter_exists(conn, parameter_name):
             """
         s = conn.execute_select_to_dict(sql, {"parameter_name": parameter_name}, fetchone=True)
     else:
-        sql = "select lower(name) as name, SPFILE_VALUE from v$spparameter where name = lower(:parameter_name)"
+        sql = "select lower(name) as name, DISPLAY_VALUE as SPFILE_VALUE from v$spparameter where name = lower(:parameter_name)"
         s = conn.execute_select_to_dict(sql, {"parameter_name": parameter_name}, fetchone=True)
 
     p.update(s)
@@ -198,7 +198,7 @@ def main():
     scope = module.params["scope"]
 
     if parameter_name.startswith('_') and mode != 'sysdba':
-        msg = 'You need sysdba privs to verify underscore parameters (%s), mode: (%s)' % (parameter_name, mode)
+        msg = 'You need sysdba privileges to verify underscore parameters (%s), mode: (%s)' % (parameter_name, mode)
         module.fail_json(msg=msg, changed=False)
 
     conn = oracleConnection(module)
