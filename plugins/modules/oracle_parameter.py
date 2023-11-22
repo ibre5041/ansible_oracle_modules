@@ -80,6 +80,7 @@ def check_parameter_exists(conn, parameter_name):
     mode = conn.module.params['mode']
     scope = conn.module.params['scope']
 
+    # Check if parameter name is valid
     if parameter_name.startswith('_') and mode != 'sysdba':
         msg = 'You need sysdba privs to verify underscore parameters (%s), mode: (%s)' % (parameter_name, mode)
         conn.module.fail_json(msg=msg, changed=False)
@@ -87,7 +88,9 @@ def check_parameter_exists(conn, parameter_name):
         sql = "select lower(ksppinm) from sys.x$ksppi where ksppinm = lower(:parameter_name)"
     else:
         sql = "select lower(name) from v$parameter where name = lower(:parameter_name)"
-    r1 = conn.execute_select(sql, {"parameter_name": parameter_name}, fetchone=True)
+    n = conn.execute_select(sql, {"parameter_name": parameter_name}, fetchone=True)
+    if not n[0]:
+        conn.module.fail_json(msg="Could not verify parameter name: {}".format(parameter_name), changed=False)
 
     if scope == 'spfile':
         parameter_source = 'v$spparameter'
@@ -101,9 +104,9 @@ def check_parameter_exists(conn, parameter_name):
             sql = "select lower(y.ksppstdvl) from sys.x$ksppi x, sys.x$ksppcv y where x.indx = y.indx and x.ksppinm = lower(:parameter_name)"
     else:
         sql = "select lower(display_value) from %s where name = lower(:parameter_name)" % parameter_source
-    r2 = conn.execute_select(sql, {"parameter_name": parameter_name}, fetchone=True)
+    v = conn.execute_select(sql, {"parameter_name": parameter_name}, fetchone=True)
 
-    return r1, r2
+    return v[0]
 
 
 def modify_parameter(conn, module, current_parameter):
@@ -184,7 +187,7 @@ from ansible.module_utils.basic import *
 # While this file is placed in <project-dir>/library
 # No collections are used
 #try:
-#    from ansible.module_utils.oracle_utils import oracle_connect
+#    from ansible.module_utils.oracle_utils import oracleConnection
 #except:
 #    pass
 
