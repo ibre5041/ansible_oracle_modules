@@ -38,10 +38,19 @@ EXAMPLES = '''
         path: "{{ oracle_env.ORACLE_HOME }}/network/admin/tnsnames.ora"
 '''
 
+# In this case we do import from local project project sub-directory <project-dir>/module_utils
+# While this file is placed in <project-dir>/library
+# No colletions are used
+#try:
+#    from ansible.module_utils.dotora import *
+#except:
+#    pass
+
+# In this case we do import from collections
 try:
-    from ansible.module_utils.dotora import *
-except:
     from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.dotora import *
+except:
+    pass
 
 from ansible.module_utils.basic import *
 
@@ -69,33 +78,33 @@ def main():
         argument_spec = dict(
             path        = dict(required=True),
             follow      = dict(default=True, required=False),
-            backup      = dict(type='bool', default=False), # inherited from add_file_common_args
+            backup      = dict(type='bool', default=True), # inherited from add_file_common_args
             state       = dict(default="present", choices=["present", "absent"]),
             alias       = dict(required=False),
             aliases     = dict(required=False, type="list"),
             whole_value = dict(required=False),
-            cs_simple   = dict(required=False),
-            cs_dg       = dict(required=False),
             attribute_path  = dict(required=False),
+            attribute_name  = dict(required=False),
             attribute_value = dict(required=False),
         ),
         #add_file_common_args=True,
         supports_check_mode=True,
-        mutually_exclusive=[['alias', 'aliases'],['whole_value', 'cs_simple', 'cs_dg', 'attribute_path']]
+        mutually_exclusive=[['alias', 'aliases'],['whole_value', 'attribute_path', 'attribute_name']]
     )
     
     #if module._verbosity >= 3:
     #    module.exit_json(changed=True, debug=module.params)
 
     whole_value     = module.params['whole_value']
-    cs_simple       = module.params['cs_simple']
-    cs_dg           = module.params['cs_dg']
     attribute_value = module.params['attribute_value']
-    
+    attribute_path  = module.params['attribute_path']
+    attribute_name  = module.params['attribute_name']
+
     # Preparation
     facts = {}
 
     filename = module.params["path"]
+    alias = module.params['alias']
 
     if module.params["follow"]:
         while os.path.islink(filename):
@@ -106,17 +115,18 @@ def main():
         
     orafile = DotOraFile(filename)
 
-    if module.params['alias'] and module.params['whole_value']:
-        orafile.upsertalias(module.params['alias'], module.params['whole_value'])
-        
-    if module.params['alias']:
-        alias = module.params['alias']
+    if alias and whole_value:
+        orafile.upsertalias(alias, whole_value)
+    elif alias and attribute_name:
+        orafile.setvalue(alias, attribute_name, attribute_value)
+    elif alias and attribute_path:
+        orafile.upsertaliasatribute(alias, attribute_path, attribute_value)
+    elif alias:
         try:
             param = next(p for p in orafile.params if p.name.casefold() == alias.casefold())
             facts.update({alias: str(param.valuesstr())})
         except StopIteration:
             facts.update({alias: None})
-
 
     if module.params['aliases']:
         for alias in module.params['aliases']:
@@ -127,7 +137,7 @@ def main():
                 facts.update({alias: None})
 
     new_content = str(orafile)
-    changed = bool((old_content != new_content) and (whole_value or attribute_value or cs_simple or cs_dg))
+    changed = bool((old_content != new_content) and (whole_value or attribute_value))
     if changed:
         if module.params['backup']:
             backup_file = module.backup_local(filename)
