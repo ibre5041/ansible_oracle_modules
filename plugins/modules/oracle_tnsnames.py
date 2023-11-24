@@ -3,39 +3,104 @@
 
 DOCUMENTATION = '''
 ---
+
 module: oracle_tnsnames
-short_description: Manipulate Oracle's tnsnames.ora and other .ora files
+short_description: Manipulate Oracles tnsnames.ora and other .ora files
 description:
-    - Manipulate Oracle's tnsnames.ora and other .ora files
-    - Must be run on a remote host
+  - Manipulate Oracles tnsnames.ora and other .ora files
+  - Must be run on a remote host
 version_added: "3.0.1"
 options:
-    path:
-        description:
-        - location of .ora file
-        required: true
-    backup:
-        description:
-        - Create a backup file including the timestamp information so you can get the original file back if you somehow clobbered it incorrectly.
-        type: bool
-        default: no
-
+  path:
+    description:
+      - location of .ora file
+    required: true
+  backup:
+    description:
+      - Create a backup file including the timestamp information so you can get the original file back if you somehow clobbered it incorrectly.
+    type: bool
+    default: no
+    required: false
+  follow:
+    description: Follow symlinks
+    required: false
+  alias:
+    description: name of stanza alias in .ora file.
+    required: true    
+  attribute_path:
+    description:
+      - xpath like expression in .ora stanza
+      - for example: SID_LIST/SID_DESC/ORACLE_HOME
+    required: false
+  attribute_name:
+    description:
+      - name ob attribute to be affected at any depth
+    required: false      
+  attribute_value:
+    description: value to be stored eiter by attribute_path or attribute_name
+    required: false    
+  whole_value:
+    description: The whole string value for a specified alias
+    required: false    
 notes:
-    - Each stanze is written on single line
-    - Comments are not supported (yet)
-author: ibre5041@ibrezina.net
+  - Each stanza is written on single line
+  - Comments are not supported (yet)
+author:
+  - Ivan Brezina
 '''
 
 EXAMPLES = '''
 ---
-- hosts: localhost
-  vars:
-    oracle_env:
-      ORACLE_HOME: /u01/app/grid/product/12.1.0.2/grid
-  tasks:
-    - name: Modify tnsnames.ora
-      oracle_tnsnames:
-        path: "{{ oracle_env.ORACLE_HOME }}/network/admin/tnsnames.ora"
+- name: Remove DESCRIPTION/ENABLE from RMAN alias
+  oracle_tnsnames:
+    path: "{{ tnsnames_file }}"
+    alias: "RMAN"
+    state: absent
+    attribute_path: "DESCRIPTION/ENABLE"
+
+- name: "Add DESCRIPTION/ENABLE=ENABLE to RMAN alias"
+  oracle_tnsnames:
+    path: "{{ tnsnames_file }}"
+    alias: "RMAN"
+    state: present
+    attribute_path: "DESCRIPTION/ENABLE"
+    attribute_value: "BROKEN"
+
+- name: "Change value or SQLNET.EXPIRE_TIME"
+  oracle_tnsnames:
+    path: "{{ tnsnames_file }}"
+    alias: "SQLNET.EXPIRE_TIME"
+    state: present
+    whole_value: 20
+
+- name: Parse listener.ora.in return SID_LIST_ASM_LISTENER"
+  oracle_tnsnames:
+    path: "{{ listener_file }}"
+    alias: "SID_LIST_ASM_LISTENER"
+  register: _listerner
+
+- debug: var=_listerner.msg
+
+- name: Set new ORACLE_HOME in listener.ora.in for SID_LIST_ASM_LISTENER
+  oracle_tnsnames:
+    path: "{{ listener_file }}"
+    alias: "SID_LIST_ASM_LISTENER"
+    attribute_path: "SID_LIST/SID_DESC/ORACLE_HOME"
+    attribute_value: "/oracle/grid/product/19.3.0.0"
+
+- name: Remove ENVS from listener.ora.in for SID_LIST_LISTENER
+  oracle_tnsnames:
+    path: "{{ listener_file }}"
+    alias: "SID_LIST_LISTENER"
+    attribute_name: "ENVS"
+    state: absent
+
+- name: Remove whole alias DYNAMIC_REGISTRATION_LISTENER=OFF from listener.ora
+  oracle_tnsnames:
+    path: "{{ listener_file }}"
+    alias: "DYNAMIC_REGISTRATION_LISTENER"
+    state: absent
+
 '''
 
 # In this case we do import from local project project sub-directory <project-dir>/module_utils
