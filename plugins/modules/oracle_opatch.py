@@ -7,90 +7,98 @@ DOCUMENTATION = '''
 ---
 module: oracle_opatch
 short_description: Manage patches in an Oracle environment
-    - Manages patches (applies/rolls back)
-    - Only manages the opatch part of patching (opatch/opatch auto/opatchauto)
-    - If opatchauto is true, the task has to be run as root
+description:
+  - Manages patches (applies/rolls back)
+  - Only manages the opatch part of patching (opatch/opatch auto/opatchauto)
+  - If opatchauto is true, the task has to be run as root
 version_added: "3.0.1"
 options:
-    oracle_home:
-        description:
-            - The home which will be patched
-        required: False (If env ORACLE_HOME is set)
-        aliases: ['oh']
-    patch_base:
-        description:
-            - Path to where the patch is located
-              e.g /nfs/patches/12.1.0.2/27468957
-        required: False
-        default: None
-        aliases: ['path','source','patch_source','phBaseDir']
-    patch_id:
-        description:
-            - The patch id
-              e.g 27468957
-        required: False
-        default: None
-        aliases: ['id']
-    patch_version:
-        description:
-            - The patch version
-              e.g 12.2.0.1.180417
-            - This key is mandatory if you're applying a 'opatchauto' type of patch
-        required: False
-        default: None
-        aliases: ['version_added']
-    opatch_minversion:
-        description:
-            - The minimum version of opatch needed
-            - If this key is set, a comparison is made between existing version and opatch_minversion
-              If existing < opatch_minversion an error is raised
-        required: False
-        default: None
-        aliases: ['opmv']
-    opatchauto:
-        description:
-            - Should the patch be applied using opatchato
-            - If set to true, the task has to run as 'root'
-        required: False
-        default: False
-        aliases: ['autopatch']
-    conflict_check:
-        description:
-            - Should a conflict check be run before applying a patch.
-            - If the check errors the module exits with a failure
-        required: False
-        default: True
-    stop_processes:
-        description:
-            - Stop Instances and Listener before applying a patch in ORACLE_HOME
-        required: False
-        default: False
-    rolling:
-        description:
-            - Should a patch installed in rolling upgrade mode?
-        required: False
-        default: True
-    ocm_response_file:
-        description:
-            - The OCM responsefile needed for OPatch versions < '12.2.0.1.5' (basically for DB/GI versions < 12.1)
-        required: False
-        default: False
-    state:
-        description:
-            - Should a patch be applied or removed
-            - present = applied, absent = removed, opatchversion = returns the version of opatch
-        default: present
-        choices: ['present','absent','opatchversion', 'lspatches']
+  oracle_home:
+    description: The home which will be patched
+    required: False (If env ORACLE_HOME is set)
+    aliases: ['oh']
+  patch_base:
+    description: Path to where the patch is located e.g /nfs/patches/12.1.0.2/27468957
+    required: False
+    default: None
+    aliases: ['path','source','patch_source','phBaseDir']
+  patch_id:
+    description:  The patch id e.g 27468957
+    required: False
+    default: None
+    aliases: ['id']
+  patch_version:
+    description:
+      - The patch version e.g 12.2.0.1.180417
+      - This key is mandatory if you're applying a 'opatchauto' type of patch
+    required: False
+    default: None
+    aliases: ['version_added']
+  opatch_minversion:
+    description:
+      - The minimum version of opatch needed
+      - If this key is set, a comparison is made between existing version and opatch_minversion
+      - If existing < opatch_minversion an error is raised
+    required: False
+    default: None
+    aliases: ['opmv']
+  opatchauto:
+    description:
+      - Should the patch be applied using opatchato
+      - If set to true, the task has to run as 'root'
+    required: False
+    default: False
+    aliases: ['autopatch']
+  conflict_check:
+    description:
+      - Should a conflict check be run before applying a patch.
+      - If the check errors the module exits with a failure
+    required: False
+    default: True
+  stop_processes:
+    description: Stop Instances and Listener before applying a patch in ORACLE_HOME
+    required: False
+    default: False
+  rolling:
+    description: Should a patch installed in rolling upgrade mode?
+    required: False
+    default: True
+  ocm_response_file:
+    description: The OCM responsefile needed for OPatch versions < '12.2.0.1.5' (basically for DB/GI versions < 12.1)
+    required: False
+    default: False
+  state:
+    description:
+      - Should a patch be applied or removed
+      - present = applied, absent = removed, opatchversion = returns the version of opatch
+    default: present
+    choices: ['present','absent','opatchversion', 'lspatches']
 
 notes:
-    -
+   -
 requirements: [ "os","pwd","distutils.version" ]
-author: Mikael Sandström, oravirt@gmail.com, @oravirt
+author:
+  - Mikael Sandström, oravirt@gmail.com, @oravirt
+  - Ivan Brezina
 '''
 
 EXAMPLES = '''
+- name: Collect OPatch facts
+  oracle_opatch:
+    state: lspatches
+  register: _oracle_opatch
 
+- name: Return opatchversion
+  oracle_opatch:
+    state: opatchversion
+  register: _oracle_opatch
+
+- name: Apply patch
+  oracle_opatch:
+    state: present
+    patch_base: "/install/oracle_patches/12345"
 '''
+
 import os, pwd
 from distutils.version import LooseVersion
 
