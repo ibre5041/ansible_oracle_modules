@@ -6,84 +6,76 @@ DOCUMENTATION = '''
 module: oracle_pdb
 short_description: Manage pluggable databases in Oracle
 description:
-    - Manage pluggable databases in Oracle.
+  - Manage pluggable databases in Oracle
 version_added: "3.0.1"
 options:
-    name:
-        description:
-            - The name of the pdb
-        required: True
-        default: None
-    oracle_home:
-        description:
-            - The ORACLE_HOME to use
-        required: False
-        default: None
-    sourcedb:
-        description:
-            - The container database which will house the pdb
-        required: True
-        default: None
-        aliases: ['db']
-    state:
-        description:
-            - The intended state of the pdb. 'status' will just show the status of the pdb
-        default: present
-        choices: ['present','absent', 'status']
-    pdb_admin_username:
-        description:
-            - The username for the pdb admin user
-        required: false
-        default: pdb_admin
-        aliases: ['un']
-    pdb_admin_password:
-        description:
-            - The password for the pdb admin user
-        required: false
-        default: pdb_admin
-        aliases: ['pw']
-    datafile_dest:
-        description:
-            - The path where the datafiles will be placed
-        required: false
-        default: None
-        aliases: ['dfd']
-    unplug_dest:
-        description:
-            - The path where the 'unplug' xml-file will be placed. Also used when plugging in a pdb
-        required: false
-        default: None
-        aliases: ['plug_dest','upd','pd']
-    username:
-        description:
-            - The database username to connect to the database
-        required: false
-        default: None
-        aliases: ['un']
-    password:
-        description:
-            - The password to connect to the database
-        required: false
-        default: None
-        aliases: ['pw']
-    service_name:
-        description:
-            - The service_name to connect to the database
-        required: false
-        default: database_name
-        aliases: ['sn']
-    hostname:
-        description:
-            - The host of the database
-        required: false
-        default: localhost
-        aliases: ['host']
-    port:
-        description:
-            - The listener port to connect to the database
-        required: false
-        default: 1521
-
+  name:
+    description: The name of the pdb
+    required: True
+    default: None
+  oracle_home:
+    description: The ORACLE_HOME to use
+    required: False
+    default: None
+  sourcedb:
+    description: The container database which will house the pdb
+    required: False
+    default: None
+    aliases: ['db']
+  state:
+    description: The intended state of the pdb. status will just show the status of the pdb
+    default: present
+    choices: ['present','absent', 'status']
+  pdb_admin_username:
+    description: The username for the pdb admin user
+    required: false
+    default: pdb_admin
+    aliases: ['un']
+  pdb_admin_password:
+    description: The password for the pdb admin user
+    required: false
+    default: pdb_admin
+    aliases: ['pw']
+  datafile_dest:
+    description:  The path where the datafiles will be placed
+    required: false
+    default: None
+    aliases: ['dfd']
+  unplug_dest:
+    description: The path where the 'unplug' xml-file will be placed. Also used when plugging in a pdb
+    required: false
+    default: None
+    aliases: ['plug_dest','upd','pd']
+  username:
+    description: The database username to connect to the database
+    required: false
+    default: None
+    aliases: ['un']
+  password:
+    description: The password to connect to the database
+    required: false
+    default: None
+    aliases: ['pw']
+  service_name:
+    description: The service_name to connect to the database
+    required: false
+    default: database_name
+    aliases: ['sn']
+  hostname:
+    description: The host of the database
+    required: false
+    default: localhost
+    aliases: ['host']
+  port:
+    description: The listener port to connect to the database
+    required: false
+    default: 1521
+  mode:
+    description:
+      - The mode with which to connect to the database
+    required: false
+    default: normal
+    choices: ['normal','sysdba']
 notes:
     - cx_Oracle needs to be installed
 requirements: [ "cx_Oracle" ]
