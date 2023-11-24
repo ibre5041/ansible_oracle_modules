@@ -1,0 +1,102 @@
+---
+
+- name: Slurp {{ tnsnames_file }}  
+  slurp:
+    src: "{{ tnsnames_file }}"
+  register: _tnsnames_file_old
+
+- name: Parse "{{ role_path }}/files/tnsnames.ora.in return RMAN1"
+  oracle_tnsnames:
+    path: "{{ tnsnames_file }}"
+    alias: "RMAN1"
+  register: _
+  failed_when: _.changed or _.failed or _.msg != 'RMAN1=(DESCRIPTION=(ENABLE=BROKEN)(CONNECT_DATA=(SERVICE_NAME=RMAN))(ADDRESS=(PROTOCOL=tcp)(HOST=rman.net)(PORT=1521)))'
+
+- name: Remove ENABLE=BROKEN from RMAN1
+  oracle_tnsnames:
+    path: "{{ tnsnames_file }}"
+    alias: "RMAN1"
+    state: absent
+    attribute_name: ENABLE
+  register: _
+  failed_when: not _.changed or _.failed or _.msg != 'RMAN1=(DESCRIPTION=(CONNECT_DATA=(SERVICE_NAME=RMAN))(ADDRESS=(PROTOCOL=tcp)(HOST=rman.net)(PORT=1521)))'
+
+- name: Remove DESCRIPTION/ENABLE from RMAN2
+  oracle_tnsnames:
+    path: "{{ tnsnames_file }}"
+    alias: "RMAN2"
+    state: absent
+    attribute_path: "DESCRIPTION/ENABLE"
+  register: _
+  failed_when: not _.changed or _.failed or _.msg != 'RMAN2=(DESCRIPTION=(CONNECT_DATA=(SERVICE_NAME=RMAN))(ADDRESS=(PROTOCOL=tcp)(HOST=rman.net)(PORT=1521)))'
+
+- name: Remove DESCRIPTION/ENABLE from RMAN2 (no change)
+  oracle_tnsnames:
+    path: "{{ tnsnames_file }}"
+    alias: "RMAN2"
+    state: absent
+    attribute_path: "DESCRIPTION/ENABLE"
+  register: _
+  failed_when: _.changed or _.failed or _.msg != 'RMAN2=(DESCRIPTION=(CONNECT_DATA=(SERVICE_NAME=RMAN))(ADDRESS=(PROTOCOL=tcp)(HOST=rman.net)(PORT=1521)))'
+
+- name: "Add DESCRIPTION/ENABLE=ENABLE to RMAN3"
+  oracle_tnsnames:
+    path: "{{ tnsnames_file }}"
+    alias: "RMAN3"
+    state: present
+    attribute_path: "DESCRIPTION/ENABLE"
+    attribute_value: "BROKEN"
+  register: _
+  failed_when: not _.changed or _.failed or _.msg != 'RMAN3=(DESCRIPTION=(CONNECT_DATA=(SERVICE_NAME=RMAN))(ADDRESS=(PROTOCOL=tcp)(HOST=rman.net)(PORT=1521))(ENABLE=BROKEN))'
+
+- name: "Change value or SQLNET.EXPIRE_TIME"
+  oracle_tnsnames:
+    path: "{{ tnsnames_file }}"
+    alias: "SQLNET.EXPIRE_TIME"
+    state: present
+    whole_value: 20
+  register: _
+  failed_when: not _.changed or _.failed or _.msg != 'SQLNET.EXPIRE_TIME=20'
+
+- name: "Change value or SQLNET.EXPIRE_TIME (no change)"
+  oracle_tnsnames:
+    path: "{{ tnsnames_file }}"
+    alias: "SQLNET.EXPIRE_TIME"
+    state: present
+    whole_value: 20
+  register: _
+  failed_when: _.changed or _.failed or _.msg != 'SQLNET.EXPIRE_TIME=20'
+  
+- name: Add TRACE_LEVEL_CLIENT = OFF
+  oracle_tnsnames:
+    path: "{{ tnsnames_file }}"
+    alias: "TRACE_LEVEL_CLIENT"
+    state: present
+    whole_value: "OFF"
+  register: _
+  failed_when: not _.changed or _.failed or _.msg != 'TRACE_LEVEL_CLIENT=OFF'
+
+- name: Query value of TRACE_LEVEL_CLIENT
+  oracle_tnsnames:
+    path: "{{ tnsnames_file }}"
+    alias: "TRACE_LEVEL_CLIENT"
+    state: present
+    whole_value: "OFF"
+  register: _
+  failed_when: _.changed or _.failed or _.msg != 'TRACE_LEVEL_CLIENT=OFF'
+
+#- debug: var=_
+
+- name: Slurp {{ tnsnames_file }}  
+  slurp:
+    src: "{{ tnsnames_file }}"
+  register: _tnsnames_file
+
+- name: Display OLD {{ tnsnames_file }}
+  debug:
+    msg: "{{ _tnsnames_file_old.content | b64decode | split('\n') }}"
+
+- name: Display NEW {{ tnsnames_file }}
+  debug:
+    msg: "{{ _tnsnames_file.content | b64decode | split('\n') }}"
+    

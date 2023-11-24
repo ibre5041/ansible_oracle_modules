@@ -1,0 +1,15 @@
+---
+
+- name: Copy .ora files
+  copy:
+    src: "{{ item }}"
+    dest: "{{ item }}.in"
+    remote_src: true
+    force: true
+  with_items:
+    - "{{ role_path }}/files/tnsnames.ora"
+    - "{{ role_path }}/files/listener.ora"
+
+- include_tasks: "tnsnames.yml"
+- include_tasks: "listener.yml"  
+...

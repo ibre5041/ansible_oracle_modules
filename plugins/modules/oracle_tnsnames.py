@@ -118,7 +118,7 @@ def main():
         if whole_value:
             orafile.upsertalias(alias, whole_value)
         elif attribute_name:
-            orafile.setvalue(alias, attribute_name, attribute_value)
+            orafile.setparamvalue(alias, attribute_name, attribute_value)
         elif attribute_path:
             orafile.upsertaliasatribute(alias, attribute_path, attribute_value)
     elif state == 'absent':
@@ -135,13 +135,13 @@ def main():
 
 
     try:
-        param = next(p for p in orafile.params if p.name.casefold() == alias.casefold())
+        param = next(p for p in orafile.params if p.name and p.name.casefold() == alias.casefold())
         alias_value = param.valuesstr()
     except StopIteration:
-        alias_value = param.valuesstr()
+        alias_value = ''
 
     new_content = str(orafile)
-    changed = bool((old_content != new_content) and (whole_value or attribute_value))
+    changed = bool(old_content != new_content and orafile.changed)
     if changed:
         if module.params['backup']:
             backup_file = module.backup_local(filename)

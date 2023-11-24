@@ -1,0 +1,19 @@
+
+SID_LIST_ASM_LISTENER =
+  (SID_LIST =
+    (SID_DESC =
+      (ORACLE_HOME = /oracle/grid/product/12.1.0.2 )
+      (SID_NAME = +ASM)
+    )
+  )
+
+SID_LIST_LISTENER =
+ (SID_LIST=
+ (SID_DESC=
+ (GLOBAL_DBNAME=TEST19C)
+ (ORACLE_HOME=/oracle/product/12.1.0.2)
+ (ENVS="LD_LIBRARY_PATH=/oracle/product/12.1.0.2/lib")
+ (SID_NAME=TEST19C)
+ ))
+
+DYNAMIC_REGISTRATION_LISTENER=OFF

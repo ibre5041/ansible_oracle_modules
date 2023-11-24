@@ -1,0 +1,17 @@
+# Uncomment these if you want to test parser/lexer errors
+#
+#
+#        2 $%$%#$%#^
+#"
+#AAA BBB
+
+# rman host 1st comment
+RMAN1=(DESCRIPTION=(ENABLE=BROKEN)(CONNECT_DATA=(SERVICE_NAME=RMAN))(ADDRESS=(PROTOCOL=tcp)(HOST=rman.net)(PORT=1521)))
+RMAN2=(DESCRIPTION=(ENABLE=BROKEN)(CONNECT_DATA=(SERVICE_NAME=RMAN))(ADDRESS=(PROTOCOL=tcp)(HOST=rman.net)(PORT=1521)))
+
+# rman host 2nd comment
+RMAN3=(DESCRIPTION=(CONNECT_DATA=(SERVICE_NAME=RMAN))(ADDRESS=(PROTOCOL=tcp)(HOST=rman.net)(PORT=1521)))
+
+SQLNET.EXPIRE_TIME = 30
+
+

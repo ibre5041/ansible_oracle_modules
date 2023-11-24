@@ -1,0 +1,72 @@
+---
+
+- name: Slurp {{ listener_file }}  
+  slurp:
+    src: "{{ listener_file }}"
+  register: _listener_file_old
+
+- name: Parse "{{ role_path }}/files/listener.ora.in return SID_LIST_ASM_LISTENER"
+  oracle_tnsnames:
+    path: "{{ listener_file }}"
+    alias: "SID_LIST_ASM_LISTENER"
+  register: _
+  failed_when: _.changed or _.failed or _.msg != 'SID_LIST_ASM_LISTENER=(SID_LIST=(SID_DESC=(ORACLE_HOME=/oracle/grid/product/12.1.0.2)(SID_NAME=+ASM)))'
+
+- name: Set new ORACLE_HOME in "{{ role_path }}/files/listener.ora.in for SID_LIST_ASM_LISTENER"
+  oracle_tnsnames:
+    path: "{{ listener_file }}"
+    alias: "SID_LIST_ASM_LISTENER"
+    attribute_path: "SID_LIST/SID_DESC/ORACLE_HOME"
+    attribute_value: "/oracle/grid/product/19.3.0.0"
+  register: _
+  failed_when: not _.changed or _.failed or _.msg != 'SID_LIST_ASM_LISTENER=(SID_LIST=(SID_DESC=(ORACLE_HOME=/oracle/grid/product/19.3.0.0)(SID_NAME=+ASM)))'
+
+- name: Set new ORACLE_HOME in "{{ role_path }}/files/listener.ora.in for SID_LIST_ASM_LISTENER"
+  oracle_tnsnames:
+    path: "{{ listener_file }}"
+    alias: "SID_LIST_ASM_LISTENER"
+    attribute_name: "ORACLE_HOME"
+    attribute_value: "/oracle/grid/product/19.21.0.0"
+  register: _
+  failed_when: not _.changed or _.failed or _.msg != 'SID_LIST_ASM_LISTENER=(SID_LIST=(SID_DESC=(ORACLE_HOME=/oracle/grid/product/19.21.0.0)(SID_NAME=+ASM)))'
+  
+- name: Remove ENVS from "{{ role_path }}/files/listener.ora.in for SID_LIST_LISTENER"
+  oracle_tnsnames:
+    path: "{{ listener_file }}"
+    alias: "SID_LIST_LISTENER"
+    attribute_name: "ENVS"
+    state: absent
+  register: _
+  failed_when: not _.changed or _.failed or _.msg != 'SID_LIST_LISTENER=(SID_LIST=(SID_DESC=(GLOBAL_DBNAME=TEST19C)(ORACLE_HOME=/oracle/product/12.1.0.2)(SID_NAME=TEST19C)))'
+
+
+- name: Remove DYNAMIC_REGISTRATION_LISTENER=OFF
+  oracle_tnsnames:
+    path: "{{ listener_file }}"
+    alias: "DYNAMIC_REGISTRATION_LISTENER"
+    state: absent
+  register: _
+  failed_when: not _.changed or _.failed or _.msg != 'DYNAMIC_REGISTRATION_LISTENER='
+
+- name: Remove DYNAMIC_REGISTRATION_LISTENER=OFF (no change)
+  oracle_tnsnames:
+    path: "{{ listener_file }}"
+    alias: "DYNAMIC_REGISTRATION_LISTENER"
+    state: absent
+  register: _
+  failed_when: _.changed or _.failed or _.msg != 'DYNAMIC_REGISTRATION_LISTENER='
+  
+#- debug: var=_
+  
+- name: Slurp {{ listener_file }}  
+  slurp:
+    src: "{{ listener_file }}"
+  register: _listener_file
+
+- name: Display OLD {{ listener_file }}
+  debug:
+    msg: "{{ _listener_file_old.content | b64decode | split('\n') }}"
+  
+- name: Display NEW {{ listener_file }}
+  debug:
+    msg: "{{ _listener_file.content | b64decode | split('\n') }}"

@@ -1,0 +1,4 @@
+---
+tnsnames_file: "{{ role_path }}/files/tnsnames.ora.in"
+listener_file: "{{ role_path }}/files/listener.ora.in"
+...
