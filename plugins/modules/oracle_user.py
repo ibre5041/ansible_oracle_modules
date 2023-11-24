@@ -6,111 +6,126 @@ DOCUMENTATION = '''
 module: oracle_user
 short_description: Manage users/schemas in an Oracle database
 description:
-    - Manage users/schemas in an Oracle database
-    - Can be run locally on the control machine or on a remote host
+  - Manage users/schemas in an Oracle database
+  - Can be run locally on the control machine or on a remote host
 version_added: "3.0.0"
 options:
-    hostname:
-        description:
-            - The Oracle database host
-        required: false
-        default: localhost
-    port:
-        description:
-            - The listener port number on the host
-        required: false
-        default: 1521
-    service_name:
-        description:
-            - The database service name to connect to
-        required: true
-    user:
-        description:
-            - The Oracle user name to connect to the database
-        required: false
-    password:
-        description:
-            - The Oracle user password for 'user'
-        required: false
-    mode:
-        description:
-            - The mode with which to connect to the database
-        required: false
-        default: normal
-        choices: ['normal','sysdba']
-    schema:
-        description:
-            - The schema that you want to manage
-        required: false
-        default: None
-    schema_password:
-        description:
-            - The password for the new schema. i.e '..identified by password'
-        required: false
-        default: null
-    schema_password_hash:
-        description:
-            - The password hash for the new schema. i.e '..identified by values 'XXXXXXX'
-        required: false
-        default: None
-    default_tablespace:
-        description:
-            - The default tablespace for the new schema. The tablespace must exist
-        required: false
-        default: None
-    default_temp_tablespace:
-        description:
-            - The default tablespace for the new schema. The tablespace must exist
-        required: false
-        default: None
-    authentication_type:
-        description:
-            - The type of authentication for the user.
-        required: false
-        default: password
-        choices: ['password', 'external', 'global', 'none']
-    profile:
-        description:
-            - The profile for the user
-        required: false
-        default: None
-    state:
-        description:
-            - Whether the user should exist. Absent removes the user (cascade)
-        required: False
-        default: present
-        choices: ['present','absent']
-    expired:
-        description:
-            - Expire password
-            - If not specified for a new user, Oracle default will be used.
-        required: false
-        type: bool
-    locked:
-        description:
-            - Lock or unlock account.
-            - If not specified for a new user, Oracle default will be used.
-        required: false
-        type: bool
-        
+  schema:
+    description: The schema that you want to manage
+    required: false
+    default: None
+  schema_password:
+    description: The password for the new schema. i.e '..identified by password'
+    required: false
+    default: null
+  schema_password_hash:
+    description: The password hash for the new schema. i.e '..identified by values "XXXXXXX"'
+    required: false
+    default: None
+  default_tablespace:
+    description: The default tablespace for the new schema. The tablespace must exist
+    required: false
+    default: None
+  default_temp_tablespace:
+    description: The default tablespace for the new schema. The tablespace must exist
+    required: false
+    default: None
+  authentication_type:
+    description: The type of authentication for the user
+    required: false
+    default: password
+    choices: ['password', 'external', 'global', 'none']
+  profile:
+    description: The profile for the user
+    required: false
+    default: None
+  state:
+    description: Whether the user should exist. Absent removes the user (cascade)
+    required: False
+    default: present
+    choices: ['present','absent']
+  expired:
+    description:
+      - Expire password
+      - If not specified for a new user, Oracle default will be used.
+    required: false
+    type: bool
+  locked:
+    description:
+      - Lock or unlock account.
+      - If not specified for a new user, Oracle default will be used.
+    required: false
+    type: bool  
+  hostname:
+    description: The Oracle database host
+    required: false
+    default: localhost
+  port:
+    description: The listener port number on the host
+      required: false
+      default: 1521
+  service_name:
+    description: The database service name to connect to
+    required: true
+  user:
+    description: The Oracle user name to connect to the database
+    required: false
+  password:
+    description: The Oracle user password for user
+    required: false
+  mode:
+    description:
+      - The mode with which to connect to the database
+    required: false
+    default: normal
+    choices: ['normal','sysdba']
         
 notes:
-    - cx_Oracle needs to be installed
-requirements: [ "cx_Oracle" ]
-author: Mikael Sandström, oravirt@gmail.com, @oravirt
+  - cx_Oracle needs to be installed
+  - optionaly depends on pbkdf2 to validate password hashes in PBKDF2 format
+requirements:
+  - "cx_Oracle"
+  - pbkdf2
+author:
+  - Mikael Sandström, oravirt@gmail.com, @oravirt
+  - Ivan Brezina
 '''
 
 EXAMPLES = '''
-# Create a new schema on a remote db by running the module on the controlmachine  (i.e: delegate_to: localhost)
-oracle_user: hostname=remote-db-server service_name=orcl user=system password=manager schema=myschema schema_password=mypass default_tablespace=test state=present
+- name: Create a new schema on a remote db by running the module on the controlmachine  (i.e: delegate_to: localhost)
+  oracle_user: 
+    hostname: remote-db-server
+    service_name: orcl
+    user: system
+    password: manager
+    schema: myschema
+    schema_password: mypass
+    default_tablespace: test
+    state: present
+  delegate_to: localhost
+  
+- name: Create a new schema on a remote db
+  oracle_user:
+    mode: sysdba
+    schema: myschema
+    schema_password: mypass
+    default_tablespace: test
+    state: present
+  environment:
+    ORACLE_HOME: "{{ oracle_home }}"
+    ORACLE_SID: "{{ oracle_sid }}"
 
-# Create a new schema on a remote db
-oracle_user: hostname=localhost service_name=orcl user=system password=manager schema=myschema schema_password=mypass default_tablespace=test state=present
-
-# Drop a schema on a remote db
-oracle_user: hostname=localhost service_name=orcl user=system password=manager schema=myschema state=absent
-
-
+- name: Change users default_tablespace
+  oracle_user:
+    mode: sysdba
+    schema: mypass
+    default_tablespace: USERS
+    
+- name: Drop a schema
+  oracle_user:
+    mode: sysdba
+    schema: myschema
+    state: absent
 '''
 
 
