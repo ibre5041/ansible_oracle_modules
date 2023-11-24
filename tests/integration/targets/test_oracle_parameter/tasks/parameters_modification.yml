@@ -70,13 +70,21 @@
   oracle_parameter:
     <<: *pdb_con_param
     name: "pga_aggregate_target"
-    value: "501M"
+    value: "500M"
+    state: "present"
+    scope: both
+
+- name: "change pga_aggregate_target +1(change)"
+  oracle_parameter:
+    <<: *pdb_con_param
+    name: "pga_aggregate_target"
+    value: "500M"
     state: "present"
     scope: both
   register: _    
   failed_when: not _.changed
-
-- name: "change pga_aggregate_target (no change)"
+  
+- name: "change pga_aggregate_target +1(no change)"
   oracle_parameter:
     <<: *pdb_con_param
     name: "pga_aggregate_target"
@@ -85,6 +93,16 @@
     scope: both
   register: _    
   failed_when: _.changed
+
+- name: "change pga_aggregate_target +2(change in memory)"
+  oracle_parameter:
+    <<: *pdb_con_param
+    name: "pga_aggregate_target"
+    value: "502M"
+    state: "present"
+    scope: memory
+  register: _    
+  failed_when: not _.changed
   
 - name: "change blank_trimming"
   oracle_parameter:
