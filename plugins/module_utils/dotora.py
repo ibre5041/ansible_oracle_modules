@@ -99,7 +99,7 @@ class OraParameter:
         # Traverse lisp-like path
         path = key.split('/')
         child = self
-        for i in path:
+        for i in path[0:-1]:
             # 1st find a child of desired name i
             try:
                 child = next(c for c in child.values if isinstance(c, OraParameter) and c.name.upper() == i.upper())
