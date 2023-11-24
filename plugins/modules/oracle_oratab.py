@@ -11,7 +11,6 @@ description:
   - More datailed example is here: 
   - "https://github.com/ibre5041/ansible_oracle_modules_example/blob/main/oracle_oratab.yml"
 version_added: "3.0.0"
-author: Ivan Brezina
 options:
   writable_only:
     description: Return only databases openned READ WRITE

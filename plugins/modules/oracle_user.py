@@ -62,8 +62,8 @@ options:
     default: localhost
   port:
     description: The listener port number on the host
-      required: false
-      default: 1521
+    required: false
+    default: 1521
   service_name:
     description: The database service name to connect to
     required: true
