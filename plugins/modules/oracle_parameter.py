@@ -5,73 +5,93 @@ DOCUMENTATION = '''
 ---
 module: oracle_parameter
 short_description: Manage parameters in an Oracle database
-description:
-    - Manage init parameters in an Oracle database
-
+description: Manage init parameters in an Oracle database
 version_added: "3.0.2"
 options:
-    hostname:
-        description:
-            - The Oracle database host
-        required: false
-        default: localhost
-    port:
-        description:
-            - The listener port number on the host
-        required: false
-        default: 1521
-    service_name:
-        description:
-            - The database service name to connect to
-        required: true
-    user:
-        description:
-            - The Oracle user name to connect to the database
-        required: true
-    password:
-        description:
-            - The Oracle user password for 'user'
-        required: true
-    mode:
-        description:
-            - The mode with which to connect to the database
-        required: true
-        default: normal
-        choices: ['normal','sysdba']
-    name:
-        description:
-            - The parameter that is being changed
-        required: false
-        default: null
-    value:
-        description:
-            - The value of the parameter
-        required: false
-        default: null
-    state:
-        description:
-            - The intended state of the parameter (present means set to value, absent/reset means the value is reset to its default value).
-        default: present
-        choices: ['present','absent','reset']
+  name:
+    description: The parameter that is being changed
+    required: false
+    default: null
+  value:
+    description: The value of the parameter
+    required: false
+    default: null
+  state:
+    description: The intended state of the parameter (present means set to value, absent/reset means the value is reset to its default value).
+    default: present
+    choices: ['present','absent','reset']  
+  hostname:
+    description: The Oracle database host
+    required: false
+    default: localhost
+  port:
+    description: The listener port number on the host
+    required: false
+    default: 1521
+  service_name:
+    description: The database service name to connect to
+    required: true
+  user:
+    description: The Oracle user name to connect to the database
+    required: true
+  password:
+    description: The Oracle user password for user
+    required: true
+  mode:
+    description: The mode with which to connect to the database
+    required: true
+    default: normal
+    choices: ['normal','sysdba']
 notes:
-    - cx_Oracle needs to be installed
+  - cx_Oracle needs to be installed
 requirements: [ "cx_Oracle","re" ]
 author: 
-    - Mikael Sandström, oravirt@gmail.com, @oravirt
-    - Ivan Brezina
+  - Mikael Sandström, oravirt@gmail.com, @oravirt
+  - Ivan Brezina
 '''
+
 
 EXAMPLES = '''
-# Set the value of db_recovery_file_dest
-oracle_parameter: hostname=remote-db-server service_name=orcl user=system password=manager name=db_recovery_file_dest value='+FRA' state=present scope=both sid='*'
+- name: Set the value of db_recovery_file_dest
+  oracle_parameter:
+    mode: sysdba
+    name: db_recovery_file_dest
+    value: '+FRA'
+    state: present
+    scope: both
+    sid: '*'
 
-# Set the value of db_recovery_file_dest_size
-oracle_parameter: hostname=remote-db-server service_name=orcl user=system password=manager name=db_recovery_file_dest_size value=100G state=present scope=both
+- name: Set the value of db_recovery_file_dest_size
+  oracle_parameter:
+    mode: sysdba    
+    name: db_recovery_file_dest_size
+    value: 100G
+    state: present
+    scope: both
 
-# Reset the value of open_cursors
-oracle_parameter: hostname=remote-db-server service_name=orcl user=system password=manager name=db_recovery_file_dest_size state=reset scope=spfile
+- name: Set the numeric value of open_cursors
+  oracle_parameter:
+    mode: sysdba
+    name: "open_cursors"
+    value: "351"
+    state: "present"
 
+- name: Set boolean value of blank_trimming"
+  oracle_parameter:
+    mode: sysdba
+    name: "blank_trimming"
+    value: "TRUE"
+    state: "present"
+    scope: "spfile"
+    
+- name: Reset the value of open_cursors
+  oracle_parameter:
+    mode: sysdba    
+    name: db_recovery_file_dest_size
+    state: reset
+    scope: spfile
 '''
+
 
 from collections import namedtuple
 
