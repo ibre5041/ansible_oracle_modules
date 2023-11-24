@@ -6,84 +6,74 @@ DOCUMENTATION = '''
 module: oracle_privs
 short_description: Manage object and system privileges in Oracle database
 description:
-    - Manage users/schemas in an Oracle database
-    - Can be run locally on the controlmachine or on a remote host
+  - Manage users/schemas in an Oracle database
+  - Can be run locally on the controlmachine or on a remote host
 version_added: "2.2.1"
 options:
-    hostname:
-        description:
-            - The Oracle database host
-        required: false
-        default: localhost
-    port:
-        description:
-            - The listener port number on the host
-        required: false
-        default: 1521
-    service_name:
-        description:
-            - The database service name to connect to
-        required: true
-    user:
-        description:
-            - The Oracle user name to connect to the database, must have DBA privilege
-        required: False
-    password:
-        description:
-            - The Oracle user password for 'user'
-        required: False
-    mode:
-        description:
-            - The mode with which to connect to the database
-        required: true
-        default: normal
-        choices: ['normal','sysdba']
-    state:
-        description:
-            - If present, then privileges are granted, if absent then privileges are revoked
-        required: true
-        choices: ['present','absent']
-    privs:
-        description:
-            - Privileges to grant or revoke
-            - Can be either system privileges (then objs parameter must not be specified) or object privileges (objs parameter must also be set)
-        required: true
-        type: list
-        aliases: priv
-    objs:
-        description:
-            - When setting object privileges, list the objects the privileges are set for.
-            - Use format: SCHEMA_NAME.OBJECT_NAME
-            - Wildcard (%) can be used in OBJECT_NAME part, for example HR.% to set privileges for all objects (with type objecttype) in schema HR.
-            - Object names are CASE SENSITIVE, so by default use UPPER CASE.
-        required: false
-        type: list
-        aliases: obj
-    objtypes:
-        description:
-            - When using object privileges, list also the object types (from OBJECT_TYPE column from DBA_OBJECTS).
-        required: false
-        default: ['TABLE','VIEW']
-        type: list
-    roles:
-        description:
-            - List of user names and role names to set permissions to.
-            - Names are CASE SENSITIVE! So by default use UPPER CASE.
-        required: true
-        type: list
-        aliases: role
-    convert_to_upper:
-        description:
-            - Converts all entries for role and objs parameters silently to upper case to simulate case insensitivity
-        required: False
-        default: True
-        type: bool
-    quiet:
-        description:
-            - If set to False, all executed commands are returned as Ansible output message
-        required: False
-        default: True
-        type: bool
+  state:
+    description: If present, then privileges are granted, if absent then privileges are revoked
+    required: true
+    choices: ['present','absent']
+  privs:
+    description:
+      - Privileges to grant or revoke
+      - Can be either system privileges (then objs parameter must not be specified) or object privileges (objs parameter must also be set)
+    required: true
+    type: list
+    aliases: [priv]
+  objs:
+    description:
+      - When setting object privileges, list the objects the privileges are set for.
+      - Use format SCHEMA_NAME.OBJECT_NAME
+      - "Wildcard (%) can be used in OBJECT_NAME part, for example HR.% to set privileges for all objects (with type objecttype) in schema HR."
+      - Object names are CASE SENSITIVE, so by default use UPPER CASE.
+    required: false
+    type: list
+    aliases: obj
+  objtypes:
+    description: When using object privileges, list also the object types (from OBJECT_TYPE column from DBA_OBJECTS).
+    required: false
+    default: ['TABLE','VIEW']
+    type: list
+  roles:
+    description:
+      - List of user names and role names to set permissions to.
+      - Names are CASE SENSITIVE So by default use UPPER CASE.
+    required: true
+    type: list
+    aliases: role
+  convert_to_upper:
+    description: Converts all entries for role and objs parameters silently to upper case to simulate case insensitivity
+    required: False
+    default: True
+    type: bool
+  quiet:
+    description: If set to False, all executed commands are returned as Ansible output message
+    required: False
+    default: True
+    type: bool  
+  hostname:
+    description: The Oracle database host
+    required: false
+    default: localhost
+  port:
+    description: The listener port number on the host
+    required: false
+    default: 1521
+  service_name:
+    description: The database service name to connect to
+    required: true
+  user:
+    description: The Oracle user name to connect to the database, must have DBA privilege
+    required: False
+  password:
+    description: The Oracle user password for
+    required: False
+  mode:
+    description: The mode with which to connect to the database
+    required: true
+    default: normal
+    choices: ['normal','sysdba']
 
 notes:
     - cx_Oracle needs to be installed
