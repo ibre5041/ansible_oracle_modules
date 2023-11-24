@@ -89,7 +89,7 @@ class OraParameter:
         try:
             found_idx = next(i for i, c in enumerate(child.values) if isinstance(c, OraParameter) and c.name.upper() == path[-1].upper())
             del child.values[found_idx-1:found_idx+2]
-            changed = True
+            return True
         except StopIteration:
             pass
         return False
@@ -122,7 +122,6 @@ class OraParameter:
     def valuesstr(self):
         return ''.join(str(e) for e in self.values)
 
-    
     def __str__(self):
         # Check if OraParameter instance was cleared, i.e. is targeted for removal
         if self.name:
@@ -131,7 +130,6 @@ class OraParameter:
         else:
             return ''
 
-        
     def __lt__(self, other):
         return self.lineFrom < other.lineFrom
 
@@ -152,7 +150,7 @@ class DotOraFile:
         if parser.getNumberOfSyntaxErrors():
             print >> sys.stderr, "Parser errors: " + str(parser.getNumberOfSyntaxErrors())
         #
-        self.t = r.tree; # get tree from parser
+        self.t = r.tree# get tree from parser
         #
         self.params = []    
         for p in self.t.children:
