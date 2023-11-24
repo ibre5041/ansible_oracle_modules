@@ -23,6 +23,7 @@ options:
     required: false
   follow:
     description: Follow symlinks
+    default: true
     required: false
   alias:
     description: name of stanza alias in .ora file.
@@ -30,11 +31,12 @@ options:
   attribute_path:
     description:
       - xpath like expression in .ora stanza
-      - for example: SID_LIST/SID_DESC/ORACLE_HOME
+      - "for example: SID_LIST/SID_DESC/ORACLE_HOME"
     required: false
   attribute_name:
     description:
-      - name ob attribute to be affected at any depth
+      - name of attribute to be affected at any depth
+      - for example ORACLE_HOME or ORACLE_SID
     required: false      
   attribute_value:
     description: value to be stored eiter by attribute_path or attribute_name

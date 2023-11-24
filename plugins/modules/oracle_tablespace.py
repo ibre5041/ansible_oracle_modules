@@ -6,86 +6,71 @@ DOCUMENTATION = '''
 module: oracle_tablespace
 short_description: Manage tablespaces in an Oracle database
 description:
-    - Manage tablespaces in an Oracle database (create, drop, put in read only/read write, offline/online)
-    - Can be run locally on the controlmachine or on a remote host
+  - Manage tablespaces in an Oracle database (create, drop, put in read only/read write, offline/online)
+  - Can be run locally on the controlmachine or on a remote host
 version_added: "1.9.1"
 options:
-    hostname:
-        description:
-            - The Oracle database host
-        required: false
-        default: localhost
-    port:
-        description:
-            - The listener port number on the host
-        required: false
-        default: 1521
-    service_name:
-        description:
-            - The database service name to connect to
-        required: true
-    user:
-        description:
-            - The Oracle user name to connect to the database
-        required: true
-    mode:
-        description:
-            - The mode with which to connect to the database (normal/sysdba)
-        required: false
-        choices: ['normal','sysdba']
-        default: normal
-    password:
-        description:
-            - The Oracle user password for 'user'
-        required: true
-    tablespace:
-        description:
-            - The tablespace that should be managed
-        required: True
-    state:
-        description:
-            - The intended state of the tablespace
-        default: present
-        choices: ['present','absent','online','offline','read_only','read_write']
-    bigfile:
-        description:
-            - Should the tablespace be created as a bigfile tablespace
-        default: false
-        choices: ['true','false']
-    datafile:
-        description:
-            - Where to put the datafile. Can be an ASM diskgroup or a filesystem datafile (i.e '+DATA', '/u01/oradata/testdb/test01.dbf')
-            - mutually_exclusive with numfiles
-        required: false
-        aliases: ['df','path']
-    numfiles:
-        description:
-            - If OMF (db_create_file_dest) is set, you can just specify the number of datafiles you want attached to the tablespace
-            - mutually_exclusive with datafile
-        required: false
-    size:
-        description:
-            - The size of the datafile (10M, 10G, 150G etc)
-        required: false
-    content:
-        description:
-            - The type of tablespace (permanent, temporary or undo)
-        default: permanent
-        choices: ['permanent','temp','undo']
-    autoextend:
-        description:
-            - Should the datafile be autoextended
-        default: false
-        choices: ['true','false']
-    nextsize:
-        description:
-            - If autoextend, the size of the next extent allocated (1M, 50M, 1G etc)
-        aliases: ['next']
-    maxsize:
-        description:
-            - If autoextend, the maximum size of the datafile (1M, 50M, 1G etc). If empty, defaults to database limits
-        aliases: ['max']
-
+  hostname:
+    description: The Oracle database host
+    required: false
+    default: localhost
+  port:
+    description: The listener port number on the host
+    required: false
+    default: 1521
+  service_name:
+    description: The database service name to connect to
+    required: true
+  user:
+    description: The Oracle user name to connect to the database
+    required: true
+  mode:
+    description: The mode with which to connect to the database (normal/sysdba)
+    required: false
+    choices: ['normal','sysdba']
+    default: normal
+  password:
+    description: The Oracle user password for user
+    required: true
+  tablespace:
+    description: The tablespace that should be managed
+    required: True
+  state:
+    description: The intended state of the tablespace
+    default: present
+    choices: ['present','absent','online','offline','read_only','read_write']
+  bigfile:
+    description: Should the tablespace be created as a bigfile tablespace
+    default: false
+    choices: ['true','false']
+  datafile:
+    description:
+      - "Where to put the datafile. Can be an ASM diskgroup or a filesystem datafile (i.e '+DATA', '/u01/oradata/testdb/test01.dbf')"
+      - mutually_exclusive with numfiles
+    required: false
+    aliases: ['df','path']
+  numfiles:
+    description:
+      - If OMF (db_create_file_dest) is set, you can just specify the number of datafiles you want attached to the tablespace
+      - mutually_exclusive with datafile
+    required: false
+  size:
+    description: The size of the datafile (10M, 10G, 150G etc)
+    required: false
+  content:
+    description: The type of tablespace (permanent, temporary or undo)
+    default: permanent
+    choices: ['permanent','temp','undo']
+  autoextend:
+    description: Should the datafile be autoextended
+    default: false
+    choices: ['true','false']
+  nextsize:
+    description: If autoextend, the size of the next extent allocated (1M, 50M, 1G etc)
+    aliases: ['next']
+  maxsize:
+    description: If autoextend, the maximum size of the datafile (1M, 50M, 1G etc). If empty, defaults to database limits
+    aliases: ['max']
 notes:
     - cx_Oracle needs to be installed
 requirements: [ "cx_Oracle" ]
@@ -93,28 +78,71 @@ author: Mikael Sandström, oravirt@gmail.com, @oravirt
 '''
 
 EXAMPLES = '''
-# Create a new normal tablespace
-oracle_tablespace: hostname=db-server-scan service_name=orcl user=system password=manager tablespace=test datafile='+DATA' size=100M state=present
+- name: Drop a tablespace
+  oracle_tablespace:
+    mode: sysdba
+    tablespace: test
+    state: absent
 
-# Create a new bigfile temporary tablespace with autoextend on and maxsize set
-oracle_tablespace: hostname=db-server service_name=orcl user=system password=manager tablespace=test datafile='+DATA' content=temp size=100M state=present bigfile=true autoextend=true next=100M maxsize=20G
+- name: Make a tablespace read only
+  oracle_tablespace:  
+    mode: sysdba
+    tablespace: test
+    state: read_only
 
-# Drop a tablespace
-oracle_tablespace: hostname=localhost service_name=orcl user=system password=manager tablespace=test state=absent
+- name: Make a tablespace read write
+  oracle_tablespace:
+    mode: sysdba    
+    tablespace: test
+    state: read_write
 
-# Make a tablespace read only
-oracle_tablespace: hostname=localhost service_name=orcl user=system password=manager tablespace=test state=read_only
+- name: Make a tablespace offline
+  oracle_tablespace:
+    mode: sysdba
+    tablespace: test
+    state: offline
 
-# Make a tablespace read write
-oracle_tablespace: hostname=localhost service_name=orcl user=system password=manager tablespace=test state=read_write
+- name: Make a tablespace online
+  oracle_tablespace:
+    mode: sysdba    
+    tablespace: test
+    state: online
 
-# Make a tablespace offline
-oracle_tablespace: hostname=localhost service_name=orcl user=system password=manager tablespace=test state=offline
+- name: create small file temp tablespace
+  oracle_tablespace:
+    mode: sysdba
+    tablespace: "ts_temp"
+    size: "2M"
+    datafiles:
+      - "/tmp/ts_temp1.dbf"
+      - "/tmp/ts_temp2.dbf"
+    state: "present"
+    bigfile: no
+    content: "temp"
 
-# Make a tablespace online
-oracle_tablespace: hostname=localhost service_name=orcl user=system password=manager tablespace=test state=online
-
-
+- name: create tablespace
+  oracle_tablespace:
+    mode: sysdba
+    tablespace: "ts"
+    size: "1M"
+    datafiles:
+      - "/tmp/ts1.dbf"
+    state: "present"
+    bigfile: no
+    
+- name: add datafile
+  oracle_tablespace:
+    mode: sysdba    
+    tablespace: "ts"
+    size: "2M"
+    datafiles:
+      - "/tmp/ts2.dbf"
+      - "/tmp/ts3.dbf"
+    state: "present"
+    bigfile: no
+    autoextend: yes
+    nextsize: "1M"
+    maxsize: "10M"
 '''
 
 try:
