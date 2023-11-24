@@ -2,81 +2,69 @@
 # -*- coding: utf-8 -*-
 
 DOCUMENTATION = '''
----
 module: oracle_datapatch
 short_description: Manage datapatch functionality
 description:
-    - Create/delete a database using dbca
-    - If a responsefile is available, that will be used. If initparams is defined, those will be attached to the createDatabase command
-    - If no responsefile is created, the database will be created based on all other parameters
+  - Execute datapatch or catbundle.sql psu apply
 version_added: "2.4.0.0"
 options:
-    oracle_home:
-        description:
-            - The home where the database will be created
-        required: False
-        aliases: ['oh']
-    db_name:
-        description:
-            - The name of the database
-        required: True
-        default: None
-        aliases: ['db','database_name','name']
-    sid:
-        description:
-            - The instance name
-        required: False
-        default: None
-    db_unique_name:
-        description:
-            - The database db_unique_name
-        required: False
-        default: None
-        aliases: ['dbunqn','unique_name']
-    output:
-        description:
-            - The type of output you want.
-            - Verbose: stdout of the command
-            - short: Pre-defined message
-        required: False
-        default: short
-        aliases: ['db','database_name','name']
-    fail_on_db_not_exist:
-        description:
-            - Fail the task if the db does not exist
-            - If False, continues the play (changed=False)
-        required: False
-        default: True
-        choices: ['True','False']
-    user:
-        description:
-            - Password for the DB user
-        default: sys
-        aliases: ['un']
-    password:
-        description:
-            - Password for the DB user
-        required: True
-        default: None
-        aliases: ['pw','password']
-    hostname:
-        description:
-            - The host of the database
-        required: false
-        default: localhost
-        aliases: ['host']
-    service_name:
-        description:
-            - The service_name to connect to (will default to db_name if empty)
-        required: false
-        aliases: ['sn']
-    port:
-        description:
-            - The listener port to connect to the database
-        required: false
-        default: 1521
+  oracle_home:
+    description: The home where the database will be created
+    required: False
+    aliases: ['oh']
+  db_name:
+    description: The name of the database
+    required: True
+    default: None
+    aliases: ['db','database_name','name']
+  sid:
+    description: The instance name
+    required: False
+    default: None
+  db_unique_name:
+    description: The database db_unique_name
+    required: False
+    default: None
+    aliases: ['dbunqn','unique_name']
+  output:
+    description:
+      - The type of output you want.
+      - Verbose: stdout of the command
+      - short: Pre-defined message
+    required: False
+    default: short
+    aliases: ['db','database_name','name']
+  fail_on_db_not_exist:
+    description:
+      - Fail the task if the db does not exist
+      - If False, continues the play (changed=False)
+    required: False
+    default: True
+    choices: ['True','False']
+  user:
+    description: Password for the DB user
+    default: sys
+    aliases: ['un']
+  password:
+    description: Password for the DB user
+    required: True
+    default: None
+    aliases: ['pw','password']
+  hostname:
+    description: The host of the database
+    required: false
+    default: localhost
+    aliases: ['host']
+  service_name:
+    description: The service_name to connect to (will default to db_name if empty)
+    required: false
+    aliases: ['sn']
+  port:
+    description: The listener port to connect to the database
+    required: false
+    default: 1521
 notes:
-    - cx_Oracle needs to be installed
+  - cx_Oracle needs to be installed
 requirements: [ "cx_Oracle" ]
 author: Mikael Sandström, oravirt@gmail.com, @oravirt
 '''
