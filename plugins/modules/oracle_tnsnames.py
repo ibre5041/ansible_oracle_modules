@@ -60,6 +60,7 @@ import getopt
 import tempfile
 import unittest
 
+
 def write_changes(module, content, dest):
     tmpfd, tmpfile = tempfile.mkstemp(dir=module.tmpdir)
     with os.fdopen(tmpfd, 'wb') as f:
@@ -72,16 +73,13 @@ def write_changes(module, content, dest):
 
 # Ansible code
 def main():
-    global module
-    msg = ['']
     module = AnsibleModule(
         argument_spec = dict(
             path        = dict(required=True),
             follow      = dict(default=True, required=False),
             backup      = dict(type='bool', default=True), # inherited from add_file_common_args
             state       = dict(default="present", choices=["present", "absent"]),
-            alias       = dict(required=False),
-            aliases     = dict(required=False, type="list"),
+            alias       = dict(required=True),
             whole_value = dict(required=False),
             attribute_path  = dict(required=False),
             attribute_name  = dict(required=False),
@@ -89,7 +87,7 @@ def main():
         ),
         #add_file_common_args=True,
         supports_check_mode=True,
-        mutually_exclusive=[['alias', 'aliases'],['whole_value', 'attribute_path', 'attribute_name']]
+        mutually_exclusive=[['whole_value', 'attribute_path', 'attribute_name']]
     )
     
     #if module._verbosity >= 3:
@@ -105,6 +103,7 @@ def main():
 
     filename = module.params["path"]
     alias = module.params['alias']
+    state = module.params['state']
 
     if module.params["follow"]:
         while os.path.islink(filename):
@@ -115,26 +114,31 @@ def main():
         
     orafile = DotOraFile(filename)
 
-    if alias and whole_value:
-        orafile.upsertalias(alias, whole_value)
-    elif alias and attribute_name:
-        orafile.setvalue(alias, attribute_name, attribute_value)
-    elif alias and attribute_path:
-        orafile.upsertaliasatribute(alias, attribute_path, attribute_value)
-    elif alias:
-        try:
-            param = next(p for p in orafile.params if p.name.casefold() == alias.casefold())
-            facts.update({alias: str(param.valuesstr())})
-        except StopIteration:
-            facts.update({alias: None})
+    if state == 'present':
+        if whole_value:
+            orafile.upsertalias(alias, whole_value)
+        elif attribute_name:
+            orafile.setvalue(alias, attribute_name, attribute_value)
+        elif attribute_path:
+            orafile.upsertaliasatribute(alias, attribute_path, attribute_value)
+    elif state == 'absent':
+        if whole_value:
+            module.fail_json(msg="Combination state: present and whole_value is not allowed")
+        elif attribute_path:
+            orafile.deleteparampath(alias, attribute_path)
+        elif attribute_name:
+            orafile.deleteparam(alias, attribute_name)
+        elif not attribute_name and not attribute_path and not whole_value:
+            orafile.removealias(alias)
+        else:
+            module.fail_json(msg="Combination of parameter not allowed")
 
-    if module.params['aliases']:
-        for alias in module.params['aliases']:
-            try:
-                param = next(p for p in orafile.params if p.name.casefold() == alias.casefold())
-                facts.update({alias: str(param.valuesstr())})
-            except StopIteration:
-                facts.update({alias: None})
+
+    try:
+        param = next(p for p in orafile.params if p.name.casefold() == alias.casefold())
+        alias_value = param.valuesstr()
+    except StopIteration:
+        alias_value = param.valuesstr()
 
     new_content = str(orafile)
     changed = bool((old_content != new_content) and (whole_value or attribute_value))
@@ -144,7 +148,9 @@ def main():
         write_changes(module, new_content, filename)
         
     # Output
-    module.exit_json(msg=", ".join(msg), changed=changed, ansible_facts=facts)
+    for line in orafile.warn:
+        module.warn(line)
+    module.exit_json(msg="{}={}".format(alias, alias_value), changed=changed, ansible_facts=facts)
 
 
 if __name__ == '__main__':
