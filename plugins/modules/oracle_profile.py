@@ -115,17 +115,24 @@ def create_profile(conn, module):
     profile_name = module.params['profile']
     attribute_name = module.params['attribute_name']
     attribute_value = module.params['attribute_value']
+    attributes = module.params['attributes']
+
+    if attributes:
+        keys = [x.upper() for x in attributes.keys()]
+        values = [x.upper() for x in attributes.values()]
+        wanted_set = list(zip(keys, values))
+    else:
+        wanted_set = list(zip(attribute_name, attribute_value))
 
     sql = 'create profile %s limit ' % profile_name
-
-    wanted_set = list(zip(attribute_name, attribute_value))
-
     for limit in wanted_set:
         sql += ' %s %s' % (limit[0], limit[1])
 
     conn.execute_ddl(sql)
+
+    profile = check_profile_exists(conn, profile_name)
     msg = 'Successfully created profile %s ' % profile_name
-    module.exit_json(msg=msg, changed=conn.changed, ddls=conn.ddls)
+    module.exit_json(msg=msg, changed=conn.changed, ddls=conn.ddls, profile=dict(profile))
 
 
 def remove_profile(conn, module):
@@ -133,25 +140,32 @@ def remove_profile(conn, module):
     dropsql = 'drop profile %s' % profile_name
     conn.execute_ddl(dropsql)
     msg = 'Profile %s successfully removed' % profile_name
-    module.exit_json(msg=msg, changed=conn.changed, ddls=conn.ddls)
+    module.exit_json(msg=msg, changed=conn.changed, ddls=conn.ddls, profile=dict())
 
 
 def ensure_profile_state(conn, module, current_set):
     profile_name = module.params['profile']
     attribute_name = module.params['attribute_name']
     attribute_value = module.params['attribute_value']
+    attributes = module.params['attributes']
 
-    # Deal with attribute differences
-    # Make sure attributes are upper case
-    attribute_name = [x.upper() for x in attribute_name]
-    attribute_value = [str(y).upper() for y in attribute_value]
-    wanted_set = set(zip(attribute_name, attribute_value))
+    if attributes:
+        keys = [x.upper() for x in attributes.keys()]
+        values = [x.upper() for x in attributes.values()]
+        wanted_set = set(zip(keys, values))
+    else:
+        # Deal with attribute differences
+        # Make sure attributes are upper case
+        attribute_name = [x.upper() for x in attribute_name]
+        attribute_value = [str(y).upper() for y in attribute_value]
+        wanted_set = set(zip(attribute_name, attribute_value))
 
     sql = "alter profile %s limit " % profile_name
     changes = wanted_set.difference(current_set)
 
     if not changes:
-        module.exit_json(msg='Nothing to do', changed=conn.changed, ddls=conn.ddls)
+        profile = check_profile_exists(conn, profile_name)
+        module.exit_json(msg='Nothing to do', changed=conn.changed, ddls=conn.ddls, profile=dict(profile))
 
     # Process changed attributes
     for change in changes:
@@ -159,7 +173,8 @@ def ensure_profile_state(conn, module, current_set):
 
     conn.execute_ddl(sql)
     msg = 'Successfully altered the profile (%s) / %s' % (profile_name, str(changes))
-    module.exit_json(msg=msg, changed=conn.changed, ddls=conn.ddls)
+    profile = check_profile_exists(conn, profile_name)
+    module.exit_json(msg=msg, changed=conn.changed, ddls=conn.ddls, profile=dict(profile))
 
 
 def main():
@@ -173,12 +188,13 @@ def main():
             service_name        = dict(required=False, aliases=['sn']),
             oracle_home         = dict(required=False, aliases=['oh']),
             profile             = dict(required=True, aliases=['name']),
-            attribute_name      = dict(required=False, type='list', aliases=['an']),
-            attribute_value     = dict(required=False, type='list', aliases=['av']),
+            attribute_name      = dict(required=False, default=[], type='list', aliases=['an']),
+            attribute_value     = dict(required=False, default=[], type='list', aliases=['av']),
+            attributes          = dict(required=False, default={}, type='dict'),
             state               = dict(default="present", choices=["present", "absent"]),
         ),
-        required_together=[['user', 'password']],
-        required_if=[('state', 'present', ('attribute_name', 'attribute_value'))],
+        mutually_exclusive=['attribute_name', 'attributes'],
+        required_together=[['user', 'password'], ['attribute_name, attribute_value']],
         supports_check_mode=True
     )
 
@@ -203,7 +219,7 @@ def main():
         if profile:
             remove_profile(oc, module)
         else:
-            module.exit_json(msg="Profile %s doesn't exist" % name, changed=False)
+            module.exit_json(msg="Profile %s doesn't exist" % name, changed=False, profile=dict())
     module.exit_json(msg="Unhandled exit", changed=False)
 
 
