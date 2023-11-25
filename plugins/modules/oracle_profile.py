@@ -6,110 +6,100 @@ DOCUMENTATION = '''
 module: oracle_profile
 short_description: Manage profiles in an Oracle database
 description:
-    - Manage profiles in an Oracle database
+  - Manage profiles in an Oracle database
 version_added: "3.0.0"
 options:
-    name:
-        description:
-            - The name of the profile
-        required: true
-        default: None
-        aliases: ['profile']
-    state:
-        description:
-            - The intended state of the profile.
-        default: present
-        choices: ['present','absent']
-    attribute_name:
-        description:
-            - The attribute name (e.g PASSWORD_REUSE_TIME)
-        default: None
-        aliases: ['an']
-    attribute_value:
-        description:
-            - The attribute value (e.g 10)
-        default: None
-        aliases: ['av']
-    username:
-        description:
-            - The DB username
-        required: false
-        default: sys
-        aliases: ['un']
-    password:
-        description:
-            - The password for the DB user
-        required: false
-        default: None
-        aliases: ['pw']
-    service_name:
-        description:
-            - The profile_name to connect to the database.
-        required: false
-        aliases: ['sn']
-    hostname:
-        description:
-            - The host of the database if using dbms_profile
-        required: false
-        default: localhost
-        aliases: ['host']
-    port:
-        description:
-            - The listener port to connect to the database if using dbms_profile
-        required: false
-        default: 1521
-    oracle_home:
-        description:
-            - The DB ORACLE_HOME
-        required: false
-        default: None
-        aliases: ['oh']
-
-
+  name:
+    description:  The name of the profile
+    required: true
+    default: None
+    aliases: ['profile']
+  state:
+    description: The intended state of the profile.
+    default: present
+    choices: ['present','absent']
+  attribute_name:
+    description: The attribute name (e.g PASSWORD_REUSE_TIME)
+    default: None
+    aliases: ['an']
+  attribute_value:
+    description: The attribute value (e.g 10)
+    default: None
+    aliases: ['av']
+  username:
+    description: The DB username
+    required: false
+    default: sys
+    aliases: ['un']
+  password:
+    description: The password for the DB user
+    required: false
+    default: None
+    aliases: ['pw']
+  service_name:
+    description: The profile_name to connect to the database.
+    required: false
+    aliases: ['sn']
+  hostname:
+    description: The host of the database if using dbms_profile
+    required: false
+    default: localhost
+    aliases: ['host']
+  port:
+    description: The listener port to connect to the database if using dbms_profile
+    required: false
+    default: 1521
+  oracle_home:
+    description: The DB ORACLE_HOME
+    required: false
+    default: None
+    aliases: ['oh']
 notes:
     - cx_Oracle needs to be installed
 requirements: [ "cx_Oracle" ]
-author: Mikael Sandström, oravirt@gmail.com, @oravirt
+author:
+  - Mikael Sandström, oravirt@gmail.com, @oravirt
+  - Ivan Brezina
 '''
 
 EXAMPLES = '''
 # Create a profile
 - hosts: dbserver
   vars:
-      oracle_home: /u01/app/oracle/12.2.0.1/db1
-      hostname: "{{ inventory_hostname }}"
-      service_name: orclpdb
-      user: system
-      password: Oracle_123
-      oracle_env:
-             ORACLE_HOME: "{{ oracle_home }}"
-             LD_LIBRARY_PATH: "{{ oracle_home }}/lib"
-      profiles:
-               - name: profile1
-                 attribute_name:
-                            - password_reuse_max
-                            - password_reuse_time
-                            - sessions_per_user
-                 attribute_value:
-                            - 6
-                            - 20
-                            - 5
-                 state: present
+    oracle_home: /u01/app/oracle/12.2.0.1/db1
+    hostname: "{{ inventory_hostname }}"
+    service_name: orclpdb
+    user: system
+    password: Oracle_123
+    oracle_env:
+      ORACLE_HOME: "{{ oracle_home }}"
+      LD_LIBRARY_PATH: "{{ oracle_home }}/lib"
+    profiles:
+      - name: profile1
+        attribute_name:
+          - password_reuse_max
+          - password_reuse_time
+          - sessions_per_user
+        attribute_value:
+          - 6
+          - 20
+          - 5
+        state: present
   tasks:
-  - name: Manage profiles
-    oracle_profile:
-            name={{ item.name }}
-            attribute_name={{ item.attribute_name}}
-            attribute_value={{ item.attribute_value}}
-            state={{ item.state }}
-            hostname={{ hostname }}
-            service_name={{ service_name }}
-            user={{ user }}
-            password={{ password }}
-    environment: "{{oracle_env}}"
-    with_items: "{{ profiles }}"
-
+    - name: Manage profiles
+      oracle_profile:
+        name={{ item.name }}
+        attribute_name={{ item.attribute_name}}
+        attribute_value={{ item.attribute_value}}
+        state={{ item.state }}
+        hostname={{ hostname }}
+        service_name={{ service_name }}
+        user={{ user }}
+        password={{ password }}
+      environment: "{{oracle_env}}"
+      with_items: "{{ profiles }}"
 '''
+
 import os
 from ansible.module_utils.basic import AnsibleModule
 
