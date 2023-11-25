@@ -42,7 +42,7 @@
     attribute_value: ["365"]
     state: present
   register: _
-  failed_when: _.failed or _.changed == false  or 'create profile'.upper() not in _.ddls[0].upper()
+  failed_when: _.failed or not _.changed or 'create profile'.upper() not in _.ddls[0].upper()
 
 - name: 'create minimal profile (no change)'
   oracle_profile:
@@ -62,7 +62,7 @@
     attribute_value: ["365", "ORA12C_STIG_VERIFY_FUNCTION"]
     state: present
   register: _
-  failed_when: _.failed or _.changed == false or 'PASSWORD_VERIFY_FUNCTION' not in _.ddls[0].upper()
+  failed_when: _.failed or not _.changed or 'PASSWORD_VERIFY_FUNCTION' not in _.ddls[0].upper()
 
 - name: 'alter minimal profile (no change)'
   oracle_profile:
@@ -72,7 +72,7 @@
     attribute_value: ["365", "ORA12C_STIG_VERIFY_FUNCTION"]
     state: present
   register: _
-  failed_when: _.failed or _.changed == true
+  failed_when: _.failed or _.changed
 
 - name: 'drop profile (cleanup)'
   oracle_profile:
@@ -80,7 +80,7 @@
     profile: test_profile
     state: absent
   register: _
-  failed_when: _.failed or _.changed == false or 'drop profile test_profile'.upper() not in _.ddls[0].upper()
+  failed_when: _.failed or not _.changed or 'drop profile test_profile'.upper() not in _.ddls[0].upper()
 
 - name: 'drop profile (no change)'
   oracle_profile:
@@ -88,6 +88,40 @@
     profile: test_profile
     state: absent
   register: _
-  failed_when: _.failed or _.changed == true
+  failed_when: _.failed or _.changed
+
+- name: "create minimal profile - new insterface"
+  oracle_profile:
+    <<: *con_param
+    profile: TEST_PROFILE
+    attributes:
+      PASSWORD_LIFE_TIME: "365"
+      PASSWORD_VERIFY_FUNCTION: "ORA12C_STIG_VERIFY_FUNCTION"
+    state: present
+  register: _
+  failed_when: _.failed or not _.changed
+
+- name: 'create minimal profile - new insterface (no change)'
+  oracle_profile:
+    <<: *con_param
+    profile: TEST_PROFILE
+    attributes:
+      PASSWORD_LIFE_TIME: 365
+      PASSWORD_VERIFY_FUNCTION: "ORA12C_STIG_VERIFY_FUNCTION"
+    state: present
+  register: _
+  failed_when: _.failed or _.changed
+
+- name: 'alter minimal profile - new insterface'
+  oracle_profile:
+    <<: *con_param
+    profile: TEST_PROFILE
+    attributes:
+      PASSWORD_GRACE_TIME: "10"
+    state: present
+  register: _
+  failed_when: _.failed or not _.changed or _.profile.PASSWORD_GRACE_TIME != "10"
+
+- debug: var=_  
   
 ...

@@ -63,6 +63,24 @@ author:
 '''
 
 EXAMPLES = '''
+- name: Create profile:
+  oracle_profile:
+    mode: sysdba
+    profile: TEST_PROFILE
+    attributes:
+      PASSWORD_REUSE_MAX: "10"
+
+- name: Alter existing profile
+  oracle_profile:  
+    mode: sysdba
+    profile: TEST_PROFILE
+    attributes:
+      PASSWORD_LIFE_TIME: "365"
+  register: _test_profile
+
+- debug:
+    msg: "{{ _test_profile.profile }}"
+
 # Create a profile
 - hosts: dbserver
   vars:
@@ -151,7 +169,7 @@ def ensure_profile_state(conn, module, current_set):
 
     if attributes:
         keys = [x.upper() for x in attributes.keys()]
-        values = [x.upper() for x in attributes.values()]
+        values = [str(x).upper() for x in attributes.values()]
         wanted_set = set(zip(keys, values))
     else:
         # Deal with attribute differences
