@@ -354,7 +354,7 @@ def main():
             password       = dict(required = False, no_log=True),
             scope          = dict(required = False, choices=["default", "db", "cdb", "pdbs", "all_pdbs"], default = 'default'),
             pdb_list       = dict(required = False, type='list', default=[]),
-            oracle_home    = dict(required = False),
+            oracle_home    = dict(required = False, aliases=['oh']),
             oracle_sid     = dict(required = False, aliases=['oracle_db_name']),
             nls_lang       = dict(required = False),
             chdir          = dict(required = False),

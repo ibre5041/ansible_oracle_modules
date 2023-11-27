@@ -226,7 +226,7 @@ def main():
     msg = ['']
     module = AnsibleModule(
         argument_spec=dict(
-            oracle_home=dict(required=False)
+            oracle_home=dict(required=False, aliases = ['oh'])
         ),
         supports_check_mode=True
     )
