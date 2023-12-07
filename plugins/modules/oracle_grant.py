@@ -6,90 +6,93 @@ DOCUMENTATION = '''
 module: oracle_grant
 short_description: Manage users/schemas in an Oracle database
 description:
-    - Manage grant/privileges in an Oracle database
-    - Handles role/sys privileges at the moment.
-    - It is possible to add object privileges as well, but they are not considered when removing privs at the moment.
+  - Manage grant/privileges in an Oracle database
+  - Handles role/sys privileges at the moment.
+  - It is possible to add object privileges as well, but they are not considered when removing privs at the moment.
 version_added: "3.0.0"
 options:
-    hostname:
-        description:
-            - The Oracle database host
-        required: false
-        default: localhost
-    port:
-        description:
-            - The listener port number on the host
-        required: false
-        default: 1521
-    service_name:
-        description:
-            - The database service name to connect to
-        required: true
-    user:
-        description:
-            - The Oracle user name to connect to the database
-        required: true
-    password:
-        description:
-            - The Oracle user password for 'user'
-        required: true
-    mode:
-        description:
-            - The mode with which to connect to the database
-        required: true
-        default: normal
-        choices: ['normal','sysdba']
-    schema:
-        description:
-            - The schema that should get grant added/removed
-        required: false
-        default: null
-    grant:
-        description:
-            - The privileges granted to the new schema. Can be a string or a list
-        required: false
-        default: null
-    object_privs:
-        description:
-            - The privileges granted to specific objects
-            - format: 'priv1,priv2,priv3:owner.object_name'
-              e.g:
-              - select,update,insert,delete:sys.dba_tablespaces
-              - select:sys.v_$session
-        required: false
-        default: null
-    grant_mode:
-        description:
-            - Should the list of grant be enforced, or just appended to.
-            - exact: Whatever is in the list of grant will be enforced, i.e grant/privileges will be removed if they are not in the list
-            - append: Grant/privileges are just appended, nothing is removed
-        default: append
-        choices: ['exact','append']
-    state:
-        description:
-            - The intended state of the priv (present=added to the user, absent=removed from the user). 
-            -  REMOVEALL will remove ALL role/sys privileges
-        default: present
-        choices: ['present','absent','REMOVEALL']
+  hostname:
+    description: The Oracle database host
+    required: false
+    default: localhost
+  port:
+    description: The listener port number on the host
+    required: false
+    default: 1521
+  service_name:
+    description:The database service name to connect to
+    required: true
+  user:
+    description: The Oracle user name to connect to the database
+    required: true
+  password:
+    description: The Oracle user password for 'user'
+    required: true
+  mode:
+    description: The mode with which to connect to the database
+    required: true
+    default: normal
+    choices: ['normal','sysdba']
+  schema:
+    description: The schema that should get grant added/removed
+    required: false
+    default: null
+  grant:
+    description: The privileges granted to the new schema. Can be a string or a list
+    required: false
+    default: null
+  object_privs:
+    description:
+      - The privileges granted to specific objects
+      - "format: 'priv1,priv2,priv3:owner.object_name'"
+      - "e.g."
+      - "select,update,insert,delete:sys.dba_tablespaces"
+      - "select:sys.v_$session"
+    required: false
+    default: null
+  grant_mode:
+    description:
+      - "Should the list of grant be enforced, or just appended to"
+      - "exact: Whatever is in the list of grant will be enforced, i.e grant/privileges will be removed if they are not in the list"
+      - "append: Grant/privileges are just appended, nothing is removed"
+    default: append
+    choices: ['exact','append']
+  state:
+    description:
+      - The intended state of the priv (present=added to the user, absent=removed from the user). 
+      -  REMOVEALL will remove ALL role/sys privileges
+    default: present
+    choices: ['present','absent','REMOVEALL']
 notes:
-    - cx_Oracle needs to be installed
+  - cx_Oracle needs to be installed
 requirements: [ "cx_Oracle" ]
 author: 
-    - Mikael Sandström, oravirt@gmail.com, @oravirt
-    - Ivan Brezina
+  - Mikael Sandström, oravirt@gmail.com, @oravirt
+  - Ivan Brezina
 '''
 
+
 EXAMPLES = '''
-# Add grant to the user
-oracle_grant: hostname=remote-db-server service_name=orcl user=system password=manager schema=myschema state=present grant='create session','create any table',connect,resource
+- name: Add grant to the user
+  oracle_grant:
+    mode: sysdba
+    state: present
+    grant:
+      - 'create session'
+      - 'create any table'
+      - connect
+      - resource
 
-# Revoke the 'create any table' grant
-oracle_grant: hostname=localhost service_name=orcl user=system password=manager schema=myschema state=absent grant='create any table'
+- name: "Revoke the 'create any table' grant"
+  oracle_grant:
+    mode: sysdba
+    state: absent
+    grant: 'create any table'
 
-# Remove all grant from a user
-oracle_grant: hostname=localhost service_name=orcl user=system password=manager schema=myschema state=REMOVEALL grant=
-
-
+- name: Remove all grant from a user
+  oracle_grant:
+    mode: sysdba
+    state: REMOVEALL
 '''
 
 
