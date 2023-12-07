@@ -33,7 +33,7 @@ options:
     required: true
     default: normal
     choices: ['normal','sysdba']
-  schema:
+  grantee:
     description: The schema that should get grant added/removed
     required: false
     default: null
@@ -76,6 +76,7 @@ EXAMPLES = '''
 - name: Add grant to the user
   oracle_grant:
     mode: sysdba
+    grantee: app_user
     state: present
     grant:
       - 'create session'
@@ -86,12 +87,14 @@ EXAMPLES = '''
 - name: "Revoke the 'create any table' grant"
   oracle_grant:
     mode: sysdba
+    grantee: app_user
     state: absent
     grant: 'create any table'
 
 - name: Remove all grant from a user
   oracle_grant:
     mode: sysdba
+    grantee: app_user
     state: REMOVEALL
 '''
 
