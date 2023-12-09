@@ -7,6 +7,7 @@ module: oracle_profile
 short_description: Manage profiles in an Oracle database
 description:
   - Manage profiles in an Oracle database
+  - See connection parameters for oracle_ping  
 version_added: "3.0.0"
 options:
   name:
@@ -26,34 +27,6 @@ options:
     description: The attribute value (e.g 10)
     default: None
     aliases: ['av']
-  username:
-    description: The DB username
-    required: false
-    default: sys
-    aliases: ['un']
-  password:
-    description: The password for the DB user
-    required: false
-    default: None
-    aliases: ['pw']
-  service_name:
-    description: The profile_name to connect to the database.
-    required: false
-    aliases: ['sn']
-  hostname:
-    description: The host of the database if using dbms_profile
-    required: false
-    default: localhost
-    aliases: ['host']
-  port:
-    description: The listener port to connect to the database if using dbms_profile
-    required: false
-    default: 1521
-  oracle_home:
-    description: The DB ORACLE_HOME
-    required: false
-    default: None
-    aliases: ['oh']
 notes:
     - cx_Oracle needs to be installed
 requirements: [ "cx_Oracle" ]
@@ -198,13 +171,14 @@ def ensure_profile_state(conn, module, current_set):
 def main():
     module = AnsibleModule(
         argument_spec = dict(
-            user                = dict(required=False, aliases=['un', 'username']),
-            password            = dict(required=False, no_log=True, aliases=['pw']),
-            mode                = dict(default='normal', choices=["normal", "sysdba"]),
-            hostname            = dict(required=False, default='localhost', aliases=['host']),
-            port                = dict(required=False, default=1521, type='int'),
-            service_name        = dict(required=False, aliases=['sn']),
-            oracle_home         = dict(required=False, aliases=['oh']),
+            user          = dict(required=False, aliases=['un', 'username']),
+            password      = dict(required=False, no_log=True, aliases=['pw']),
+            mode          = dict(default='normal', choices=["normal", "sysdba"]),
+            hostname      = dict(required=False, default='localhost', aliases=['host']),
+            port          = dict(required=False, default=1521, type='int'),
+            service_name  = dict(required=False, aliases=['sn']),
+            oracle_home   = dict(required=False, aliases=['oh']),
+            
             profile             = dict(required=True, aliases=['name']),
             attribute_name      = dict(required=False, default=[], type='list', aliases=['an']),
             attribute_value     = dict(required=False, default=[], type='list', aliases=['av']),

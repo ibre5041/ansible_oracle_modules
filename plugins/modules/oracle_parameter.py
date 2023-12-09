@@ -5,7 +5,9 @@ DOCUMENTATION = '''
 ---
 module: oracle_parameter
 short_description: Manage parameters in an Oracle database
-description: Manage init parameters in an Oracle database
+description: 
+  - Manage init parameters in an Oracle database
+  - See connection parameters for oracle_ping  
 version_added: "3.0.2"
 options:
   name:
@@ -20,28 +22,6 @@ options:
     description: The intended state of the parameter (present means set to value, absent/reset means the value is reset to its default value).
     default: present
     choices: ['present','absent','reset']  
-  hostname:
-    description: The Oracle database host
-    required: false
-    default: localhost
-  port:
-    description: The listener port number on the host
-    required: false
-    default: 1521
-  service_name:
-    description: The database service name to connect to
-    required: true
-  user:
-    description: The Oracle user name to connect to the database
-    required: true
-  password:
-    description: The Oracle user password for user
-    required: true
-  mode:
-    description: The mode with which to connect to the database
-    required: true
-    default: normal
-    choices: ['normal','sysdba']
 notes:
   - cx_Oracle needs to be installed
 requirements: [ "cx_Oracle","re" ]
@@ -192,13 +172,14 @@ def reset_parameter(conn, module, parameter):
 def main():
     module = AnsibleModule(
         argument_spec=dict(
-            user=dict(required=False, aliases=['un', 'username']),
-            password=dict(required=False, no_log=True, aliases=['pw']),
-            mode=dict(default='normal', choices=["normal", "sysdba"]),
-            hostname=dict(required=False, default='localhost', aliases=['host']),
-            port=dict(required=False, default=1521, type='int'),
-            service_name=dict(required=False, aliases=['sn']),
-            oracle_home=dict(required=False, aliases=['oh']),
+            user          = dict(required=False, aliases=['un', 'username']),
+            password      = dict(required=False, no_log=True, aliases=['pw']),
+            mode          = dict(default='normal', choices=["normal", "sysdba"]),
+            hostname      = dict(required=False, default='localhost', aliases=['host']),
+            port          = dict(required=False, default=1521, type='int'),
+            service_name  = dict(required=False, aliases=['sn']),
+            oracle_home   = dict(required=False, aliases=['oh']),
+
             parameter_name=dict(default=None, aliases=['parameter', 'name']),
             value=dict(default=None),
             comment=dict(default=None),

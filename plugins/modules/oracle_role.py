@@ -8,34 +8,12 @@ short_description: Manage roles in an Oracle database
 description:
   - CREATE/DROP Oracle ROLE
   - Supports also idenfified roles
+  - See connection parameters for oracle_ping
 version_added: "3.0.1"
 options:
-  hostname:
-    description: The Oracle database host
-    required: false
-    default: localhost
-  port:
-    description: The listener port number on the host
-    required: false
-    default: 1521
-  service_name:
-    description: The database service name to connect to
-    required: false
-  user:
-    description: The Oracle user name to connect to the database
-    required: false
-  password:
-    description: The Oracle user password for 'user'
-    required: false
-  mode:
-    description: The mode with which to connect to the database
-    required: true
-    default: normal
-    choices: ['normal','sysdba']
   role:
     description: The role that should be added/removed
-    required: true
-    default: null
+    required: True
   state:
     description: The intended state of the role
     default: present
@@ -147,13 +125,14 @@ def drop_role(conn, module):
 def main():
     module = AnsibleModule(
         argument_spec = dict(
+            user          = dict(required=False, aliases=['un', 'username']),
+            password      = dict(required=False, no_log=True, aliases=['pw']),
+            mode          = dict(default='normal', choices=["normal", "sysdba"]),
+            hostname      = dict(required=False, default='localhost', aliases=['host']),
+            port          = dict(required=False, default=1521, type='int'),
+            service_name  = dict(required=False, aliases=['sn']),
             oracle_home   = dict(required=False, aliases=['oh']),
-            hostname      = dict(default='localhost'),
-            port          = dict(default=1521, type="int"),
-            service_name  = dict(required=False, aliases=['tns']),
-            user          = dict(required=False, aliases=['username']),
-            password      = dict(required=False, no_log=True),
-            mode          = dict(default='normal', choices=["normal","sysdba"]),
+
             role          = dict(required=True, type='str'),
             state         = dict(default="present", choices=["present", "absent"]),
             auth          = dict(default='none', choices=["none", "password", "external", "global", "application"], aliases=['identified_method']),

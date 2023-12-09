@@ -6,62 +6,32 @@ DOCUMENTATION = '''
 module: oracle_sql
 short_description: Execute arbitrary sql
 description:
-    - Execute arbitrary sql against an Oracle database
-    - This module can be used to execute arbitrary SQL queries or PL/SQL blocks against an Oracle database.
-    - If the SQL query is a select statement, the result will be returned.
-    - If the script contains dbms_output.put_line(), the output will be returned.
-    - Connection is set to autocommit. There is no rollback mechanism implemented.
+  - Execute arbitrary sql against an Oracle database
+  - This module can be used to execute arbitrary SQL queries or PL/SQL blocks against an Oracle database.
+  - If the SQL query is a select statement, the result will be returned.
+  - If the script contains dbms_output.put_line(), the output will be returned.
+  - Connection is set to autocommit. There is no rollback mechanism implemented.
+  - See connection parameters for oracle_ping
 version_added: "2.1.0.0"
 options:
-    username:
-        description:
-            - The database username to connect to the database
-        required: false
-        default: None
-        aliases: ['un']
-    password:
-        description:
-            - The password to connect to the database
-        required: false
-        default: None
-        aliases: ['pw']
-    service_name:
-        description:
-            - The service_name to connect to the database
-        required: false
-        default: database_name
-        aliases: ['sn']
-    hostname:
-        description:
-            - The host of the database
-        required: false
-        default: localhost
-        aliases: ['host']
-    port:
-        description:
-            - The listener port to connect to the database
-        required: false
-        default: 1521
-    sql:
-        description:
-            - The sql you want to execute
-        required: false
-    script:
-        description:
-            - The script you want to execute. Doesn't handle selects
-        required: false
+  sql:
+    description: The sql you want to execute
+    required: False
+  script:
+    description: The script you want to execute. Doesn't handle selects
+    required: False
 notes:
-    - cx_Oracle needs to be installed
-    - Oracle client libraries need to be installed along with ORACLE_HOME settings.
-    - Oracle basic tools.
-    - Check mode is supported.
-    - In check mode, the select query are executed.
-    - Diff mode is not supported.
+  - cx_Oracle needs to be installed
+  - Oracle client libraries need to be installed along with ORACLE_HOME settings.
+  - Oracle basic tools.
+  - Check mode is supported.
+  - In check mode, the select query are executed.
+  - Diff mode is not supported.
 requirements: [ "cx_Oracle" ]
 author: 
-    - Mikael Sandström, oravirt@gmail.com, @oravirt
-    - Ari Stark (@ari-stark)
-    - Ivan Brezina
+  - Mikael Sandström, oravirt@gmail.com, @oravirt
+  - Ari Stark (@ari-stark)
+  - Ivan Brezina
 '''
 
 EXAMPLES = '''
@@ -148,13 +118,14 @@ def execute_statements(conn, script):
 def main():
     module = AnsibleModule(
         argument_spec=dict(
-            oracle_home=dict(required=False, aliases=['oh']),
-            user=dict(required=False, aliases=['un', 'username']),
-            password=dict(required=False, no_log=True, aliases=['pw']),
-            mode=dict(default="normal", choices=["sysasm", "sysdba", "normal"]),
-            service_name=dict(required=False, aliases=['sn']),
-            hostname=dict(required=False, default='localhost', aliases=['host']),
-            port=dict(required=False, default=1521, type='int'),
+            user          = dict(required=False, aliases=['un', 'username']),
+            password      = dict(required=False, no_log=True, aliases=['pw']),
+            mode          = dict(default='normal', choices=["normal", "sysdba"]),
+            hostname      = dict(required=False, default='localhost', aliases=['host']),
+            port          = dict(required=False, default=1521, type='int'),
+            service_name  = dict(required=False, aliases=['sn']),
+            oracle_home   = dict(required=False, aliases=['oh']),
+
             sql=dict(required=False),
             script=dict(required=False),            
         ),

@@ -8,6 +8,7 @@ short_description: Manage users/schemas in an Oracle database
 description:
   - Manage users/schemas in an Oracle database
   - Can be run locally on the control machine or on a remote host
+  - See connection parameters for oracle_ping 
 version_added: "3.0.0"
 options:
   schema:
@@ -56,30 +57,6 @@ options:
       - If not specified for a new user, Oracle default will be used.
     required: false
     type: bool  
-  hostname:
-    description: The Oracle database host
-    required: false
-    default: localhost
-  port:
-    description: The listener port number on the host
-    required: false
-    default: 1521
-  service_name:
-    description: The database service name to connect to
-    required: true
-  user:
-    description: The Oracle user name to connect to the database
-    required: false
-  password:
-    description: The Oracle user password for user
-    required: false
-  mode:
-    description:
-      - The mode with which to connect to the database
-    required: false
-    default: normal
-    choices: ['normal','sysdba']
-        
 notes:
   - cx_Oracle needs to be installed
   - optionaly depends on pbkdf2 to validate password hashes in PBKDF2 format
@@ -428,13 +405,14 @@ def main():
     msg = ['']
     module = AnsibleModule(
         argument_spec=dict(
-            oracle_home   = dict(required=False, aliases=['oh']),
-            hostname      = dict(default='localhost'),
-            port          = dict(default=1521, type="int"),
-            service_name  = dict(required=False, aliases=['tns']),
-            user          = dict(required=False, aliases=['username']),
-            password      = dict(required=False, no_log=True),
+            user          = dict(required=False, aliases=['un', 'username']),
+            password      = dict(required=False, no_log=True, aliases=['pw']),
             mode          = dict(default='normal', choices=["normal", "sysdba"]),
+            hostname      = dict(required=False, default='localhost', aliases=['host']),
+            port          = dict(required=False, default=1521, type='int'),
+            service_name  = dict(required=False, aliases=['sn']),
+            oracle_home   = dict(required=False, aliases=['oh']),
+
             schema        = dict(required=True, type='str', aliases=['name', 'schema_name']),
             schema_password = dict(default=None, no_log=True),
             schema_password_hash = dict(default=None, no_log=True),

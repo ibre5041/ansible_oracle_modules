@@ -6,57 +6,26 @@ DOCUMENTATION = '''
 module: oracle_redo
 short_description: Manage Oracle redo related things
 description:
-    - Manage redogroups
-    - Can be run locally on the controlmachine or on a remote host
+  - Manage redogroups
+  - Can be run locally on the controlmachine or on a remote host
+  - See connection parameters for oracle_ping
 version_added: "3.0.0"
 options:
-    hostname:
-        description:
-            - The Oracle database host
-        required: false
-        default: localhost
-    port:
-        description:
-            - The listener port number on the host
-        required: false
-        default: 1521
-    service_name:
-        description:
-            - The database service name to connect to
-        required: true
-    user:
-        description:
-            - The Oracle user name to connect to the database, must have DBA privilege
-        required: False
-    password:
-        description:
-            - The Oracle user password for 'user'
-        required: False
-    mode:
-        description:
-            - The mode with which to connect to the database
-        required: true
-        default: normal
-        choices: ['normal','sysdba']
-    size:
-        description:
-            - size of redologs
-        required:
-            - True
-        default:
-            - 50MB
-    groups:
-        description:
-            - The number of redolog groups
-        required:
-            - False
-    members:
-        description:
-            - Either to set the preference (present) or reset it to default (absent)
-        required: true
-        default: 1
-
-
+  size:
+    description: size of redologs
+    required: True
+    default: 50MB
+  groups:
+    description: The number of redolog groups
+    required: False
+  members:
+    description: Either to set the preference (present) or reset it to default (absent)
+    required: True
+    default: 1
+  log_type:
+    description: Redolog type, redo or standby
+    default: "redo"
+    choices: ['redo','standby']
 notes:
     - cx_Oracle needs to be installed
 requirements: [ "cx_Oracle" ]
@@ -69,36 +38,28 @@ EXAMPLES = '''
 - hosts: all
   gather_facts: true
   vars:
-      oracle_home: /u01/app/oracle/12.2.0.1/db1
-      hostname: "{{ ansible_hostname }}"
-      service_name: orclcdb
-      user: system
-      password: Oracle_123
-      oracle_env:
-             ORACLE_HOME: "{{ oracle_home }}"
-             LD_LIBRARY_PATH: "{{ oracle_home }}/lib"
-
-      redosize: 15M
-      numgroups: 3
+    oracle_home: /u01/app/oracle/12.2.0.1/db1
+    hostname: "{{ ansible_hostname }}"
+    service_name: orclcdb
+    user: system
+    password: Oracle_123
+    oracle_env:
+      ORACLE_HOME: "{{ oracle_home }}"
+      LD_LIBRARY_PATH: "{{ oracle_home }}/lib"      
+    redosize: 15M
+    numgroups: 3
   tasks:
-  - name: Manage redologs
-    oracle_redo:
-        service_name={{ service_name }}
-        hostname={{ hostname}}
-        user={{ user }}
-        password={{ password }}
-        groups={{ numgroups |default(omit) }}
-        size={{ redosize |default(omit)}}
-    environment: "{{ oracle_env }}"
-    run_once: True
+- name: Manage redologs
+  oracle_redo:
+    service_name={{ service_name }}
+    hostname={{ hostname}}
+    user={{ user }}
+    password={{ password }}
+    groups={{ numgroups |default(omit) }}
+    size={{ redosize |default(omit)}}
+  environment: "{{ oracle_env }}"
+  run_once: True
 '''
-
-try:
-    import cx_Oracle
-except ImportError:
-    cx_oracle_exists = False
-else:
-    cx_oracle_exists = True
 
 # Ansible code
 def main():
@@ -112,6 +73,7 @@ def main():
             user          = dict(required=False),
             password      = dict(required=False, no_log=True),
             mode          = dict(default='normal', choices=["normal","sysdba"]),
+            
             size          = dict(required=True),
             groups        = dict(required=True),
             log_type      = dict(default='redo', choices=["redo", "standby"])

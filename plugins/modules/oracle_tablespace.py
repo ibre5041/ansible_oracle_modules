@@ -8,30 +8,9 @@ short_description: Manage tablespaces in an Oracle database
 description:
   - Manage tablespaces in an Oracle database (create, drop, put in read only/read write, offline/online)
   - Can be run locally on the controlmachine or on a remote host
+  - See connection parameters for oracle_ping    
 version_added: "1.9.1"
 options:
-  hostname:
-    description: The Oracle database host
-    required: false
-    default: localhost
-  port:
-    description: The listener port number on the host
-    required: false
-    default: 1521
-  service_name:
-    description: The database service name to connect to
-    required: true
-  user:
-    description: The Oracle user name to connect to the database
-    required: true
-  mode:
-    description: The mode with which to connect to the database (normal/sysdba)
-    required: false
-    choices: ['normal','sysdba']
-    default: normal
-  password:
-    description: The Oracle user password for user
-    required: true
   tablespace:
     description: The tablespace that should be managed
     required: True
@@ -41,22 +20,22 @@ options:
     choices: ['present','absent','online','offline','read_only','read_write']
   bigfile:
     description: Should the tablespace be created as a bigfile tablespace
-    default: false
-    choices: ['true','false']
+    default: False
+    choices: ['True','False']
   datafile:
     description:
       - "Where to put the datafile. Can be an ASM diskgroup or a filesystem datafile (i.e '+DATA', '/u01/oradata/testdb/test01.dbf')"
       - mutually_exclusive with numfiles
-    required: false
+    required: False
     aliases: ['df','path']
   numfiles:
     description:
       - If OMF (db_create_file_dest) is set, you can just specify the number of datafiles you want attached to the tablespace
       - mutually_exclusive with datafile
-    required: false
+    required: False
   size:
     description: The size of the datafile (10M, 10G, 150G etc)
-    required: false
+    required: False
   content:
     description: The type of tablespace (permanent, temporary or undo)
     default: permanent
@@ -72,9 +51,11 @@ options:
     description: If autoextend, the maximum size of the datafile (1M, 50M, 1G etc). If empty, defaults to database limits
     aliases: ['max']
 notes:
-    - cx_Oracle needs to be installed
+  - cx_Oracle needs to be installed
 requirements: [ "cx_Oracle" ]
-author: Mikael Sandström, oravirt@gmail.com, @oravirt
+author:
+  - Mikael Sandström, oravirt@gmail.com, @oravirt
+  - Ivan Brezina
 '''
 
 EXAMPLES = '''
@@ -737,13 +718,13 @@ def main():
     newtbs = False
     module = AnsibleModule(
         argument_spec = dict(
-            oracle_home   = dict(required=False, aliases=['oh']),
-            hostname      = dict(default='localhost'),
+            user          = dict(required=False, aliases=['un', 'username']),
+            password      = dict(required=False, no_log=True, aliases=['pw']),
+            mode          = dict(default='normal', choices=["normal", "sysdba"]),
+            hostname      = dict(required=False, default='localhost', aliases=['host']),
             port          = dict(required=False, default=1521, type='int'),
-            service_name  = dict(required=False),
-            mode          = dict(default='normal', choices=['normal', 'sysdba']),
-            user          = dict(required=False),
-            password      = dict(required=False, no_log=True),
+            service_name  = dict(required=False, aliases=['sn']),
+            oracle_home   = dict(required=False, aliases=['oh']),
 
             tablespace    = dict(required=True, aliases=['name','ts']),
             state         = dict(default="present", choices=["present", "absent", "read_only", "read_write", "offline", "online" ]),
