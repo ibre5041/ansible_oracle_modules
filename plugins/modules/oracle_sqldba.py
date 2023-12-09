@@ -467,7 +467,7 @@ def main():
         res_dict = dictify(ET.fromstring(result)) if result else {"ROW": []}
         module.exit_json(msg=result, changed=False, state=res_dict)
     else:
-        module.exit_json(msg=result, changed=changed)
+        module.exit_json(msg=result.splitlines(), changed=changed)
 
 
 if __name__ == '__main__':
