@@ -94,9 +94,27 @@ author:
 '''
 
 EXAMPLES = '''
-# Example 1, mixed post installation tasks
-# from inventory:
+# Example call utlrp
+- name: "Call @?/rdbms/admin/utlrp"
+  oracle_sqldba:
+    oh: "{{ oracle_db_new_home }}"
+    sqlscript: "@?/rdbms/admin/utlrp"
+  register: _oracle_utlrp
 
+# Example 2, read sql result
+- name: Read job_queue_processes
+  oracle_sqldba:
+    sqlselect: "select value from gv$parameter where name = 'job_queue_processes'"
+    oracle_home: "{{ oracle_db_home }}"
+    oracle_db_name: "{{ oracle_db_name }}"
+  register: jqpresult
+
+- name: Store job_queue_processes
+  set_fact:
+    job_queue_processes: "{{ jqpresult.state.ROW[0].VALUE }}"
+    # Use all uppercase for "ROW" and for column names!
+
+# Example mixed post installation tasks from inventory:
 oracle_databases:
   - oracle_db_name: eek17ec
       home: 12.2.0.1-ee
@@ -139,20 +157,6 @@ db_postinstall:
   loop: "{{ oradb.postinstall }}"
   loop_control:
     loop_var: pitask
-
-# Example 2, read sql result
-
-- name: Read job_queue_processes
-  oracle_sqldba:
-    sqlselect: "select value from gv$parameter where name = 'job_queue_processes'"
-    oracle_home: "{{ oracle_db_home }}"
-    oracle_db_name: "{{ oracle_db_name }}"
-  register: jqpresult
-
-- name: Store job_queue_processes
-  set_fact:
-    job_queue_processes: "{{ jqpresult.state.ROW[0].VALUE }}"
-    # Use all uppercase for "ROW" and for column names!
 
 '''
 

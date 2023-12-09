@@ -14,20 +14,20 @@ version_added: "3.0.0"
 options:
   writable_only:
     description: Return only databases openned READ WRITE
-    required: false
-    default: false
+    required: False
+    default: False
   asm_only:
     description: Return only ASM instances
-    required: false
-    default: false
+    required: False
+    default: False
   running_only:
     description: Return only instances which are running
-    required: false
-    default: false
+    required: False
+    default: False
   open_only:
     description: Return only databases which are OPEN
-    required: false
-    default: false
+    required: False
+    default: False
 notes:
   - Has to run either as root or oracle db owner
 requirements:
@@ -39,7 +39,7 @@ author:
 EXAMPLES = '''
 - name: Read oratab, detect all ORACLE_HOMEs and writable database
   oracle_oratab:
-    writable_only: true
+    writable_only: True
   register: sid_list
 
 - debug:

@@ -4,73 +4,63 @@
 DOCUMENTATION = '''
 ---
 module: oracle_role
-short_description: Manage users/roles in an Oracle database
+short_description: Manage roles in an Oracle database
 description:
-    - Manage grants/privileges in an Oracle database
-    - Handles role/sys privileges at the moment.
-    - It is possible to add object privileges as well, but they are not considered when removing privs at the moment.
+  - CREATE/DROP Oracle ROLE
+  - Supports also idenfified roles
 version_added: "3.0.1"
 options:
-    hostname:
-        description:
-            - The Oracle database host
-        required: false
-        default: localhost
-    port:
-        description:
-            - The listener port number on the host
-        required: false
-        default: 1521
-    service_name:
-        description:
-            - The database service name to connect to
-        required: true
-    user:
-        description:
-            - The Oracle user name to connect to the database
-        required: true
-    password:
-        description:
-            - The Oracle user password for 'user'
-        required: true
-    mode:
-        description:
-            - The mode with which to connect to the database
-        required: true
-        default: normal
-        choices: ['normal','sysdba']
-    role:
-        description:
-            - The role that should get grants added/removed
-        required: false
-        default: null
-    grants:
-        description:
-            - The privileges granted to the new role. Can be a string or a list
-        required: false
-        default: null
-    state:
-        description:
-            - The intended state of the priv (present=added to the user, absent=removed from the user). REMOVEALL will remove ALL role/sys privileges
-        default: present
-        choices: ['present','absent','REMOVEALL']
+  hostname:
+    description: The Oracle database host
+    required: false
+    default: localhost
+  port:
+    description: The listener port number on the host
+    required: false
+    default: 1521
+  service_name:
+    description: The database service name to connect to
+    required: false
+  user:
+    description: The Oracle user name to connect to the database
+    required: false
+  password:
+    description: The Oracle user password for 'user'
+    required: false
+  mode:
+    description: The mode with which to connect to the database
+    required: true
+    default: normal
+    choices: ['normal','sysdba']
+  role:
+    description: The role that should be added/removed
+    required: true
+    default: null
+  state:
+    description: The intended state of the role
+    default: present
+    choices: ['present','absent']
 notes:
-    - cx_Oracle needs to be installed
+  - cx_Oracle needs to be installed
 requirements: [ "cx_Oracle" ]
-author: Mikael Sandström, oravirt@gmail.com, @oravirt
+author:
+  - Mikael Sandström, oravirt@gmail.com, @oravirt
+  - Ivan Brezina
 '''
 
 EXAMPLES = '''
-# Add grants to the user
-oracle_role: hostname=remote-db-server service_name=orcl user=system password=manager role=myrole state=present grants='create session','create any table',connect,resource
+- name: Add grants to the user
+  oracle_role:
+    mode: sysdba
+    role: myrole
+    state: present
 
-# Revoke the 'create any table' grant
-oracle_role: hostname=localhost service_name=orcl user=system password=manager role=myrole state=absent grants='create any table'
-
-# Remove all grants from a user
-oracle_role: hostname=localhost service_name=orcl user=system password=manager role=myrole state=REMOVEALL grants=
-
-
+- name: Create idenfified role
+  oracle_role:
+    mode: sysdba    
+    role: "foo"
+    identified_method: "password"
+    identified_value: "bar"
 '''
 
 

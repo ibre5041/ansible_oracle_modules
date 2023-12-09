@@ -41,11 +41,6 @@ options:
     required: false
     default: None
     aliases: ['dfd']
-  unplug_dest:
-    description: The path where the 'unplug' xml-file will be placed. Also used when plugging in a pdb
-    required: false
-    default: None
-    aliases: ['plug_dest','upd','pd']
   username:
     description: The database username to connect to the database
     required: false
@@ -85,41 +80,48 @@ author:
 '''
 
 EXAMPLES = '''
-# Creates a pdb on a different filesystem
-oracle_pdb: name=pdb1 sourcedb=cdb1 dfd=/u02/oradata/pdb1 state=present un=system pw=Oracle123 oracle_home=/u01/app/oracle/12.2.0.1/db
+---
+- name: Creates a pdb on a different filesystem
+  oracle_pdb:
+    mode: sysdba
+    pdb_name: "XEPDB2"
+    state: "closed"
+    pdb_admin_username: foo
+    pdb_admin_password: bar
+    roles: connect
+    datafile_dest: /u02/oradata/pdb1
+    sourcedb: cdb1
 
-# Remove a pdb
-oracle_pdb: name=pdb1 sourcedb=cdb1 state=absent un=system pw=Oracle123 oracle_home=/u01/app/oracle/12.2.0.1/db
+- name: Remove a pdb
+  oracle_pdb:
+    mode: sysdba    
+    pdb_name: pdb1
+    state: absent
 
-# Check the status for a pdb
-oracle_pdb: name=pdb1 sourcedb=cdb1 state=status un=system pw=Oracle123 oracle_home=/u01/app/oracle/12.2.0.1/db
+- name: Check the status for a pdb
+  oracle_pdb:
+    mode: sysdba    
+    pdb_name: pdb1
+    state: status
+  register: _oracle_pdb_status
 
+- name: Unplug a pdb
+  oracle_pdb:
+    mode: sysdba    
+    pdb_name: pdb1
+    plug_file: /tmp/unplugged-pdb.xml
+    state: unplugged
 
-# Unplug a pdb
-oracle_pdb:
-    name=pdb1
-    sourcedb=cdb1
-    unplug_dest=/tmp/unplugged-pdb.xml
-    state=unplugged
-    un=sys
-    pw=Oracle123
-    mode=sysdba
-    sn=cdb1
-    oracle_home=/u01/app/oracle/12.2.0.1/db1
-
-# plug in a pdb
-oracle_pdb:
-    name=plug1
-    sourcedb=cdb2
-    plug_dest=/tmp/unplugged-pdb.xml
-    state=present
-    un=sys
-    pw=Oracle123
-    mode=sysdba
-    sn=cdb1
-    oracle_home=/u01/app/oracle/12.2.0.1/db2
-
+- name: plug in a pdb
+  oracle_pdb:
+    mode: sysdba
+    pdb_name: plug1
+    plug_file: /tmp/unplugged-pdb.xml
+    state: present
+    pdb_admin_username: foo
+    pdb_admin_password: bar
 '''
+
 import os
 
 
