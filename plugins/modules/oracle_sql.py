@@ -78,11 +78,11 @@ EXAMPLES = '''
 import os, re
 from ansible.module_utils.basic import AnsibleModule
 
-# In thise we do import from local project project sub-directory <project-dir>/module_utils
+# In this case we do import from local project project sub-directory <project-dir>/module_utils
 # While this file is placed in <project-dir>/library
 # No colletions are used
 #try:
-#    from ansible.module_utils.oracle_utils import oracle_connect
+#    from ansible.module_utils.oracle_utils import oracleConnection
 #except:
 #    pass
 
