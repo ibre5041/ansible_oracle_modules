@@ -20,5 +20,7 @@ clean:
 test:
 	cd ~/.ansible/collections/ansible_collections/ibre5041/ansible_oracle_modules/tests/integration && ansible-test integration $(ROLE)
 
+check:	build
+	python3 -m galaxy_importer.main ${TARGET}
 
 all:

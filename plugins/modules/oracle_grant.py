@@ -20,7 +20,7 @@ options:
     required: false
     default: 1521
   service_name:
-    description:The database service name to connect to
+    description: The database service name to connect to
     required: true
   user:
     description: The Oracle user name to connect to the database
