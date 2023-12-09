@@ -5,48 +5,19 @@ DOCUMENTATION = '''
 ---
 module: oracle_directory
 short_description: Create/drop DIRECTORY in an Oracle database
-description: Create/drop DIRECTORY in an Oracle database
+description:
+  - Create/drop DIRECTORY in an Oracle database
+  - See connection parameters for oracle_ping
 version_added: "3.0.0"
 options:
-    hostname:
-        description:
-            - The Oracle database host
-        required: false
-        default: localhost
-    port:
-        description:
-            - The listener port number on the host
-        required: false
-        default: 1521
-    service_name:
-        description:
-            - The database service name to connect to
-        required: true
-    user:
-        description:
-            - The Oracle user name to connect to the database
-        required: true
-    password:
-        description:
-            - The Oracle user password for 'user'
-        required: true
-    mode:
-        description:
-            - The mode with which to connect to the database
-        required: true
-        default: normal
-        choices: ['normal','sysdba']
-    directory_name:
-        description:
-            - The name of the directory
-        required: True
-        default: null
-    path:
-        description:
-            - Where the directory should point
-        required: false
-        default: null
-
+  connection:
+    description: See M(ibre5041.ansible_oracle_modules.oracle_ping)
+  directory_name:
+    description: The name of the directory
+    required: True
+  path:
+    description: Where the directory should point to
+    required: False
 notes:
     - cx_Oracle needs to be installed
 requirements: [ "cx_Oracle" ]
@@ -56,13 +27,18 @@ author:
 '''
 
 EXAMPLES = '''
-
-    - name: create a directory
-      oracle_directory:
-        mode: sysdba
-        directory_name: TEST_DIRECTORY
-        directory_path: /oracle/directory
-
+- name: create a directory
+  oracle_directory:
+    mode: sysdba
+    directory_name: TEST_DIRECTORY
+    directory_path: /oracle/directory
+    state: present
+    
+- name: drop a directory
+  oracle_directory:
+    mode: sysdba
+    directory_name: TEST_DIRECTORY
+    state: absent
 '''
 
 
@@ -113,6 +89,7 @@ def main():
             port          = dict(required=False, default=1521, type='int'),
             service_name  = dict(required=False, aliases=['sn']),
             oracle_home   = dict(required=False, aliases=['oh']),
+            
             directory_name = dict(default=None),
             directory_path = dict(default=None),
             state          = dict(default="present", choices=["present", "absent"])

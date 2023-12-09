@@ -6,73 +6,37 @@ DOCUMENTATION = '''
 module: oracle_facts
 short_description: Returns some facts about Oracle DB
 description:
-    - Returns some facts about Oracle DB
+  - Returns some facts about Oracle DB
+  - See connection parameters for oracle_ping  
 version_added: "3.0.0"
 options:
-    hostname:
-        description:
-            - The Oracle database host
-        required: false
-        default: localhost
-    port:
-        description:
-            - The listener port number on the host
-        required: false
-        default: 1521
-    service_name:
-        description:
-            - The database service name to connect to
-        required: false
-    user:
-        description:
-            - The Oracle user name to connect to the database, must have DBA privilege
-        required: false
-    password:
-        description:
-            - The Oracle user password for 'user'
-        required: false
-    mode:
-        description:
-            - The mode with which to connect to the database
-        required: false
-        default: normal
-        choices:
-            - normal
-            - sysdba
-    password_file:
-        description:
-            - Detect location of password file
-        required: false
-        default: false
-        
-    instance:
-        description:
-            - Query values from v$instance
-        required: false
-        default: false
-    database:
-        description:
-            - Query values from v$database
-        required: false
-        default: true
-    userenv:
-        description:
-            - Query values from userenv
-        required: false
-        default: true
-    redo:
-        description:
-            - Query info about redologs
-        required: false
-        default: None
-        choices: [None, 'detail', 'summary']
+  password_file:
+    description: Detect location of password file
+    required: False
+  instance:
+    description: Query values from v$instance
+    required: False
+    default: False
+  database:
+    description: Query values from v$database
+    required: False
+    default: True
+  userenv:
+    description: Query values from userenv
+    required: False
+    default: True
+  redo:
+    description: Query info about redologs
+    required: False
+    default: None
+    choices: [None, 'detail', 'summary']
 notes:
-    - cx_Oracle needs to be installed
-    - Oracle RDBMS 10gR2 or later required
+  - cx_Oracle needs to be installed
+  - Oracle RDBMS 10gR2 or later required
 requirements: [ "cx_Oracle" ]
 author:
-    - Ilmar Kerm, ilmar.kerm@gmail.com, @ilmarkerm
-    - Ivan Brezina
+  - Ilmar Kerm, ilmar.kerm@gmail.com, @ilmarkerm
+  - Ivan Brezina
 '''
 
 EXAMPLES = '''
@@ -282,13 +246,14 @@ def query_params(module, conn):
 def main():
     module = AnsibleModule(
         argument_spec=dict(
-            hostname=dict(default='localhost'),
-            port=dict(default=1521, type='int'),
-            service_name=dict(required=False),
-            user=dict(required=False),
-            password=dict(required=False, no_log=True),
-            mode=dict(default='normal', choices=["normal", "sysdba"]),
-
+            user          = dict(required=False, aliases=['un', 'username']),
+            password      = dict(required=False, no_log=True, aliases=['pw']),
+            mode          = dict(default='normal', choices=["normal", "sysdba"]),
+            hostname      = dict(required=False, default='localhost', aliases=['host']),
+            port          = dict(required=False, default=1521, type='int'),
+            service_name  = dict(required=False, aliases=['sn']),
+            oracle_home   = dict(required=False, aliases=['oh']),
+            
             password_file=dict(default=False, type='bool'),
             instance=dict(default=False, type='bool'),
             database=dict(default=True, type='bool'),

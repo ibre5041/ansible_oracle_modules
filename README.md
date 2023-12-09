@@ -32,6 +32,7 @@ The default behaviour for the modules using `cx_Oracle` is this:
 
 | Module						    | Description |
 | :-------------------------------------------------------- | :---------- |
+| [oracle_ping](../content/module/oracle_ping/)		    | Test database connection |
 | [oracle_acfs](../content/module/oracle_acfs/)		    | Manage ACFS filesystems |
 | [oracle_asmdg](../content/module/oracle_asmdg/)	    | Manage diskgroups in an Oracle database |
 | [oracle_asmvol](../content/module/oracle_asmvol/)	    | Manage Oracle ASMCMD Volumes |

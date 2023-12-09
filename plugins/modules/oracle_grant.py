@@ -9,30 +9,9 @@ description:
   - Manage grant/privileges in an Oracle database
   - Handles role/sys privileges at the moment.
   - It is possible to add object privileges as well, but they are not considered when removing privs at the moment.
+  - See connection parameters for oracle_ping  
 version_added: "3.0.0"
 options:
-  hostname:
-    description: The Oracle database host
-    required: false
-    default: localhost
-  port:
-    description: The listener port number on the host
-    required: false
-    default: 1521
-  service_name:
-    description: The database service name to connect to
-    required: true
-  user:
-    description: The Oracle user name to connect to the database
-    required: true
-  password:
-    description: The Oracle user password for 'user'
-    required: true
-  mode:
-    description: The mode with which to connect to the database
-    required: true
-    default: normal
-    choices: ['normal','sysdba']
   grantee:
     description: The schema that should get grant added/removed
     required: false
@@ -83,6 +62,8 @@ EXAMPLES = '''
       - 'create any table'
       - connect
       - resource
+    object_privs:
+      - "select:sys.v_$session"
 
 - name: "Revoke the 'create any table' grant"
   oracle_grant:
@@ -358,13 +339,13 @@ def get_current_sys_grant(conn, schema):
 def main():
     module = AnsibleModule(
         argument_spec = dict(
-            oracle_home   = dict(required=False, aliases=['oh']),
-            hostname      = dict(default='localhost'),
-            port          = dict(default=1521, type="int"),
-            service_name  = dict(required=False, aliases=['tns']),
-            user          = dict(required=False, aliases=['username']),
-            password      = dict(required=False, no_log=True),
+            user          = dict(required=False, aliases=['un', 'username']),
+            password      = dict(required=False, no_log=True, aliases=['pw']),
             mode          = dict(default='normal', choices=["normal", "sysdba"]),
+            hostname      = dict(required=False, default='localhost', aliases=['host']),
+            port          = dict(required=False, default=1521, type='int'),
+            service_name  = dict(required=False, aliases=['sn']),
+            oracle_home   = dict(required=False, aliases=['oh']),
 
             grantee       = dict(required=True, type='str', aliases=['name', 'schema_name', 'role', 'role_name']),
 

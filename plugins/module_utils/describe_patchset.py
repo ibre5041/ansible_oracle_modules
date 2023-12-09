@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 
-DOCUMENTATION = '''
+__metaclass__ = type
+
+DOCUMENTATION = r"""
 ---
 module: describe_patchset
 short_description: Parse .xml metadata in oracle patch directory
@@ -9,9 +11,9 @@ description:
   - See EXAMPLES
 author:
   - Ivan Brezina
-'''
+"""
 
-EXAMPLES = '''
+EXAMPLES = r"""
 describe_patchset.py -h
 usage: describe_patchset.py [-h] -d DIRECTORY
 
@@ -45,7 +47,7 @@ ONE-OFF:/oracle/product/19.21.0.0/db1/inventory/oneoffs/29585399:OCW RELEASE UPD
 ONE-OFF:/oracle/product/19.21.0.0/db1/inventory/oneoffs/29517242:Database Release Update : 19.3.0.0.190416 (29517242):(cluster,rac_database,oracle_database,has)
 ONE-OFF:/oracle/product/19.21.0.0/db1/inventory/oneoffs/35638318:JDK BUNDLE PATCH 19.0.0.0.231017:()
 
-'''
+"""
 
 import os
 import argparse
