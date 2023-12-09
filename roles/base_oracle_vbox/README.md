@@ -140,30 +140,27 @@ Role Variables
 All roles include dummy "default_vars_only". See `roles/default_vars_only/defaults/main.yml` first.
 Variables imported from default_vars_only role:
 
- - oracle_install_dir_root: /oracle/u01
- - oracle_install_dir_temp: "{{ oracle_install_dir_root}}/tmp"
- - oracle_install_dir_base: "{{ oracle_install_dir_root}}/base"
- - oracle_install_dir_prod: "{{ oracle_install_dir_root}}/product"
- - oracle_inventory_location: "{{ oracle_install_dir_root}}/oraInventory"
- - oracle_os_user, oracle_os_uid, oracle_os_group, oracle_os_groups
+ - `oracle_install_dir_root: /oracle/u01`
+ - `oracle_install_dir_temp: "{{ oracle_install_dir_root}}/tmp"`
+ - `oracle_install_dir_base: "{{ oracle_install_dir_root}}/base"`
+ - `oracle_install_dir_prod: "{{ oracle_install_dir_root}}/product"`
+ - `oracle_inventory_location: "{{ oracle_install_dir_root}}/oraInventory"`
+ - `oracle_os_user, oracle_os_uid, oracle_os_group, oracle_os_groups`
  - ... and other or related
 
 Variables defined in this role:
 
- - oracle_create_vg: false
- - oracle_vg: vg01 
- - oracle_create_swap: false
- - oracle_create_fs: false
+ - `oracle_create_vg: false`
+ - `oracle_vg: vg01`
+ - `oracle_create_swap: false`
+ - `oracle_create_fs: false`
 
 These variables determine whether separate VG should be created for Oracle binaries.
 Whether mount point and directory structure should be created by this role.
 
-
 Dependencies
 ------------
-
 This role depends only on `default_vars_only`.
-
 
 Example Playbook
 ----------------
