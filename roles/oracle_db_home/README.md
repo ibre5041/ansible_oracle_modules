@@ -6,29 +6,29 @@ Install Oracle binaries in predefned ORACLE_HOME.
 Requirements
 ------------
 
-
-
 Role Variables
 --------------
 
 See `roles/default_vars_only/defaults/main.yml`
- - oracle_install_dir_root: /oracle/u01
- - oracle_install_dir_temp: "{{ oracle_install_dir_root}}/tmp"
- - oracle_install_dir_base: "{{ oracle_install_dir_root}}/base"
- - oracle_install_dir_prod: "{{ oracle_install_dir_root}}/product"
- - oracle_inventory_location: "{{ oracle_install_dir_root}}/oraInventory"
- - oracle_os_user, oracle_os_uid, oracle_os_group, oracle_os_groups
+
+ - `oracle_install_dir_root: /oracle/u01`
+ - `oracle_install_dir_temp: "{{ oracle_install_dir_root}}/tmp"`
+ - `oracle_install_dir_base: "{{ oracle_install_dir_root}}/base"`
+ - `oracle_install_dir_prod: "{{ oracle_install_dir_root}}/product"`
+ - `oracle_inventory_location: "{{ oracle_install_dir_root}}/oraInventory"`
+ - `oracle_os_user, oracle_os_uid, oracle_os_group, oracle_os_groups`
 
 Also:
+
  - oracle_gi_media: name of golden image file
  - oracle_url_base: HTTP(S) base URL to download install image from
 
- - oracle_release: one of 18c, 19c, 21c, is used as a key in oracle_install_space
+ - oracle_release: one of [18c, 19c, 21c], it used as a lookup key in oracle_install_space(default_vars_only)
 
 Dependencies
 ------------
 
-You should run base_oracle_ec2 role before.
+You should run `base_oracle_...` role before this role.
 
 Example Playbook
 ----------------
@@ -49,7 +49,6 @@ Including an example of how to use your role (for instance, with variables passe
            oracle_release: 19c
            tags: [ oracle, oracledbhome ]
 
-
 License
 -------
 
@@ -59,4 +58,3 @@ Author Information
 ------------------
 
 Ivan Brezina
-

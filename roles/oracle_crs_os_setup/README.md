@@ -1,31 +1,47 @@
 Role Name
 =========
 
-A brief description of the role goes here.
+Setup OS for Oracle RAC installation.
 
 Requirements
 ------------
 
-Any pre-requisites that may not be covered by Ansible itself or the role should be mentioned here. For instance, if the role uses the EC2 module, it may be a good idea to mention in this section that the boto package is required.
+VMware, on-premise and VBOX HW is supported.
 
 Role Variables
 --------------
 
-A description of the settable variables for this role should go here, including any variables that are in defaults/main.yml, vars/main.yml, and any variables that can/should be set via parameters to the role. Any variables that are read from other roles and/or the global scope (ie. hostvars, group vars, etc.) should be mentioned here as well.
+Variables for this role are defined in `default_vars_only`
 
 Dependencies
 ------------
 
-A list of other roles hosted on Galaxy should go here, plus any details in regards to parameters that may need to be set for other roles, or variables that are used from other roles.
+You should run `base_oracle_...` role before this role.
 
 Example Playbook
 ----------------
 
-Including an example of how to use your role (for instance, with variables passed in as parameters) is always nice for users too:
-
-    - hosts: servers
-      roles:
-         - { role: username.rolename, x: 42 }
+        - hosts: all
+          collections:
+            - ibre5041.ansible_oracle_modules
+          become: yes
+          become_user: root
+          become_method: sudo
+        
+          any_errors_fatal: true
+          roles:
+          - role: default_vars_only
+        
+          - role: base_oracle_vmware
+            tags: [ base, baseoracle ]
+            when: is_vmware_environment
+        
+          - role: base_oracle_vbox
+            tags: [ base, baseoracle ]
+            when: is_vbox_environment
+        
+          - role: oracle_crs_19c
+            tags: [ oracle, oraclecrs ]
 
 License
 -------
@@ -35,4 +51,5 @@ BSD
 Author Information
 ------------------
 
-An optional section for the role authors to include contact information, or a website (HTML is not allowed).
+Ivan Brezina
+
