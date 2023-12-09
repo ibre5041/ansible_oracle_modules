@@ -7,7 +7,7 @@ module: oracle_db
 short_description: Manage an Oracle database
 description:
     - Create/delete a database using dbca
-    - If a responsefile is available, that will be used. If initparams is defined, those will be attached to the createDatabase command
+    - If a responsefile is available, it will be used. If initparams is defined, those will be attached to the createDatabase command
     - If no responsefile is created, the database will be created based on all other parameters
 version_added: "3.0.0"
 options:
@@ -220,7 +220,6 @@ options:
         required: false
         default: 1521
 
-
 notes:
     - cx_Oracle needs to be installed
 requirements: [ "cx_Oracle" ]
@@ -273,7 +272,6 @@ oracle_db:
     dfd=+DATA
     rfd=+DATA
     default_tablespace_type: bigfile
-
 
 - hosts: all
   gather_facts: true

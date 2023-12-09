@@ -4,11 +4,8 @@
 DOCUMENTATION = '''
 ---
 module: oracle_directory
-short_description: Manage users/schemas in an Oracle database
-description:
-    - Manage grants/privileges in an Oracle database
-    - Handles role/sys privileges at the moment.
-    - It is possible to add object privileges as well, but they are not considered when removing privs at the moment.
+short_description: Create/drop DIRECTORY in an Oracle database
+description: Create/drop DIRECTORY in an Oracle database
 version_added: "3.0.0"
 options:
     hostname:

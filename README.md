@@ -30,6 +30,42 @@ The default behaviour for the modules using `cx_Oracle` is this:
 
 # These are the different modules:
 
+| Module						    | Description |
+| :-------------------------------------------------------- | :---------- |
+| [oracle_acfs](../content/module/oracle_acfs/)		    | Manage ACFS filesystems |
+| [oracle_asmdg](../content/module/oracle_asmdg/)	    | Manage diskgroups in an Oracle database |
+| [oracle_asmvol](../content/module/oracle_asmvol/)	    | Manage Oracle ASMCMD Volumes |
+| [oracle_awr](../content/module/oracle_awr/)		    | Manage AWR configuration |
+| [oracle_datapatch](../content/module/oracle_datapatch/)   | Manage datapatch functionality |
+| [oracle_db](../content/module/oracle_db/)		    | Create/delete a database using dbca |
+| [oracle_directory](../content/module/oracle_directory/)   | Create/drop DIRECTORY in an Oracle database |
+| [oracle_facts](../content/module/oracle_facts/)	    | Returns some facts about Oracle DB |
+| [oracle_gi_facts](../content/module/oracle_gi_facts/)	    | Returns some facts about Grid Infrastructure environment |
+| [oracle_grant](../content/module/oracle_grant/)	    | Manage grant/privileges in an Oracle database |
+| [oracle_jobclass](../content/module/oracle_jobclass/)	    |
+| [oracle_job](../content/module/oracle_job/)		    |
+| [oracle_jobschedule](../content/module/oracle_jobschedule/)|
+| [oracle_jobwindow](../content/module/oracle_jobwindow/)   |
+| [oracle_ldapuser](../content/module/oracle_ldapuser/)	    |
+| [oracle_opatch](../content/module/oracle_opatch/)	    | Manage patches in an Oracle environment |
+| [oracle_oratab](../content/module/oracle_oratab/)	    | Reads oratab to ansible_facts |
+| [oracle_parameter](../content/module/oracle_parameter/)   | Manage parameters in an Oracle database |
+| [oracle_pdb](../content/module/oracle_pdb/)		    | Manage pluggable databases in Oracle |
+| [oracle_privs](../content/module/oracle_privs/)	    | 
+| [oracle_profile](../content/module/oracle_profile/)	    | Manage profiles in an Oracle database |
+| [oracle_redo](../content/module/oracle_redo/)		    | Manage Oracle redo related things |
+| [oracle_role](../content/module/oracle_role/)		    | Manage users/roles in an Oracle database |
+| [oracle_rsrc_consgroup](../content/module/oracle_rsrc_consgroup/)| 
+| [oracle_services](../content/module/oracle_services/)	    |
+| [oracle_sqldba](../content/module/oracle_sqldba/)	    | Execute sql (scripts) using sqlplus (BEQ) or catcon.pl |
+| [oracle_sql](../content/module/oracle_sql/)		    | Execute arbitrary sql
+| [oracle_stats_prefs](../content/module/oracle_stats_prefs/)| 
+| [oracle_tablespace](../content/module/oracle_tablespace/) | Manage tablespaces in an Oracle database
+| [oracle_tnsnames](../content/module/oracle_tnsnames/)	    | Manipulate Oracle's tnsnames.ora and other .ora files
+| [oracle_user](../content/module/oracle_user/)		    | Manage users/schemas in an Oracle database
+
+
+
 ## **oracle_db**
 
 *pre-req: cx_Oracle*
@@ -71,8 +107,8 @@ The default behaviour for the modules using `cx_Oracle` is this:
 ## **oracle_oratab**
 
 - Parses oratab, crs_stat output to get list of databases
-- Set facts as list of dict.
-   See [sample playbook](https://github.com/ibre5041/ansible_oracle_modules_example/blob/main/oracle_oratab.yml):
+- Set facts as list of dict. See [sample playbook](https://github.com/ibre5041/ansible_oracle_modules_example/blob/main/oracle_oratab.yml):
+- [Module oracle_db documentation and examples](../content/module/oracle_oratab/)
 
         vars:
         # List of affected databases, this variable overrides default: sid_list.oracle_list.keys()
@@ -89,7 +125,7 @@ The default behaviour for the modules using `cx_Oracle` is this:
               var: sid_list
 
           - oracle_role:
-            mode: sysdba
+              mode: sysdba
               role: SOME_ROLE
             environment:
               ORACLE_HOME: "{{ sid_list.oracle_list[item].ORACLE_HOME }}"

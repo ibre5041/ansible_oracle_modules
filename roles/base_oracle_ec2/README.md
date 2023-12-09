@@ -13,6 +13,7 @@ Role Variables
 
 All roles include dummy "default_vars_only". See `roles/default_vars_only/defaults/main.yml` first.
 Variables imported from default_vars_only role:
+
  - oracle_install_dir_root: /oracle/u01
  - oracle_install_dir_temp: "{{ oracle_install_dir_root}}/tmp"
  - oracle_install_dir_base: "{{ oracle_install_dir_root}}/base"
@@ -22,6 +23,7 @@ Variables imported from default_vars_only role:
  - ... and other or related
 
 Variables defined in this role:
+
  - oracle_create_vg: true
  - oracle_vg: vg01 
  - oracle_create_swap: true

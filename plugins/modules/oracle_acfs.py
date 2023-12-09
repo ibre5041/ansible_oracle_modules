@@ -4,7 +4,7 @@
 DOCUMENTATION = '''
 ---
 module: oracle_acfs
-short_description: Manage diskgroups in an Oracle database
+short_description: Manage ACFS filesystems
 description:
     - Manage ACFS filesystems
 version_added: "2.1.0.0"
