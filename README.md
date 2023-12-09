@@ -1,12 +1,12 @@
 # ansible-oracle-modules
 **Oracle modules for Ansible**
 
-- This project was forked from https://github.com/oravirt/ansible-oracle-modules, but also tries to consolidate fixes from other forks.  
+- This project was forked from [oravirt/ansible-oracle-modules](https://github.com/oravirt/ansible-oracle-modules), but also tries to consolidate fixes from other forks.  
 - This fork uses different layout than original, db connection code is shared via module_utils
-- This fork prefers to use `connect / as sysdba` over using a wallet, password or SQLNET over TCPIP 
-- This fork uses `oracle_oratab` module to store list of databases as ansible facts
-
-See project: https://github.com/ibre5041/ansible_oracle_modules_example.git as an example.
+- This fork prefers to use `connect / as sysdba` over using wallet, password or SQLNET over TCPIP 
+- This fork adds modules `oracle_oratab` to query list od databases, `oracle_tnsnames` to manipulate Oracle .ora files
+- This project also contains roles to install Database, Oracle RAC, Oracle HAS on VMware, EC2, on-premise HW.
+See project: [ibre5041/ansible_oracle_modules_example](https://github.com/ibre5041/ansible_oracle_modules_example.git) as an example.
 
 To use this collection place this in requirements.yml
 
@@ -16,15 +16,15 @@ To use this collection place this in requirements.yml
         type: git
         version: main
 
-And then execute: `ansible-galaxy collection install -r requirements.yml`
+And then execute: `ansible-galaxy collection install -r collections/requirements.yml`
 
-Most (if not all) requires `cx_Oracle` either on your on the managed node "control machine".
+Most (if not all) modules require `cx_Oracle` either on your  managed node or on "control machine".
 To install `cx_Oracle` you can use: `pip3 install --user cx_Oracle` (`/usr/libexec/platform-python -m pip install --user cx_Oracle` on RHEL8)
 
 The default behaviour for the modules using `cx_Oracle` is this:
 
 - If mode=='sysdba' connect internal `/ as sysdba` is used
-- If neither username or password is passed as input to the module(s), the use of an Oracle wallet is assumed.
+- If neither username and password is passed as input to the module(s), the use of an Oracle wallet is assumed.
 - In that case, the `cx_Oracle.makedsn` step is skipped, and the connection will use the `'/@<service_name>'` format instead.
 - You then need to make sure that you're using the correct tns-entry (service_name) to match the credential stored in the wallet.
 
@@ -35,7 +35,8 @@ The default behaviour for the modules using `cx_Oracle` is this:
 *pre-req: cx_Oracle*
 
 - Create/remove databases (cdb/non-cdb)
-- Can be created by passing in a responsefile or just by using parameters
+- Database can be created by passing in a response file or just by using parameters
+- [Module oracle_db documentation and examples](../content/module/oracle_db/)
 
         - name: create database
           oracle_db:
@@ -129,18 +130,22 @@ This module can query or amend content of Oracle's .ora files.
 *Note*: It uses ANTLR3 generated parser for .ora files, manipulates parsed AST and the serializes it.
 This results into situation when all white-noise characters are omited and resulting tnsnames.ora file has all aliases stored as one-liners. 
 
-        - name: oracle_tnsnames
+        - name: Parse listener.ora.in return SID_LIST_ASM_LISTENER"
           oracle_tnsnames:
-            path: /oracle/product/19.0.0/db1/network/admin/tnsnames.ora
-            #alias: XXXXX01D
-            aliases:
-              - XXXXX01D
-              - LISTENER_XXXXX01D
-          register: alias
+            path: "{{ listener_file }}"
+            alias: "SID_LIST_ASM_LISTENER"
+            register: _alias
     
-        - name: XXXXX01D alias
+        - name: SID_LIST_ASM_LISTENER alias
           debug:
-            var: alias
+            var: _alias
+
+        - name: Set new ORACLE_HOME in listener.ora.in for SID_LIST_ASM_LISTENER
+          oracle_tnsnames:
+          path: "{{ listener_file }}"
+            alias: "SID_LIST_ASM_LISTENER"
+            attribute_path: "SID_LIST/SID_DESC/ORACLE_HOME"
+            attribute_value: "/oracle/grid/product/19.3.0.0"
     
         - name: oracle_tnsnames
           oracle_tnsnames:
