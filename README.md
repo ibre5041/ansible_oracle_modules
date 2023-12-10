@@ -6,7 +6,7 @@
 - This fork prefers to use `connect / as sysdba` over using wallet, password or SQLNET over TCPIP 
 - This fork adds modules `oracle_oratab` to query list od databases, `oracle_tnsnames` to manipulate Oracle .ora files
 - This project also contains roles to install Database, Oracle RAC, Oracle HAS on VMware, EC2, on-premise HW.
-See project: [ibre5041/ansible_oracle_modules_example](https://github.com/ibre5041/ansible_oracle_modules_example.git) as an example.
+- See project: [ibre5041/ansible_oracle_modules_example](https://github.com/ibre5041/ansible_oracle_modules_example.git) as an example.
 
 To use this collection place this in requirements.yml
 
@@ -92,4 +92,3 @@ The default behaviour for the modules using `cx_Oracle` is this:
 - [VMware](../content/role/base_oracle_vmware/)
 - [VirtualBox](../content/role/base_oracle_vbox/)
 - [EC2](../content/role/base_oracle_ec2/)
-
