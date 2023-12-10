@@ -73,13 +73,15 @@ EXAMPLES = '''
         end;
         /
 
-# Execute arbitrary SQL file
+# Execute arbitrary SQL file on DB server
 - oracle_sql:
-    hostname: "foo.server.net"
-    username: "foo"
-    password: "bar"
-    service_name: "pdb001"
+    mode: sysdba
     script: '@/u01/scripts/create-all-the-procedures.sql'
+
+# Execute SQL file included in playbook
+- oracle_sql:
+    mode: sysdba
+    script: "{{ lookup('file', role_path + '/files/role_script.sql') }}"
 '''
 
 import os, re
