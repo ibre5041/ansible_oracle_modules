@@ -69,6 +69,17 @@ author:
 '''
 
 EXAMPLES = '''
+
+- name: create user sample_user
+  oracle_user:
+    mode: sysdba
+    schema: sample_user
+    state: present
+    profile: app_profile
+    #schema_password_hash: 'T:BC3BF4B95DBAE1A9B6E633FB90FDB2351ACEFE5871A990806F565AD756D4C5C2312B4D2306A34C5BD0588E49F8AB8F0CBFF0DBE427B373B3E3BFE374904B6E01E2EC5166823A917227492E58556AE1D5' # pw: Xiejfkljfssgdhd123
+    schema_password: Xiejfkljfssgdhd123
+    default_tablespace: users
+
 - name: Create a new schema on a remote db by running the module on the controlmachine  (i.e: delegate_to: localhost)
   oracle_user: 
     hostname: remote-db-server

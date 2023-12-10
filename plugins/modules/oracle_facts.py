@@ -40,6 +40,26 @@ author:
 '''
 
 EXAMPLES = '''
+- name: Oracle DB facts
+  oracle_facts:
+    mode: sysdba
+    userenv: false
+    database: false
+    instance: false
+    password_file: true
+    redo: summary
+    standby: summary
+    parameter:
+      - audit_file_dest
+      - db_name
+      - db_unique_name
+      - instance_name
+      - service_names
+  register: database_facts
+- name: database facts
+  debug:
+    var: database_facts
+
 - hosts: localhost
   vars:
     oraclehost: 192.168.56.101

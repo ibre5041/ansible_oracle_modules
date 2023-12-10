@@ -8,6 +8,25 @@ Requirements
 
 VM should have at least 8GB RAM and free space for Oracle binaries.
 Prepare two VMs according this [article](https://balazspapp.wordpress.com/2020/04/05/installing-oracle-19c-rac-on-virtualbox-silent-installation-part-1/).
+This is how storage on mine VM looks like:
+
+        [root@has ~]# lsblk -a -f
+        NAME             FSTYPE      LABEL UUID                                   MOUNTPOINT
+        sda
+        ├─sda1           xfs               ea4260e4-e6a7-4a0d-bdce-4a2f708b6382   /boot
+        └─sda2           LVM2_member       b42quB-zqEC-LA4B-tequ-uKed-GHEq-U8Gqb9
+          ├─cs_rac1-root xfs               2ae55093-b7b7-40e1-bf0e-6d9367e0f27b   /
+          └─cs_rac1-swap swap              f4251b4b-c534-489f-b6e3-6e610fcf836c   [SWAP]
+        sr0
+        nvme0n1
+        └─nvme0n1p1      oracleasm
+        nvme0n2
+        └─nvme0n2p1      oracleasm
+        [root@has ~]# lsscsi
+        [1:0:0:0]    cd/dvd  VBOX     CD-ROM           1.0   /dev/sr0
+        [2:0:0:0]    disk    ATA      VBOX HARDDISK    1.0   /dev/sda
+        [N:0:0:1]    disk    ORCL-VBOX-NVME-VER12__1                    /dev/nvme0n1
+        [N:0:0:2]    disk    ORCL-VBOX-NVME-VER12__2                    /dev/nvme0n2
 
 - Install necessary packages
 
@@ -183,6 +202,7 @@ This playbook will:
         
           roles:
             - role: ibre5041.ansible_oracle_modules.base_oracle_vbox
+	      oracle_vg: rootvg
   	      oracle_create_vg: False
  	      oracle_create_swap: False	    
  	      tags: [ baseoracle]

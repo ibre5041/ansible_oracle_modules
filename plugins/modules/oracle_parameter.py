@@ -7,6 +7,7 @@ module: oracle_parameter
 short_description: Manage parameters in an Oracle database
 description: 
   - Manage init parameters in an Oracle database
+  - Also handles underscore parameters. That will require using mode=sysdba, to be able to read the X$ tables needed to verify the existence of the parameter.
   - See connection parameters for oracle_ping  
 version_added: "3.0.2"
 options:

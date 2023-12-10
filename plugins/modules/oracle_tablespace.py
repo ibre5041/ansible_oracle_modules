@@ -59,6 +59,16 @@ author:
 '''
 
 EXAMPLES = '''
+- name: USERS tablespace
+  oracle_tablespace: 
+    tablespace: test
+    # use: db_create_file_dest parameter
+    # datafile: '+DATA' 
+    size: 100M
+    state: present 
+    bigfile: true 
+    autoextend: true
+
 - name: Drop a tablespace
   oracle_tablespace:
     mode: sysdba

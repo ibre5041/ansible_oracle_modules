@@ -39,6 +39,13 @@ EXAMPLES = '''
 - oracle_sql:
     mode: sysdba
     sql: "select username from dba_users"
+  register: _oracle_dba_users
+  environment:
+    ORACLE_HOME: "{{ ORACLE_HOME }}"
+    ORACLE_SID:  "{{ ORACLE_SID }}"
+  become: yes
+  become_user: "{{ oracle_owner }}"
+  become_method: sudo
 
 # Execute several arbitrary SQL statements (each statement must end with a semicolon at end of line)
 - oracle_sql:

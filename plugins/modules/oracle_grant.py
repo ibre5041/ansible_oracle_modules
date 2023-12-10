@@ -52,6 +52,26 @@ author:
 
 
 EXAMPLES = '''
+
+- name: append user privs
+  oracle_grants:
+    mode: sysdba
+    schema: u_foo
+    grants:
+      - sysdg
+      - select_catalog_role
+    object_privs:
+      - execute:dbms_random
+    directory_privs:
+      - read,write:data_pump_dir
+    grant_mode: append
+
+ - name: revoke user privs
+  oracle_grants:
+    mode: sysdba
+    schema: u_foo
+    grant_mode: exact
+
 - name: Add grant to the user
   oracle_grant:
     mode: sysdba

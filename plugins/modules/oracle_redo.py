@@ -35,6 +35,20 @@ author:
 '''
 
 EXAMPLES = '''
+- name: Manage online redologs
+  oracle_redo:
+    mode: sysdba
+    log_type: redo
+    size: 200M
+    groups: 4
+
+- name: Manage standby redologs
+  oracle_redo:
+    mode: sysdba
+    log_type: standby
+    size: 200M
+    groups: 5
+
 - hosts: all
   gather_facts: true
   vars:
