@@ -6,7 +6,7 @@ This role pre-configures VMWare host for Oracle Installation
 Requirements
 ------------
 
-VM should have at least 8GB RAM and one unallocated disk for Oracle binaries.
+VM should have at least 8GB RAM and diskgroup(vg01) for Oracle binaries.
 
 Role Variables
 --------------
@@ -24,10 +24,9 @@ Variables imported from default_vars_only role:
 
 Variables defined in this role:
 
- - `oracle_create_vg: true`
  - `oracle_vg: vg01` 
- - `oracle_create_swap: true`
- - `oracle_create_fs: true`
+ - `oracle_create_swap: True`
+ - `oracle_create_fs: True`
 
 These variables determine whether separate VG should be created for Oracle binaries.
 Whether mount point and directory structure should be created by this role.
@@ -40,24 +39,28 @@ This role depends only on `default_vars_only`.
 Example Playbook
 ----------------
 
-Including an example of how to use your role (for instance, with variables passed in as parameters) is always nice for users too:
+This playbook will:
+  - Configure kernel parameters `/etc/sysctl.d/98-oracle.conf`
+  - Install tuned.conf Oracle profile
+  - Install necessary .rpm packages
+  - Create OS groups and oracle user
+  - Install security limits for oracle user `/etc/security/limits.d/99-oracle-limits.conf`
+  - Create swap device
+  - Create FS for Oracle binaries
 
-    - hosts: servers
-      collections:
-        - ibre5041.ansible_oracle_modules
-      become: yes
-      become_user: root
-      become_method: sudo
-    
-      roles:
-        - { role: ibre5041.ansible_oracle_modules.base_oracle_ec2, oracle_vg: vg02, oracle_create_vg: false, oracle_create_swap: false }      
-
-      roles:
-        - role: ibre5041.ansible_oracle_modules.base_oracle_vmware
-	    - oracle_vg: vg02
-	    - oracle_create_vg: false
-	    - oracle_create_swap: false	    
-          tags: [ baseoracle]
+        - hosts: servers
+          collections:
+            - ibre5041.ansible_oracle_modules
+          become: yes
+          become_user: root
+          become_method: sudo
+        
+          roles:
+            - role: ibre5041.ansible_oracle_modules.base_oracle_vmware
+    	      oracle_vg: vg01
+ 	      oracle_create_vg: True
+    	      oracle_create_swap: True
+              tags: [ baseoracle]
 
 License
 -------
