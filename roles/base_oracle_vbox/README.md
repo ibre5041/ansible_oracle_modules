@@ -1,5 +1,5 @@
-Role Name
-=========
+base_oracle_vbox
+================
 
 This role pre-configures VirtualBox host for Oracle Installation
 

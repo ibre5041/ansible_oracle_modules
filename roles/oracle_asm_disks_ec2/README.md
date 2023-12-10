@@ -1,5 +1,5 @@
-Role Name
-=========
+oracle_asm_disks_ec2
+====================
 
 This role prepares partitions on disks to be members of Oracle ASM disk group.
 Also installs Oracle ASM specific udev rules.

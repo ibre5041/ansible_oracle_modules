@@ -1,5 +1,5 @@
-Role Name
-=========
+base_oracle_ec2
+===============
 
 This role pre-configures EC2 host for Oracle Installation
 

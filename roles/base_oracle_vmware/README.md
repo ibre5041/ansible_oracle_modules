@@ -1,5 +1,5 @@
-Role Name
-=========
+base_oracle_vmware
+==================
 
 This role pre-configures VMWare host for Oracle Installation
 
