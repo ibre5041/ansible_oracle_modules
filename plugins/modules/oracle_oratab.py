@@ -14,20 +14,20 @@ version_added: "3.0.0"
 options:
   writable_only:
     description: Return only databases openned READ WRITE
-    required: False
-    default: False
+    required: false
+    default: false
   asm_only:
     description: Return only ASM instances
-    required: False
-    default: False
+    required: false
+    default: false
   running_only:
     description: Return only instances which are running
-    required: False
-    default: False
+    required: false
+    default: false
   open_only:
     description: Return only databases which are OPEN
-    required: False
-    default: False
+    required: false
+    default: false
 notes:
   - Has to run either as root or oracle db owner
 requirements:
