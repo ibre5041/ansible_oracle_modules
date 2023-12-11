@@ -1,13 +1,17 @@
 ---
 # tasks file for default_vars_only
 
+- name: virt-what
+  yum:
+    name: virt-what
+
 - name: Check if inside AWS.
   shell: "virt-what | grep aws"
   register: aws_uri_check
   failed_when: False
   changed_when: False
 
-- name: set_fact is_aws_environment
+- name: "set_fact is_aws_environment: {{ aws_uri_check.stdout == 'aws' }}"
   set_fact:
     is_aws_environment: "{{ aws_uri_check.stdout == 'aws' }}"
 
@@ -17,7 +21,7 @@
   failed_when: False
   changed_when: False
 
-- name: set_fact is_vmware_environment
+- name: "set_fact is_vmware_environment: {{ vmware_virt_check.stdout == 'vmware' }}"
   set_fact:
     is_vmware_environment: "{{ vmware_virt_check.stdout == 'vmware' }}"
 
@@ -27,7 +31,7 @@
   failed_when: False
   changed_when: False
 
-- name: set_fact is_vbox_environment
+- name: "set_fact is_vbox_environment: {{ vbox_virt_check.stdout == 'virtualbox' }}"
   set_fact:
     is_vbox_environment: "{{ vbox_virt_check.stdout == 'virtualbox' }}"
     

@@ -173,15 +173,16 @@ oracle_os_packages_rhel8:
   - platform-python-pip
   - python3-pip  
   - nvme-cli
+  - sysstat
   
 oracle_os_packages_rhel9:
   - libnsl
   - policycoreutils-python-utils
   - chrony
-#  - python39
   - platform-python-pip
   - python3-pip
   - nvme-cli
+  - sysstat
 
 oracle_os_packages_crs:
   - gcc-c++

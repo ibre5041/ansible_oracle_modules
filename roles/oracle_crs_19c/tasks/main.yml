@@ -60,6 +60,38 @@
     #oracle_install_dir_temp:
   when: crs_unpacked.stat.exists != True and oracle_ohasd_service.status.LoadState == "not-found" and ansible_hostname == first_rac_node
 
+- name: Find .rpm package cvuqdisk-1.0.10-1.rpm
+  find:
+    paths: "{{ oracle_home }}/cv"
+    patterns: 'cvuqdisk-*.rpm'
+    recurse: yes
+  register: oracle_cvuqdisk_rpm
+  #when: crs_unpacked.stat.exists != True and oracle_ohasd_service.status.LoadState == "not-found" and ansible_hostname == first_rac_node
+  when: ansible_hostname == first_rac_node
+
+- name: Copy cvuqdisk-1.0.10-1.rpm into /tmp (local)
+  fetch: 
+    src: "{{ oracle_cvuqdisk_rpm.files[0].path }}"
+    dest: "/tmp/{{ oracle_cvuqdisk_rpm.files[0].path | basename }}"
+    flat: yes
+  when: ansible_hostname == first_rac_node
+
+- name: "Fact oracle_cvuqdisk_rpm: /tmp/{{ oracle_cvuqdisk_rpm.files[0].path | basename }}"
+  set_fact: 
+    oracle_cvuqdisk_rpm: "/tmp/{{ oracle_cvuqdisk_rpm.files[0].path | basename }}"
+  when: ansible_hostname == first_rac_node
+
+- name: Copy cvuqdisk-1.0.10-1.rpm into /tmp (other)
+  copy: 
+    src: "{{ hostvars[first_rac_node].oracle_cvuqdisk_rpm }}"
+    dest: "{{ hostvars[first_rac_node].oracle_cvuqdisk_rpm }}"
+
+- name: Install cvuqdisk-1.0.10-1.rpm
+  yum:
+    name: "{{ hostvars[first_rac_node].oracle_cvuqdisk_rpm }}"
+    disable_gpg_check: True
+    state: present
+      
 - name: check if Oracle CRS set up
   stat: 
     path: "{{ oracle_inventory_location }}/ContentsXML"
