@@ -14,7 +14,7 @@
 
 - name: Build crs node list
   set_fact:
-    crs_node_list : "{{ crs_node_list + [ item + '.' + domain_name + ':' + hostvars[item].oracle_crs_vip + '.' +  domain_name] | sort }}"
+    crs_node_list : "{{ crs_node_list + [ item + '.' + domain_name + ':' + hostvars[item].oracle_crs_node_vip + '.' +  domain_name] | sort }}"
   with_items: "{{ ansible_play_batch }}"
 - name: crs node list
   debug:
