@@ -4,5 +4,7 @@ oracle_port: ..TODO.ADD.PORT
 oracle_service_name: ..TODO.ADD.ORACLE.SERVICE.NAME
 oracle_username: ..TODO.ADD.DB.USERNAME
 oracle_password: ..TODO.ADD.DB.PASSWORD
+
+oracle_home: ..ORACLE_HOME..for oracle_db module
 --mode: "sysdba"
 
