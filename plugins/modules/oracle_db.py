@@ -599,7 +599,7 @@ def guess_oracle_sid(module, ohomes):
                 if sid.startswith(db_name) and len(sid) == len(db_name) + 1 and bool(re.search(r'\d+$', sid)):
                     os.environ['ORACLE_SID'] = sid
                     return sid
-                # ORACLE_SID for database uniqute name TESTRAC_B is TESTRACB1
+                # ORACLE_SID for database unique name TESTRAC_B is TESTRACB1
                 if sid.startswith(db_unique_name) and len(sid) == len(db_unique_name) + 1 and bool(re.search(r'\d+$', sid)):
                     os.environ['ORACLE_SID'] = sid
                     return sid
@@ -753,12 +753,12 @@ def ensure_db_state(module, ohomes, newdb):
 
             # <- Apply changes that requires database in mount state
             if change_restart_sql:
-                ddls = apply_restart_changes(module, ohomes, sid, instance_name, change_restart_sql)
+                ddls = apply_restart_changes(module, ohomes, instance_name, change_restart_sql)
                 return_ddls.append(ddls)
         else:
             # <- Apply changes that requires database in mount state
             if change_restart_sql:
-                ddls = apply_restart_changes(module, ohomes, sid, instance_name, change_restart_sql)
+                ddls = apply_restart_changes(module, ohomes, instance_name, change_restart_sql)
                 return_ddls.append(ddls)
             # <- Apply changes that does not require a restart
             if change_db_sql:
@@ -777,16 +777,16 @@ def ensure_db_state(module, ohomes, newdb):
         module.exit_json(msg=msg, changed=newdb)
 
 
-def apply_restart_changes(module, ohomes, sid, instance_name, change_restart_sql):
-    stop_db(module, ohomes, sid)
-    start_instance(module, ohomes, 'mount', sid, instance_name)
+def apply_restart_changes(module, ohomes, instance_name, change_restart_sql):
+    stop_db(module, ohomes)
+    start_instance(module, ohomes, 'mount', instance_name)
     time.sleep(10) #<- To allow the DB to register with the listener
     conn = oracleConnection(module)
 
     for sql in change_restart_sql:
         conn.execute_ddl(sql)
-    stop_db(module, ohomes, sid)
-    start_db(module, ohomes, sid)
+    stop_db(module, ohomes)
+    start_db(module, ohomes)
     return conn.ddls
 
 
@@ -797,7 +797,7 @@ def apply_norestart_changes(module, change_db_sql):
     return conn.ddls
 
 
-def stop_db(module, ohomes, sid):
+def stop_db(module, ohomes):
     oracle_home    = module.params["oracle_home"]
     db_name        = module.params["db_name"]
     db_unique_name = module.params["db_unique_name"]
@@ -812,6 +812,7 @@ def stop_db(module, ohomes, sid):
             msg = 'Error - STDOUT: %s, STDERR: %s, COMMAND: %s' % (stdout, stderr, " ".join(command))
             module.fail_json(msg=msg, changed=False)
     else:
+        sid = guess_oracle_sid(module, ohomes)
         os.environ['ORACLE_SID'] = sid
         shutdown_sql = '''
         connect / as sysdba
@@ -827,7 +828,7 @@ def stop_db(module, ohomes, sid):
             module.fail_json(msg=msg, changed=False)
 
 
-def start_db(module, ohomes, sid):
+def start_db(module, ohomes):
     oracle_home    = module.params["oracle_home"]
     db_name        = module.params["db_name"]
     db_unique_name = module.params["db_unique_name"]
@@ -842,6 +843,7 @@ def start_db(module, ohomes, sid):
             msg = 'Error - STDOUT: %s, STDERR: %s, COMMAND: %s' % (stdout, stderr, " ".join(command))
             module.fail_json(msg=msg, changed=True, stdout=stdout, stderr=stderr)
     else:
+        sid = guess_oracle_sid(module, ohomes)
         os.environ['ORACLE_SID'] = sid
         startup_sql = '''
         connect / as sysdba
@@ -857,10 +859,11 @@ def start_db(module, ohomes, sid):
             module.fail_json(msg=msg, changed=True, stdout=stdout, stderr=stderr)
 
 
-def start_instance(module, ohomes, open_mode, sid, instance_name):
+def start_instance(module, ohomes, open_mode, instance_name):
     oracle_home    = module.params["oracle_home"]
     db_name        = module.params["db_name"]
     db_unique_name = module.params["db_unique_name"]
+    sid = guess_oracle_sid(module, ohomes)
 
     if ohomes.oracle_gi_managed:
         srvctl = os.path.join(oracle_home, 'bin', 'srvctl')
@@ -1016,7 +1019,7 @@ def main():
         elif ohomes.facts_item[sid]['running']:
             module.exit_json(msg="Database is already running", changed=False)
         else:
-            start_db(module, ohomes, sid)
+            start_db(module, ohomes)
             module.exit_json(msg="Database started", changed=True)
 
     if state == 'stopped':
@@ -1028,7 +1031,7 @@ def main():
         elif not ohomes.facts_item[sid]['running']:
             module.exit_json(msg="Database is already stopped", changed=False)
         else:
-            stop_db(module, ohomes, sid)
+            stop_db(module, ohomes)
             module.exit_json(msg="Database stopped", changed=True)
 
     if state == 'restarted':
@@ -1038,8 +1041,8 @@ def main():
             msg = "Database not found. %s" % msg
             module.fail_json(msg=msg, changed=False)
         if ohomes.facts_item[sid]['running']:
-            stop_db(module, ohomes, sid)
-        start_db(module, ohomes, sid)
+            stop_db(module, ohomes)
+        start_db(module, ohomes)
         module.exit_json(msg="Database restarted", changed=True)
 
 
