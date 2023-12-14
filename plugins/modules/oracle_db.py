@@ -581,6 +581,10 @@ def remove_db(module, ohomes):
 
 def guess_oracle_sid(module, ohomes):
     db_name = module.params["db_name"]
+    db_unique_name = module.params["db_unique_name"]
+
+    db_unique_name = db_unique_name.replace('_', '')
+
     if 'ORACLE_SID' in os.environ:
         return os.environ['ORACLE_SID']
 
@@ -593,6 +597,10 @@ def guess_oracle_sid(module, ohomes):
             for sid in ohomes.facts_item.keys():
                 # check if sid = db_name + digit
                 if sid.startswith(db_name) and len(sid) == len(db_name) + 1 and bool(re.search(r'\d+$', sid)):
+                    os.environ['ORACLE_SID'] = sid
+                    return sid
+                # ORACLE_SID for database uniqute name TESTRAC_B is TESTRACB1
+                if sid.startswith(db_unique_name) and len(sid) == len(db_unique_name) + 1 and bool(re.search(r'\d+$', sid)):
                     os.environ['ORACLE_SID'] = sid
                     return sid
 
