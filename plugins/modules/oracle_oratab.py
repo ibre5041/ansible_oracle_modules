@@ -99,6 +99,7 @@ class oracle_homes():
         self.oracle_crs = False
         self.oracle_standalone = False
         self.oracle_install_type = None
+        self.oracle_gi_managed = False
         self.crs_home = None
         self.homes = {}
         self.ora_inventory = None

@@ -25,6 +25,7 @@ class oracle_homes():
         self.oracle_crs = False
         self.oracle_standalone = False
         self.oracle_install_type = None
+        self.oracle_gi_managed = False
         self.crs_home = None
         self.homes = {}
         self.ora_inventory = None
@@ -40,8 +41,12 @@ class oracle_homes():
                         (_, local_only,) = line.strip().split('=')
                         if local_only.upper() == 'TRUE':
                             self.oracle_install_type = 'RESTART'
+                            self.oracle_restart = True
+                            self.oracle_gi_managed = True
                         if local_only.upper() == 'FALSE':
                             self.oracle_install_type = 'CRS'
+                            self.oracle_crs = True
+                            self.oracle_gi_managed = True
         except:
             pass
 
