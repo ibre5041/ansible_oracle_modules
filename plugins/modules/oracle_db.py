@@ -1023,6 +1023,18 @@ def main():
             stop_db(module, ohomes, sid)
             module.exit_json(msg="Database stopped", changed=True)
 
+    if state == 'restarted':
+        sid = guess_oracle_sid(module, ohomes)
+        msg = "oracle_home: %s db_name: %s sid: %s db_unique_name: %s" % (oracle_home, db_name, sid, db_unique_name)
+        if not check_db_exists(module, ohomes):
+            msg = "Database not found. %s" % msg
+            module.fail_json(msg=msg, changed=False)
+        if ohomes.facts_item[sid]['running']:
+            stop_db(module, ohomes, sid)
+        start_db(module, ohomes, sid)
+        module.exit_json(msg="Database restarted", changed=True)
+
+
     elif state == 'present':
         if not check_db_exists(module, ohomes):
             if create_db(module):
