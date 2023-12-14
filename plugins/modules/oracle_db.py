@@ -101,10 +101,9 @@ options:
         required: False
         default: True
     dbconfig_type:
-        description:
-            - Type of database (SI,RAC,RON)
+        description: Type of database (SI,RAC,RON)
         required: False
-        default: SI
+        default: SI on standalone, RAC on clustered environment
         choices: ['SI','RAC','RACONENODE']
     db_type:
         description:
@@ -453,13 +452,13 @@ def create_db(module):
         command += ' -storageType %s ' % storage_type
     if omf and storage_type == 'FS':
         command += ' -useOMF %s ' % str(omf).lower()
+    if dbconfig_type == 'SI':
+        dbconfig_type = 'SINGLE'
     if dbconfig_type:
-        if dbconfig_type == 'SI':
-            dbconfig_type = 'SINGLE'
-        if major_version == '12.2':
-            command += ' -databaseConfigType %s ' % dbconfig_type
-        elif major_version == '12.1':
+        if major_version == '12.1':
             command += ' -databaseConfType %s ' % dbconfig_type
+        else:
+            command += ' -databaseConfigType %s ' % dbconfig_type
     if dbconfig_type == 'RACONENODE':
         if racone_service is None:
             racone_service = db_name+'_ronserv'
@@ -470,10 +469,6 @@ def create_db(module):
         command += ' -memoryPercentage %s ' % memory_percentage
     if memory_totalmb and not skip_memory:
         command += ' -totalMemory %s ' % memory_totalmb
-    if dbconfig_type == 'RAC':
-        if nodelist:
-            nodelist = ",".join(nodelist)
-            command += ' -nodelist %s ' % nodelist
     if db_type:
         command += ' -databaseType %s ' % db_type
     if amm:
@@ -563,14 +558,14 @@ def remove_db(module, ohomes):
 
     if ohomes.oracle_gi_managed:
         if db_unique_name:
-            remove_db = db_unique_name
+            db_to_remove = db_unique_name
         else:
-            remove_db = db_name
+            db_to_remove = db_name
     else:
-        remove_db = db_name
+        db_to_remove = db_name
 
     dbca = os.path.join(oracle_home, 'bin', 'dbca')
-    command = [dbca, '-deleteDatabase', '-silent', '-sourceDB', remove_db, '-sysDBAUserName', 'sys', '-sysDBAPassword', sys_password]
+    command = [dbca, '-deleteDatabase', '-silent', '-sourceDB', db_to_remove, '-sysDBAUserName', 'sys', '-sysDBAPassword', sys_password]
     (rc, stdout, stderr) = module.run_command(command)
     if 0 < rc <= 6:
         module.warn(stdout)
@@ -915,7 +910,7 @@ def main():
             recoveryfile_dest   = dict(required=False, aliases=['rfd']),
             storage_type        = dict(default='FS', aliases=['storage'], choices=['FS', 'ASM']),
             omf                 = dict(default=True, type='bool'),
-            dbconfig_type       = dict(default='SI', choices=['SI', 'RAC', 'RACONENODE']),
+            dbconfig_type       = dict(default=None, choices=['SI', 'RAC', 'RACONENODE']),
             db_type             = dict(default='MULTIPURPOSE', choices=['MULTIPURPOSE', 'DATA_WAREHOUSING', 'OLTP']),
             racone_service      = dict(required=False, aliases=['ron_service']),
             characterset        = dict(default='AL32UTF8'),
@@ -934,7 +929,7 @@ def main():
             flashback           = dict(default=False, type='bool'),
             domain              = dict(required=False),
             timezone            = dict(required=False),
-            state               = dict(default="present", choices=["present", "absent", "started"])
+            state               = dict(default="present", choices=["present", "absent", "started", "stopped", "restarted"])
         ),
         mutually_exclusive=[['memory_percentage', 'memory_totalmb']],
         supports_check_mode=False,
@@ -974,6 +969,24 @@ def main():
     ohomes.parse_oratab()
     #ohomes.oracle_gi_managed = False# TODO REMOVE - override GI presence for testing
 
+    # Override dbconfig_type on RAC when not specified
+    dbconfig_type = module.params['dbconfig_type']
+    if not dbconfig_type and ohomes.oracle_crs:
+        module.params['dbconfig_type'] = dbconfig_type = 'RAC'
+
+    nodelist = module.params["nodelist"]
+    if not nodelist and dbconfig_type == 'RAC':
+        olsnodes_bin = os.path.join(os.path.dirname(ohomes.crsctl), 'olsnodes')
+        (rc, stdout, stderr) = module.run_command(olsnodes_bin)
+        if rc == 0:
+            nodelist = stdout.splitlines()
+            module.params['nodelist'] = nodelist
+        else:
+            module.fail_json(msg="Error executing olsnodes, {}, {}".format(stdout, stderr),
+                             changed=True, stdout=stdout, stderr=stderr)
+
+
+
     # Connection details for database
     if db_unique_name:
         service_name = db_unique_name
@@ -997,6 +1010,18 @@ def main():
         else:
             start_db(module, ohomes, sid)
             module.exit_json(msg="Database started", changed=True)
+
+    if state == 'stopped':
+        sid = guess_oracle_sid(module, ohomes)
+        msg = "oracle_home: %s db_name: %s sid: %s db_unique_name: %s" % (oracle_home, db_name, sid, db_unique_name)
+        if not check_db_exists(module, ohomes):
+            msg = "Database not found. %s" % msg
+            module.fail_json(msg=msg, changed=False)
+        elif not ohomes.facts_item[sid]['running']:
+            module.exit_json(msg="Database is already stopped", changed=False)
+        else:
+            stop_db(module, ohomes, sid)
+            module.exit_json(msg="Database stopped", changed=True)
 
     elif state == 'present':
         if not check_db_exists(module, ohomes):
