@@ -477,13 +477,13 @@ def remove_db(module, ohomes):
     db_unique_name = module.params["db_unique_name"] or ''
     sys_password = module.params["sys_password"]
 
-    if ohomes.oracle_gi_managed:
-        if db_unique_name:
-            db_to_remove = db_unique_name
-        else:
-            db_to_remove = db_name
-    else:
-        db_to_remove = db_name
+    # if ohomes.oracle_gi_managed:
+    #     # if db_unique_name:
+    #     #     db_to_remove = db_unique_name
+    #     # else:
+    #     #     db_to_remove = db_name
+    # else:
+    db_to_remove = db_name
 
     dbca = os.path.join(oracle_home, 'bin', 'dbca')
     command = [dbca, '-deleteDatabase', '-silent', '-sourceDB', db_to_remove, '-sysDBAUserName', 'sys', '-sysDBAPassword', sys_password]
