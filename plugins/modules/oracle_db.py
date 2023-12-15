@@ -725,12 +725,12 @@ def stop_db(module, ohomes):
     db_unique_name = module.params["db_unique_name"]
 
     if ohomes.oracle_gi_managed:
-        if db_unique_name:
-            db_name = db_unique_name
+        # if db_unique_name:
+        #     db_name = db_unique_name
         srvctl = os.path.join(oracle_home, 'bin', 'srvctl')
         command = [srvctl, 'stop', 'database', '-d', db_name, '-o', 'immediate']
         (rc, stdout, stderr) = module.run_command(command)
-        if rc != 0:
+        if rc != 0 or stdout.startswith('PRCD-') or stderr.startswith('PRCD-'):
             msg = 'Error - STDOUT: %s, STDERR: %s, COMMAND: %s' % (stdout, stderr, " ".join(command))
             module.fail_json(msg=msg, changed=False)
     else:
@@ -756,12 +756,12 @@ def start_db(module, ohomes):
     db_unique_name = module.params["db_unique_name"]
 
     if ohomes.oracle_gi_managed:
-        if db_unique_name:
-            db_name = db_unique_name
+        # if db_unique_name:
+        #     db_name = db_unique_name
         srvctl = os.path.join(oracle_home, 'bin', 'srvctl')
         command = [srvctl, 'start', 'database', '-d', db_name]
         (rc, stdout, stderr) = module.run_command(command)
-        if rc != 0:
+        if rc != 0 or stdout.startswith('PRCD') or stderr.startswith('PRCD'):
             msg = 'Error - STDOUT: %s, STDERR: %s, COMMAND: %s' % (stdout, stderr, " ".join(command))
             module.fail_json(msg=msg, changed=True, stdout=stdout, stderr=stderr)
     else:
@@ -789,8 +789,6 @@ def start_instance(module, ohomes, open_mode, instance_name):
 
     if ohomes.oracle_gi_managed:
         srvctl = os.path.join(oracle_home, 'bin', 'srvctl')
-        if db_unique_name:
-            db_name = db_unique_name
         if ohomes.facts_item[sid]['israc']:
             command = [srvctl, 'start', 'instance', '-d', db_name, '-i', instance_name]
         else:
