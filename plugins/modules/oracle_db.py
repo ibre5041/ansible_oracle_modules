@@ -252,6 +252,10 @@ def check_db_exists(module, ohomes):
     db_name        = module.params["db_name"]
     db_unique_name = module.params["db_unique_name"]
 
+    sid = guess_oracle_sid(module, ohomes, fail=False)
+    if sid:
+        return True
+
     if ohomes.oracle_gi_managed:
         if db_unique_name:
             checkdb = db_unique_name
@@ -304,7 +308,7 @@ def create_db(module):
     dbsnmp_password     = module.params["dbsnmp_password"]
     responsefile        = module.params["responsefile"]
     template            = module.params["template"]
-    db_options          = module.params["db_options"]
+    db_options          = module.params["db_options"] or {}
     listeners           = module.params["listeners"]
     cdb                 = module.params["cdb"]
     local_undo          = module.params["local_undo"]
@@ -320,14 +324,12 @@ def create_db(module):
     nodelist            = module.params["nodelist"]
     db_type             = module.params["db_type"]
     amm                 = module.params["amm"]
-    initparams          = module.params["initparams"] or []
+    initparams          = module.params["initparams"] or {}
     customscripts       = module.params["customscripts"]
     domain              = module.params["domain"]
 
     # Get the Oracle version
     major_version = get_version(module, oracle_home)
-
-    paramslist = []
 
     for i in initparams:
         if i.lower().startswith('sga_target'):
@@ -353,7 +355,8 @@ def create_db(module):
     if template:
         command += ' -templateName \"%s\"' % template
     if db_options:
-        command += ' -dbOptions %s' % (",".join(db_options))
+        # Convert dict to list of k:v pairs and then join it.
+        command += ' -dbOptions ' + ",".join(["{}:{}".format(_[0], str(_[1]).lower()) for _ in db_options.items()])
     if listeners:
         command += ' -listeners %s' % listeners
     if major_version > '11.2':
@@ -433,27 +436,24 @@ def create_db(module):
         dbsnmp_password = sys_password
         command += ' -dbsnmpPassword \"%s\"' % dbsnmp_password
 
-    # if sid:
-    #     command += ' -sid %s' % sid
+    sid = module.params["sid"]
+    if sid:
+        command += ' -sid %s' % sid
 
+    paramslist = dict()
     if db_unique_name:
-        paramslist.append('db_name=%s' % db_name)
-        paramslist.append('db_unique_name=%s' % db_unique_name)
-
-    module.warn('paramslist %s' % str(paramslist))
+        paramslist.update({'db_name': db_name})
+        paramslist.update({'db_unique_name': db_unique_name})
 
     if domain:
-        paramslist.append('db_domain=%s' % domain)
-
-    module.warn('paramslist %s' % str(paramslist))
+        paramslist.update({'db_domain': domain})
 
     if initparams:
-        paramslist.extend(initparams)
-
-    module.warn('paramslist %s' % str(paramslist))
+        paramslist.update(initparams)
 
     if paramslist:
-        command += ' -initParams ' + ','.join(paramslist)
+        # Convert dict to list of k:v pairs and then join it.
+        command += ' -initParams ' + ",".join(["{}:{}".format(_[0], str(_[1])) for _ in paramslist.items()])
 
     msg = "command: %s" % command
     module.warn(msg)
@@ -474,7 +474,7 @@ def create_db(module):
 def remove_db(module, ohomes):
     oracle_home = module.params["oracle_home"]
     db_name = module.params["db_name"]
-    db_unique_name = module.params["db_unique_name"]
+    db_unique_name = module.params["db_unique_name"] or ''
     sys_password = module.params["sys_password"]
 
     if ohomes.oracle_gi_managed:
@@ -500,9 +500,9 @@ def remove_db(module, ohomes):
         module.fail_json(msg=msg, changed=True, stdout=stdout, stderr=stderr)
 
 
-def guess_oracle_sid(module, ohomes):
+def guess_oracle_sid(module, ohomes, fail=True):
     db_name = module.params["db_name"]
-    db_unique_name = module.params["db_unique_name"]
+    db_unique_name = module.params["db_unique_name"] or ''
 
     db_unique_name = db_unique_name.replace('_', '')
 
@@ -520,12 +520,13 @@ def guess_oracle_sid(module, ohomes):
                 if sid.startswith(db_name) and len(sid) == len(db_name) + 1 and bool(re.search(r'\d+$', sid)):
                     os.environ['ORACLE_SID'] = sid
                     return sid
-                # ORACLE_SID for database unique name TESTRAC_B is TESTRACB1
+                # ORACLE_SID for database unique name TESTRAC_B is TESTRACB1 when -sid is not passed to dbca
                 if sid.startswith(db_unique_name) and len(sid) == len(db_unique_name) + 1 and bool(re.search(r'\d+$', sid)):
                     os.environ['ORACLE_SID'] = sid
                     return sid
 
-    module.fail_json("Could not deduce ORACLE_SID for db_name: {}".format(db_name))
+    if fail:
+        module.fail_json("Could not deduce ORACLE_SID for db_name: {}".format(db_name))
 
 
 def ensure_db_state(module, ohomes, newdb):
@@ -724,7 +725,7 @@ def stop_db(module, ohomes):
     db_unique_name = module.params["db_unique_name"]
 
     if ohomes.oracle_gi_managed:
-        if db_unique_name is not None:
+        if db_unique_name:
             db_name = db_unique_name
         srvctl = os.path.join(oracle_home, 'bin', 'srvctl')
         command = [srvctl, 'stop', 'database', '-d', db_name, '-o', 'immediate']
@@ -755,7 +756,7 @@ def start_db(module, ohomes):
     db_unique_name = module.params["db_unique_name"]
 
     if ohomes.oracle_gi_managed:
-        if db_unique_name is not None:
+        if db_unique_name:
             db_name = db_unique_name
         srvctl = os.path.join(oracle_home, 'bin', 'srvctl')
         command = [srvctl, 'start', 'database', '-d', db_name]
@@ -827,6 +828,7 @@ def main():
     module = AnsibleModule(
         argument_spec = dict(
             oracle_home         = dict(default=None, aliases=['oh']),
+            sid                 = dict(required=False),
             db_name             = dict(required=True, aliases=['db', 'database_name', 'name']),
             db_unique_name      = dict(required=False, aliases=['dbunqn', 'unique_name']),
             sys_password        = dict(required=False, no_log=True, aliases=['syspw', 'sysdbapassword', 'sysdbapw']),
@@ -834,7 +836,7 @@ def main():
             dbsnmp_password     = dict(required=False, no_log=True, aliases=['dbsnmppw']),
             responsefile        = dict(required=False),
             template            = dict(default='General_Purpose.dbc'),
-            db_options          = dict(required=False, type='list'),
+            db_options          = dict(required=False, type='dict'),
             listeners           = dict(required=False, aliases=['listener']),
             cdb                 = dict(default=False, type='bool', aliases=['container']),
             local_undo          = dict(default=True, type='bool'),
@@ -850,9 +852,9 @@ def main():
             memory_totalmb      = dict(default='2048'),
             nodelist            = dict(required=False, type='list'),
             amm                 = dict(default=False, type='bool', aliases=['automatic_memory_management']),
-            initparams          = dict(required=False, type='list'),
+            initparams          = dict(required=False, type='dict'),
             customscripts       = dict(required=False, type='list'),
-            default_tablespace_type = dict(default='smallfile', choices=['smallfile', 'bigfile']),
+            default_tablespace_type = dict(default='bigfile', choices=['smallfile', 'bigfile']),
             default_tablespace  = dict(required=False),
             default_temp_tablespace = dict(required=False),
             archivelog          = dict(default=False, type='bool'),
@@ -917,8 +919,6 @@ def main():
             module.fail_json(msg="Error executing olsnodes, {}, {}".format(stdout, stderr),
                              changed=True, stdout=stdout, stderr=stderr)
 
-
-
     # Connection details for database
     if db_unique_name:
         service_name = db_unique_name
@@ -965,7 +965,6 @@ def main():
             stop_db(module, ohomes)
         start_db(module, ohomes)
         module.exit_json(msg="Database restarted", changed=True)
-
 
     elif state == 'present':
         if not check_db_exists(module, ohomes):
