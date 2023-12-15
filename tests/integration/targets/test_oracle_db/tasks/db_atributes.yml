@@ -1,0 +1,76 @@
+---
+
+- name: 'drop database'
+  oracle_db:
+    <<: *con_param
+    db_name: "TESTDB"
+    state: absent
+  register: _
+  failed_when: _.failed
+
+- name: 'create database minimal config - requires GI'
+  oracle_db:
+    <<: *con_param
+    db_name: "TESTDB"
+    storage_type: ASM
+    datafile_dest: "{{ oracle_asm_dg }}"
+    sys_password: X43ofljfksjfkhfr3fkh
+    state: present
+    archivelog: False
+  register: _
+  failed_when: _.failed
+
+- name: 'switch database into archivelog mode'
+  oracle_db:
+    <<: *con_param
+    db_name: "TESTDB"
+    storage_type: ASM
+    datafile_dest: "{{ oracle_asm_dg }}"
+    sys_password: X43ofljfksjfkhfr3fkh
+    archivelog: True
+    state: present
+  register: _
+  failed_when: _.failed
+
+- name: 'switch database add flashback mode'
+  oracle_db:
+    <<: *con_param
+    db_name: "TESTDB"
+    storage_type: ASM
+    datafile_dest: "{{ oracle_asm_dg }}"
+    sys_password: X43ofljfksjfkhfr3fkh
+    archivelog: True
+    flashback: True
+    state: present
+  register: _
+  failed_when: _.failed
+
+- name: 'turn archivelog and flashback mode off'
+  oracle_db:
+    <<: *con_param
+    db_name: "TESTDB"
+    storage_type: ASM
+    datafile_dest: "{{ oracle_asm_dg }}"
+    sys_password: X43ofljfksjfkhfr3fkh
+    archivelog: False
+    flashback: False
+    state: present
+  register: _
+  failed_when: _.failed
+
+- name: 'turn archivelog and flashback mode on'
+  oracle_db:
+    <<: *con_param
+    db_name: "TESTDB"
+    storage_type: ASM
+    datafile_dest: "{{ oracle_asm_dg }}"
+    sys_password: X43ofljfksjfkhfr3fkh
+    archivelog: True
+    flashback: True
+    supplemental_logging: True
+    force_logging: True
+    state: present
+  register: _
+  failed_when: _.failed
+  
+  
