@@ -97,7 +97,7 @@ class oracle_homes():
         self.writable_only = False        
         self.oracle_restart = False
         self.oracle_crs = False
-        self.oracle_standalone = False
+        self.oracle_standalone = True
         self.oracle_install_type = None
         self.oracle_gi_managed = False
         self.crs_home = None
@@ -115,8 +115,12 @@ class oracle_homes():
                         (_, local_only,) = line.strip().split('=')
                         if local_only.upper() == 'TRUE':
                             self.oracle_install_type = 'RESTART'
+                            self.oracle_restart = True
                         if local_only.upper() == 'FALSE':
                             self.oracle_install_type = 'CRS'
+                            self.oracle_crs = True
+                        self.oracle_gi_managed = True
+                        self.oracle_standalone = False
         except:
             pass
 

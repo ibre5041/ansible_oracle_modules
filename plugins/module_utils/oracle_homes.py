@@ -12,7 +12,7 @@ import glob
 import subprocess
 import socket
 from pwd import getpwuid
-
+from xml.dom import minidom
 
 class oracle_homes():
 
@@ -23,7 +23,7 @@ class oracle_homes():
         self.writable_only = False        
         self.oracle_restart = False
         self.oracle_crs = False
-        self.oracle_standalone = False
+        self.oracle_standalone = True
         self.oracle_install_type = None
         self.oracle_gi_managed = False
         self.crs_home = None
@@ -42,11 +42,11 @@ class oracle_homes():
                         if local_only.upper() == 'TRUE':
                             self.oracle_install_type = 'RESTART'
                             self.oracle_restart = True
-                            self.oracle_gi_managed = True
                         if local_only.upper() == 'FALSE':
                             self.oracle_install_type = 'CRS'
                             self.oracle_crs = True
-                            self.oracle_gi_managed = True
+                        self.oracle_gi_managed = True
+                        self.oracle_standalone = False
         except:
             pass
 
@@ -226,8 +226,34 @@ class oracle_homes():
     def add_home(self, ORACLE_HOME):
         if ORACLE_HOME and ORACLE_HOME not in self.homes:
             ORACLE_BASE = self.base_from_home(ORACLE_HOME)
-            self.homes[ORACLE_HOME] = {'ORACLE_HOME': ORACLE_HOME, 'ORACLE_BASE': ORACLE_BASE}
 
+            try:
+                inventory_path = os.path.join(ORACLE_HOME, 'inventory', 'ContentsXML', 'comps.xml')
+                inv_tree = minidom.parse(inventory_path)
+                components = inv_tree.getElementsByTagName('COMP')
+                oracle_owner = getpwuid(os.stat(inventory_path).st_uid).pw_name
+                for comp in components:
+                    component_name = comp.attributes['NAME'].value
+                    if component_name == "oracle.client":
+                        component_name = 'client'
+                        break
+                    elif component_name == "oracle.server":
+                        component_name = "server"
+                        break
+                    elif component_name == "oracle.crs":
+                        component_name = "crs"
+                        break
+                    elif component_name == "oracle.tg":
+                        component_name = "gateway"
+                        break
+            except:
+                component_name = 'unknown'
+                oracle_owner = 'unknown'
+            self.homes[ORACLE_HOME] = {'ORACLE_HOME': ORACLE_HOME
+                , 'ORACLE_BASE': ORACLE_BASE
+                , 'home_type': component_name
+                , 'owner': oracle_owner}
+            
     def add_sid(self, ORACLE_SID, ORACLE_HOME=None, running=False):
         if ORACLE_SID in self.facts_item:
             sid = self.facts_item[ORACLE_SID]
@@ -239,8 +265,10 @@ class oracle_homes():
                 sid['running'] = running
         else:
             self.add_home(ORACLE_HOME)
-            if ORACLE_HOME and ORACLE_HOME in self.homes[ORACLE_HOME]:
+            if ORACLE_HOME and ORACLE_HOME in self.homes:
                 ORACLE_BASE = self.homes[ORACLE_HOME]['ORACLE_BASE']
+            elif ORACLE_HOME:
+                ORACLE_BASE = self.base_from_home(ORACLE_HOME)
             else:
                 ORACLE_BASE = None            
             self.facts_item[ORACLE_SID] = {'ORACLE_SID': ORACLE_SID
