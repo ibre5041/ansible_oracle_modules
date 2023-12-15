@@ -235,7 +235,8 @@ class oracle_homes():
                                 if line.decode('utf-8').startswith('ORACLE_HOME='):
                                     (_, ORACLE_HOME,) = line.decode('utf-8').strip().split('=')
                                 proc.poll()
-                                if proc.returncode is not None:
+                                # The EOF condition on PIPE is signalized by read() returning zero bytes
+                                if proc.returncode and not line:
                                     break
                         pass                    
                     if not ORACLE_HOME:
@@ -275,7 +276,8 @@ class oracle_homes():
                         self.add_sid(ORACLE_SID=ORACLE_SID, ORACLE_HOME=ORACLE_HOME)
                         (ORACLE_HOME, ORACLE_SID) = (None, None)
                     proc.poll()
-                    if proc.returncode is not None:
+                    # The EOF condition on PIPE is signalized by read() returning zero bytes
+                    if proc.returncode and not line:
                         break
 
     def base_from_home(self, ORACLE_HOME):
