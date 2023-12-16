@@ -206,19 +206,19 @@ EXAMPLES = '''
     #dbsnmp_password:
     #template:
     db_options:
-      - JSERVER: True
-      - ORACLE_TEXT: False
-      - IMEDIA: False
-      - CWMLITE: False
-      - SPATIAL: False
-      - OMS: False
-      - APEX: False
-      - DV: False
+      JSERVER: True
+      ORACLE_TEXT: False
+      IMEDIA: False
+      CWMLITE: False
+      SPATIAL: False
+      OMS: False
+      APEX: False
+      DV: False
     initparams:
-      - memory_target: 0
-      - memory_max_target: 0
-      - sga_target: 1500MB
-      - sga_max_size: 1500MB
+      memory_target: 0
+      memory_max_target: 0
+      sga_target: 1500MB
+      sga_max_size: 1500MB
     storage_type: ASM
     datafile_dest: +XDATA
     state: present

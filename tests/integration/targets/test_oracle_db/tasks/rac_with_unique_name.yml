@@ -1,6 +1,58 @@
 ---
-- include_tasks: "simple.yml"
-- include_tasks: "rac_with_unique_name.yml"
-- include_tasks: "db_atributes.yml"
 
+- name: "define db parameters"
+  set_fact:
+    connection_parameters: &con_param
+      oracle_home: "{{ oracle_home }}"  
+
+- name: 'Connection paramters - see or use integration_config.yml.template'
+  debug:
+    var: connection_parameters
+
+- name: 'drop database'
+  oracle_db:
+    <<: *con_param
+    db_name: "TESTDB"
+    sys_password: X43ofljfksjfkhfr3fkh    
+    state: absent
+  register: _
+  failed_when: _.failed
+
+- name: 'create RAC database'
+  oracle_db:
+    <<: *con_param
+    db_name: "TESTDB"
+    db_unique_name: "TESTDB_A"
+    storage_type: ASM
+    dbconfig_type: RAC
+    datafile_dest: "{{ oracle_asm_dg }}"
+    recoveryfile_dest: "{{ oracle_asm_dg }}"
+    sys_password: X43ofljfksjfkhfr3fkh
+    state: present
+    db_options:
+      JSERVER: False
+      ORACLE_TEXT: False
+      IMEDIA: False
+      CWMLITE: False
+      SPATIAL: False
+      OMS: False
+      APEX: False
+      DV: False
+    initparams:
+      memory_target: 0
+      memory_max_target: 0
+      sga_target: 1500MB
+      sga_max_size: 1500MB    
+      gister: _
+  failed_when: _.failed
+
+- name: 'drop database'
+  oracle_db:
+    <<: *con_param
+    db_name: "TESTDB"
+    sys_password: X43ofljfksjfkhfr3fkh    
+    state: absent
+  register: _
+  failed_when: _.failed
+  
 ...

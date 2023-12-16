@@ -18,7 +18,7 @@
   register: _
   failed_when: _.failed
 
-- name: 'create database minimal config - requires GI'
+- name: 'create database TESTDB'
   oracle_db:
     <<: *con_param
     db_name: "TESTDB"
@@ -26,68 +26,35 @@
     datafile_dest: "{{ oracle_asm_dg }}"
     recoveryfile_dest: "{{ oracle_asm_dg }}"
     sys_password: X43ofljfksjfkhfr3fkh
-    state: present
-    archivelog: False
-  register: _
-  failed_when: _.failed
-
-- name: 'switch database into archivelog mode'
-  oracle_db:
-    <<: *con_param
-    db_name: "TESTDB"
-    storage_type: ASM
-    datafile_dest: "{{ oracle_asm_dg }}"
-    recoveryfile_dest: "{{ oracle_asm_dg }}"
-    sys_password: X43ofljfksjfkhfr3fkh
-    archivelog: True
     state: present
   register: _
   failed_when: _.failed
 
-- name: 'switch database add flashback mode'
+- name: 'create database TESTDB_A'
   oracle_db:
     <<: *con_param
-    db_name: "TESTDB"
+    db_name: "TESTDB_A"
     storage_type: ASM
     datafile_dest: "{{ oracle_asm_dg }}"
     recoveryfile_dest: "{{ oracle_asm_dg }}"
     sys_password: X43ofljfksjfkhfr3fkh
-    archivelog: True
-    flashback: True
     state: present
   register: _
   failed_when: _.failed
 
-- name: 'turn archivelog and flashback mode off'
+- name: 'create database TESTDBA unique_name TESTDB_A'
   oracle_db:
     <<: *con_param
-    db_name: "TESTDB"
+    db_name: "TESTDD"
+    db_unique_name: "TESTDB_A"    
     storage_type: ASM
     datafile_dest: "{{ oracle_asm_dg }}"
     recoveryfile_dest: "{{ oracle_asm_dg }}"
     sys_password: X43ofljfksjfkhfr3fkh
-    archivelog: False
-    flashback: False
     state: present
   register: _
   failed_when: _.failed
 
-- name: 'turn archivelog and flashback mode on'
-  oracle_db:
-    <<: *con_param
-    db_name: "TESTDB"
-    storage_type: ASM
-    datafile_dest: "{{ oracle_asm_dg }}"
-    recoveryfile_dest: "{{ oracle_asm_dg }}"
-    sys_password: X43ofljfksjfkhfr3fkh
-    archivelog: True
-    flashback: True
-    supplemental_logging: True
-    force_logging: True
-    state: present
-  register: _
-  failed_when: _.failed
-  
 - name: 'drop database'
   oracle_db:
     <<: *con_param
@@ -97,4 +64,22 @@
   register: _
   failed_when: _.failed
 
+- name: 'drop database'
+  oracle_db:
+    <<: *con_param
+    db_name: "TESTDD"
+    sys_password: X43ofljfksjfkhfr3fkh    
+    state: absent
+  register: _
+  failed_when: _.failed
+
+- name: 'drop database'
+  oracle_db:
+    <<: *con_param
+    db_name: "TESTDB_A"
+    sys_password: X43ofljfksjfkhfr3fkh    
+    state: absent
+  register: _
+  failed_when: _.failed
+  
 ...
