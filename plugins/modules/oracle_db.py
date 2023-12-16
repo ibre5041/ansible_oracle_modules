@@ -455,13 +455,13 @@ def create_db(module):
         command += ' -initParams ' + ",".join(["{}:{}".format(_[0], str(_[1])) for _ in paramslist.items()])
 
     msg = "command: %s" % command
-    module.warn(msg)
+    # module.warn(msg)
     # module.fail_json(msg=msg, changed=False)
     env = {'ORACLE_HOME': oracle_home, 'PATH': '%s/bin/:/bin:/sbin:/usr/bin:/usr/sbin' % oracle_home}
     (rc, stdout, stderr) = module.run_command(command, environ_update=env)
-    module.warn('dcdba: %s ' % stdout)
-    module.warn('dcdba: %s ' % stderr)
-    module.warn('dcdba: %s ' % rc)
+    # module.warn('dcdba: %s ' % stdout)
+    # module.warn('dcdba: %s ' % stderr)
+    # module.warn('dcdba: %s ' % rc)
     if rc != 0:
         msg = 'Error - STDOUT: %s, STDERR: %s, COMMAND: %s' % (stdout, stderr, command)
         module.fail_json(msg=msg, changed=False)
@@ -529,7 +529,7 @@ def guess_oracle_sid(module, ohomes, fail=True):
 
 
 def ensure_db_state(module, ohomes, newdb):
-    module.warn('ensure_db_state')
+    # module.warn('ensure_db_state')
     db_name        = module.params["db_name"]
     archivelog     = module.params["archivelog"]
     force_logging  = module.params["force_logging"]
@@ -926,7 +926,7 @@ def main():
         service_name = "%s.%s" % (service_name, domain)
 
     module.params["service_name"] = service_name
-    module.warn("service_name {}".format(service_name))
+    # module.warn("service_name {}".format(service_name))
 
     if state == 'started':
         sid = guess_oracle_sid(module, ohomes)

@@ -1,0 +1,6 @@
+---
+- include_tasks: "simple.yml"
+- include_tasks: "rac_with_unique_name.yml"
+- include_tasks: "db_atributes.yml"
+
+...
