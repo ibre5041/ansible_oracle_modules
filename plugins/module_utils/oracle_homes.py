@@ -168,7 +168,7 @@ class oracle_homes():
                                     (_, ORACLE_HOME,) = line.strip().split('=')
                                 proc.poll()
                                 # The EOF condition on PIPE is signalized by read() returning zero bytes
-                                if proc.returncode and not l:
+                                if not l:
                                     break
                         pass                    
                     if not ORACLE_HOME:
