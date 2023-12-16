@@ -1,5 +1,14 @@
 ---
 
+- name: "define db parameters"
+  set_fact:
+    connection_parameters: &con_param
+      oracle_home: "{{ oracle_home }}"  
+
+- name: 'Connection paramters - see or use integration_config.yml.template'
+  debug:
+    var: connection_parameters
+
 - name: 'drop database'
   oracle_db:
     <<: *con_param
@@ -14,6 +23,7 @@
     db_name: "TESTDB"
     storage_type: ASM
     datafile_dest: "{{ oracle_asm_dg }}"
+    recoveryfile_dest: "{{ oracle_asm_dg }}"
     sys_password: X43ofljfksjfkhfr3fkh
     state: present
     archivelog: False
@@ -26,6 +36,7 @@
     db_name: "TESTDB"
     storage_type: ASM
     datafile_dest: "{{ oracle_asm_dg }}"
+    recoveryfile_dest: "{{ oracle_asm_dg }}"
     sys_password: X43ofljfksjfkhfr3fkh
     archivelog: True
     state: present
@@ -38,6 +49,7 @@
     db_name: "TESTDB"
     storage_type: ASM
     datafile_dest: "{{ oracle_asm_dg }}"
+    recoveryfile_dest: "{{ oracle_asm_dg }}"
     sys_password: X43ofljfksjfkhfr3fkh
     archivelog: True
     flashback: True
@@ -51,6 +63,7 @@
     db_name: "TESTDB"
     storage_type: ASM
     datafile_dest: "{{ oracle_asm_dg }}"
+    recoveryfile_dest: "{{ oracle_asm_dg }}"
     sys_password: X43ofljfksjfkhfr3fkh
     archivelog: False
     flashback: False
@@ -64,6 +77,7 @@
     db_name: "TESTDB"
     storage_type: ASM
     datafile_dest: "{{ oracle_asm_dg }}"
+    recoveryfile_dest: "{{ oracle_asm_dg }}"
     sys_password: X43ofljfksjfkhfr3fkh
     archivelog: True
     flashback: True
