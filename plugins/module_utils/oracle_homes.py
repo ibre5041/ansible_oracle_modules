@@ -13,14 +13,16 @@ import subprocess
 import socket
 from pwd import getpwuid
 from xml.dom import minidom
+from collections import namedtuple
+
 
 class oracle_homes():
 
-    def __init__(self, module = None):
+    def __init__(self, module=None):
         self.facts_item = {}
         self.running_only = False
         self.open_only = False
-        self.writable_only = False        
+        self.writable_only = False
         self.oracle_restart = False
         self.oracle_crs = False
         self.oracle_standalone = True
@@ -31,7 +33,7 @@ class oracle_homes():
         self.ora_inventory = None
         self.orabase = None
         self.crsctl = None
-        self.module = module      # possible reference onto AnsibleModule
+        self.module = module  # possible reference onto AnsibleModule
 
         # Check whether CRS/HAS is installed
         try:
@@ -81,19 +83,16 @@ class oracle_homes():
         except:
             pass
 
-        
-    def module_warn(msg):
+    def module_warn(self, msg):
         if self.module:
-            module.warn(msg)
+            self.module.warn(msg)
 
-
-    def module_fail_json(msg='', changed=False):
+    def module_fail_json(self, msg='', changed=False):
         if self.module:
-            module.fail_json(msg=msg, changed=changed)
+            self.module.fail_json(msg=msg, changed=changed)
         else:
             os.exit(1)
 
-        
     def parse_oratab(self):
         # Reads SID and ORACLE_HOME from oratab
         with open('/etc/oratab', 'r') as oratab:
@@ -106,6 +105,67 @@ class oracle_homes():
 
                 ORACLE_SID, ORACLE_HOME, _ = line.split(':')
                 self.add_sid(ORACLE_SID=ORACLE_SID, ORACLE_HOME=ORACLE_HOME)
+
+    def parse_crs_output(self, lines):
+        attributes = dict()
+        while lines:
+            try:
+                line = lines.pop(0)
+                (key, value) = line.split('=', 1)
+                if value:
+                    attributes.update({key: value})
+            except ValueError as e:
+                break
+
+        crsname = ORACLE_HOME = ORACLE_SID = DB_UNIQUE_NAME = None
+        try:
+            crsname = attributes['NAME'].split('.')[1]
+        except KeyError:
+            pass
+
+        try:
+            ORACLE_HOME = attributes['ORACLE_HOME']
+        except KeyError:
+            pass
+
+        try:
+            if attributes['TYPE'] == 'ora.asm.type':
+                ORACLE_HOME = self.crs_home
+        except KeyError:
+            pass
+
+        try:
+            DB_UNIQUE_NAME = attributes['DB_UNIQUE_NAME']
+        except KeyError:
+            pass
+
+        try:
+            ORACLE_SID = attributes['GEN_USR_ORA_INST_NAME'] or ORACLE_SID
+        except KeyError:
+            pass
+        try:
+            ORACLE_SID = attributes['USR_ORA_INST_NAME'] or ORACLE_SID
+        except KeyError:
+            pass
+
+        hostname = socket.gethostname().split('.')[0]
+        try:
+            k = 'GEN_USR_ORA_INST_NAME@SERVERNAME({})'.format(hostname)
+            ORACLE_SID = attributes[k] or ORACLE_SID
+        except KeyError:
+            pass
+        try:
+            k = 'USR_ORA_INST_NAME@SERVERNAME({})'.format(hostname)
+            ORACLE_SID = attributes[k] or ORACLE_SID
+        except KeyError:
+            pass
+
+        Database = namedtuple('Database', ['ORACLE_SID', 'ORACLE_HOME', 'DB_UNIQUE_NAME', 'crsname'])
+        if ORACLE_SID:
+            return Database(ORACLE_SID, ORACLE_HOME, DB_UNIQUE_NAME, crsname)
+        else:
+            return None
+
 
     def list_processes(self):
         """
@@ -133,13 +193,6 @@ class oracle_homes():
                     exefile = os.path.join(piddir, 'exe')
 
                     try:
-                        if self.facts_item[ORACLE_SID]['ORACLE_HOME']:
-                            self.add_sid(ORACLE_SID, running=True)
-                            continue
-                    except:
-                        pass
-
-                    try:
                         if not os.path.islink(exefile):
                             continue
                         oraclefile = os.readlink(exefile)
@@ -156,21 +209,27 @@ class oracle_homes():
                             if cmd_line.startswith('asm'):
                                 dfiltertype = 'ora.asm.type'
                                 ORACLE_HOME = self.crs_home
-                            else:
-                                dfiltertype = 'ora.database.type'
-                            dfilter = '((TYPE = {}) and (GEN_USR_ORA_INST_NAME = {}))'.format(dfiltertype, ORACLE_SID)
-                            proc = subprocess.Popen([self.crsctl, 'stat', 'res', '-p', '-w', dfilter],
-                                                    stdout=subprocess.PIPE)
-                            (ORACLE_HOME, DB_UNIQUE_NAME) = (None, None)
-                            for l in iter(proc.stdout.readline, None):
-                                line = l.decode('utf-8')
-                                if line.startswith('ORACLE_HOME='):
-                                    (_, ORACLE_HOME,) = line.strip().split('=')
-                                proc.poll()
-                                # The EOF condition on PIPE is signalized by read() returning zero bytes
-                                if not l:
-                                    break
-                        pass                    
+                                self.add_sid(ORACLE_SID=ORACLE_SID, ORACLE_HOME=ORACLE_HOME, running=True)
+                                continue
+                            dfiltertype = 'ora.database.type'
+                            dfilter = '((TYPE = {}) and ((GEN_USR_ORA_INST_NAME = {}) or (USR_ORA_INST_NAME = {}))'. \
+                                format(dfiltertype, ORACLE_SID, ORACLE_SID)
+                            proc = subprocess.Popen([self.crsctl, 'stat', 'res', '-p', '-w', dfilter], stdout=subprocess.PIPE)
+                            try:
+                                (stdout, stderr) = proc.communicate(timeout=10)
+                            except subprocess.TimeoutExpired:
+                                proc.kill()
+                                (stdout, stderr) = proc.communicate()
+                            lines = stdout.decode('utf-8').splitlines()
+                            while lines:
+                                db = self.parse_crs_output(lines)
+                                if db:
+                                    ORACLE_HOME = db.ORACLE_HOME
+                                    self.add_sid(ORACLE_SID=db.ORACLE_SID,
+                                                 ORACLE_HOME=db.ORACLE_HOME,
+                                                 DB_UNIQUE_NAME=db.DB_UNIQUE_NAME,
+                                                 crsname=db.crsname,
+                                                 running=True)
                     if not ORACLE_HOME:
                         own_uid = os.geteuid()
                         ora_uid = os.stat(cmd_line_file).st_uid
@@ -179,7 +238,8 @@ class oracle_homes():
                         else:
                             crs_uid = None
                         if own_uid != 0 and own_uid != ora_uid:
-                            module_fail_json(msg='I(uid={}) am not oracle process owner(uid={}) and I am not root'.format(own_uid, ora_uid), changed=False)
+                            msg = 'I(uid={}) am not oracle process owner(uid={}) and I am not root'.format(own_uid, ora_uid)
+                            self.module_fail_json(msg, changed=False)
 
                     self.add_sid(ORACLE_SID=ORACLE_SID, ORACLE_HOME=ORACLE_HOME, running=True)
 
@@ -189,37 +249,24 @@ class oracle_homes():
                 pass
 
     def list_crs_instances(self):
-        hostname = socket.gethostname().split('.')[0]
         if self.crsctl:
-            for dfiltertype in ['ora.database.type']:  # ora.asm.type does not report ORACLE_HOME
-                # for dfiltertype in ['ora.asm.type', 'ora.database.type']:
+            for dfiltertype in ['ora.database.type', 'ora.asm.type']:# NOTE does not report ORACLE_HOME
                 dfilter = '(TYPE = {})'.format(dfiltertype)
-                proc = subprocess.Popen([self.crsctl, 'stat', 'res', '-p', '-w', dfilter], stdout=subprocess.PIPE)
-                (ORACLE_HOME, ORACLE_SID, DB_UNIQUE_NAME) = (None, None, None)
-                for l in iter(proc.stdout.readline, None):
-                    line = l.decode('utf-8').strip()
-                    if not line:
-                        (ORACLE_HOME, ORACLE_SID) = (None, None)
-                    # if not line.startswith('GEN_USR_ORA_INST_NAME') and \
-                    #         not not line.startswith('GEN_USR_ORA_INST_NAME') \
-                    #         and not line.startswith('ORACLE_HOME=') and line:
-                    #     continue
-                    # print(str(l))
-                    if 'SERVERNAME({})'.format(hostname) in line and line.startswith('GEN_USR_ORA_INST_NAME'):
-                        (_, ORACLE_SID,) = line.strip().split('=')
-                    if 'SERVERNAME({})'.format(hostname) in line and line.startswith('USR_ORA_INST_NAME'):
-                        (_, ORACLE_SID,) = line.strip().split('=')
-                    if line.startswith('ORACLE_HOME='):
-                        (_, ORACLE_HOME,) = line.strip().split('=')
-                    if line.startswith('DB_UNIQUE_NAME='):
-                        (_, DB_UNIQUE_NAME,) = line.strip().split('=')
-                    if ORACLE_SID and ORACLE_HOME:
-                        self.add_sid(ORACLE_SID=ORACLE_SID, ORACLE_HOME=ORACLE_HOME, DB_UNIQUE_NAME=DB_UNIQUE_NAME)
-                        (ORACLE_HOME, ORACLE_SID) = (None, None)
-                    proc.poll()
-                    # The EOF condition on PIPE is signalized by read() returning zero bytes
-                    if not l:
-                        break
+                proc = subprocess.Popen([self.crsctl, 'stat', 'res', '-p', '-w', dfilter], stdout=subprocess.PIPE,
+                                        stderr=subprocess.PIPE)
+                try:
+                    (stdout, stderr) = proc.communicate(timeout=10)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+                    (stdout, stderr) = proc.communicate()
+                lines = stdout.decode('utf-8').splitlines()
+                while lines:
+                    db = self.parse_crs_output(lines)
+                    if db:
+                        self.add_sid(ORACLE_SID=db.ORACLE_SID,
+                                     ORACLE_HOME=db.ORACLE_HOME,
+                                     DB_UNIQUE_NAME=db.DB_UNIQUE_NAME,
+                                     crsname=db.crsname)
 
     def base_from_home(self, ORACLE_HOME):
         """ execute $ORACLE_HOME/bin/orabase to get ORACLE_BASE """
@@ -264,15 +311,17 @@ class oracle_homes():
                 , 'ORACLE_BASE': ORACLE_BASE
                 , 'home_type': component_name
                 , 'owner': oracle_owner}
-            
-    def add_sid(self, ORACLE_SID, ORACLE_HOME=None, DB_UNIQUE_NAME=None, running=False):
+
+    def add_sid(self, ORACLE_SID, ORACLE_HOME=None, DB_UNIQUE_NAME=None, crsname=None, running=None):
         if ORACLE_SID in self.facts_item:
             sid = self.facts_item[ORACLE_SID]
             if ORACLE_HOME:
                 sid['ORACLE_HOME'] = ORACLE_HOME
+            if DB_UNIQUE_NAME:
+                sid['DB_UNIQUE_NAME'] = DB_UNIQUE_NAME
+            if crsname:
+                sid['crsname'] = crsname
             if running:
-                sid['running'] = running
-            if running is not None and sid['running'] is not True:
                 sid['running'] = running
         else:
             self.add_home(ORACLE_HOME)
@@ -281,35 +330,36 @@ class oracle_homes():
             elif ORACLE_HOME:
                 ORACLE_BASE = self.base_from_home(ORACLE_HOME)
             else:
-                ORACLE_BASE = None            
+                ORACLE_BASE = None
             self.facts_item[ORACLE_SID] = {'ORACLE_SID': ORACLE_SID
                 , 'ORACLE_HOME': ORACLE_HOME
                 , 'ORACLE_BASE': ORACLE_BASE
                 , 'DB_UNIQUE_NAME': DB_UNIQUE_NAME
+                , 'crsname': crsname
                 , 'running': running}
-            
+
     def query_db_status(self, oracle_owner, oracle_home, oracle_sid):
         sqlplus_path = Path(oracle_home, 'bin', 'sqlplus')
         args = [str(sqlplus_path), '-S', '/', 'as', 'sysdba']
         pw_record = pwd.getpwnam(oracle_owner)
-        user_name      = pw_record.pw_name
-        user_home_dir  = pw_record.pw_dir
-        user_uid       = pw_record.pw_uid
-        user_gid       = pw_record.pw_gid
-        user_gids      = os.getgrouplist(user_name, user_gid)
+        user_name = pw_record.pw_name
+        user_home_dir = pw_record.pw_dir
+        user_uid = pw_record.pw_uid
+        user_gid = pw_record.pw_gid
+        user_gids = os.getgrouplist(user_name, user_gid)
         env = os.environ.copy()
-        env[ 'HOME'     ]   = user_home_dir
-        env[ 'LOGNAME'  ]   = user_name
-        env[ 'PWD'      ]   = '/'
-        env[ 'USER'     ]   = user_name
-        env[ 'ORACLE_HOME'] = oracle_home
-        env[ 'ORACLE_SID']  = oracle_sid
+        env['HOME'] = user_home_dir
+        env['LOGNAME'] = user_name
+        env['PWD'] = '/'
+        env['USER'] = user_name
+        env['ORACLE_HOME'] = oracle_home
+        env['ORACLE_SID'] = oracle_sid
 
         if os.getuid() == 0:
             process = subprocess.Popen(args,
                                        preexec_fn=self.demote(user_uid, user_gid, user_gids),
                                        cwd='/', env=env, stdout=subprocess.PIPE, stdin=subprocess.PIPE)
-        elif os.getuid() == user_uid:        
+        elif os.getuid() == user_uid:
             process = subprocess.Popen(args,
                                        cwd='/', env=env, stdout=subprocess.PIPE, stdin=subprocess.PIPE)
         else:
@@ -325,27 +375,27 @@ class oracle_homes():
         """
 
         header = None
-        delim  = False
-        value  = None
-        r      = {}
+        delim = False
+        value = None
+        r = {}
         out = process.communicate(input=sql.encode(), timeout=5)
         for l in out[0].decode('utf-8').splitlines():
-            #module_warn("{}:{}".format(oracle_sid,l.rstrip()))
+            # module_warn("{}:{}".format(oracle_sid,l.rstrip()))
             if l.strip() in ('STATUS', 'OPEN_MODE', 'ORA_DG_ON', 'DATABASE_ROLE'):
                 header = l.strip()
-                delim  = False
-                value  = None
+                delim = False
+                value = None
             elif l.rstrip().startswith('-------'):
-                delim  = True
+                delim = True
                 value = None
             elif l.rstrip() and header and delim and value is None:
                 value = l.strip()
                 r[header] = value
                 header = None
-                delim  = False
-                value  = False        
-        #module_warn(str(r))
-        #module_warn("Exit code {}".format(process.returncode))
+                delim = False
+                value = False
+                # module_warn(str(r))
+        # module_warn("Exit code {}".format(process.returncode))
         if oracle_sid.startswith('+ASM') and r['STATUS'] == 'STARTED':
             return ['ASM', 'STARTED']
         elif oracle_sid.startswith('+ASM'):
@@ -356,13 +406,13 @@ class oracle_homes():
         elif r['STATUS'] == 'MOUNTED' and int(r['ORA_DG_ON']):
             return ['MOUNTED', 'STANDBY']
         elif r['STATUS'] == 'MOUNTED':
-            return ['MOUNTED']    
+            return ['MOUNTED']
         elif r['STATUS'] == 'OPEN' and int(r['ORA_DG_ON']):
             return ['OPEN', 'PRIMARY', r['OPEN_MODE']]
         elif r['STATUS'] == 'OPEN':
             return ['OPEN', r['OPEN_MODE']]
 
-    @staticmethod    
+    @staticmethod
     def demote(user_uid, user_gid, supplementary_groups):
         def result():
             os.setgroups(supplementary_groups)
@@ -370,6 +420,7 @@ class oracle_homes():
             os.setegid(user_gid)
             os.setuid(user_uid)
             os.seteuid(user_uid)
+
         return result
 
 
@@ -384,7 +435,8 @@ def main():
             sqlplus_path = Path(h.facts_item[sid]['ORACLE_HOME'], 'bin', 'oracle')
             oracle_owner = getpwuid(os.stat(sqlplus_path).st_uid).pw_name
             h.facts_item[sid]['owner'] = oracle_owner
-        except:
+        except BaseException as e:
+            print(e)
             pass
 
         if h.facts_item[sid]["running"]:
@@ -395,7 +447,8 @@ def main():
         else:
             h.facts_item[sid]['status'] = ['DOWN']
 
-    print(str(h.homes))
+    # print(str(h.homes))
+    print(str(h.facts_item))
 
 
 if __name__ == '__main__':
