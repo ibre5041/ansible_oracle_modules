@@ -14,6 +14,7 @@ import socket
 from pwd import getpwuid
 from xml.dom import minidom
 from collections import namedtuple
+import json
 
 
 class oracle_homes():
@@ -182,6 +183,7 @@ class oracle_homes():
         #
         """
         for cmd_line_file in glob.glob('/proc/[0-9]*/cmdline'):
+            ORACLE_SID = ORACLE_HOME = None
             try:
                 with open(cmd_line_file) as x:
                     cmd_line = x.read().rstrip("\x00")
@@ -192,61 +194,62 @@ class oracle_homes():
                     piddir = os.path.dirname(cmd_line_file)
                     exefile = os.path.join(piddir, 'exe')
 
+            except FileNotFoundError as e: # Python3
+            #except EnvironmentError as e: # Python2
+                #print("Missing file ignored: {} ({})".format(cmd_line_file, e))
+                continue
+
+            try:
+                if not os.path.islink(exefile):
+                    continue
+                oraclefile = os.readlink(exefile)
+                ORACLE_HOME = os.path.dirname(oraclefile)
+                ORACLE_HOME = os.path.dirname(ORACLE_HOME)
+            except:
+                # In case oracle binary is suid, ptrace does not work,
+                # stat/readlink /proc/<pid>/exec does not work
+                # fails with: Permission denied
+                # Then try to query the same information from CRS (if possible)
+
+                if self.crsctl:
+                    if cmd_line.startswith('asm'):
+                        dfiltertype = 'ora.asm.type'
+                        ORACLE_HOME = self.crs_home
+                        self.add_sid(ORACLE_SID=ORACLE_SID, ORACLE_HOME=ORACLE_HOME, running=True)
+                        continue
+                    dfiltertype = 'ora.database.type'
+                    dfilter = '((TYPE = {}) and ((GEN_USR_ORA_INST_NAME = {}) or (USR_ORA_INST_NAME = {}))'. \
+                        format(dfiltertype, ORACLE_SID, ORACLE_SID)
+                    proc = subprocess.Popen([self.crsctl, 'stat', 'res', '-p', '-w', dfilter], stdout=subprocess.PIPE)
                     try:
-                        if not os.path.islink(exefile):
-                            continue
-                        oraclefile = os.readlink(exefile)
-                        ORACLE_HOME = os.path.dirname(oraclefile)
-                        ORACLE_HOME = os.path.dirname(ORACLE_HOME)
-                    except:
-                        # In case oracle binary is suid, ptrace does not work,
-                        # stat/readlink /proc/<pid>/exec does not work
-                        # fails with: Permission denied
-                        # Then try to query the same information from CRS (if possible)
-                        ORACLE_HOME = None
+                        (stdout, stderr) = proc.communicate(timeout=10)
+                    except subprocess.TimeoutExpired:
+                        proc.kill()
+                        (stdout, stderr) = proc.communicate()
+                    lines = stdout.decode('utf-8').splitlines()
+                    while lines:
+                        db = self.parse_crs_output(lines)
+                        if db:
+                            ORACLE_HOME = db.ORACLE_HOME
+                            self.add_sid(ORACLE_SID=db.ORACLE_SID,
+                                         ORACLE_HOME=db.ORACLE_HOME,
+                                         DB_UNIQUE_NAME=db.DB_UNIQUE_NAME,
+                                         crsname=db.crsname,
+                                         running=True)
+            # ORACLE_HOME was not detected, this script was probably executed with insufficient privileges
+            if not ORACLE_HOME:
+                own_uid = os.geteuid()
+                ora_uid = os.stat(cmd_line_file).st_uid
+                if self.crsctl:
+                    crs_uid = os.stat(self.crsctl).st_uid
+                else:
+                    crs_uid = None
+                if own_uid != 0 and own_uid != ora_uid:
+                    msg = 'I(uid={}) am not oracle process owner(uid={}) and I am not root'.format(own_uid, ora_uid)
+                    self.module_fail_json(msg, changed=False)
 
-                        if self.crsctl:
-                            if cmd_line.startswith('asm'):
-                                dfiltertype = 'ora.asm.type'
-                                ORACLE_HOME = self.crs_home
-                                self.add_sid(ORACLE_SID=ORACLE_SID, ORACLE_HOME=ORACLE_HOME, running=True)
-                                continue
-                            dfiltertype = 'ora.database.type'
-                            dfilter = '((TYPE = {}) and ((GEN_USR_ORA_INST_NAME = {}) or (USR_ORA_INST_NAME = {}))'. \
-                                format(dfiltertype, ORACLE_SID, ORACLE_SID)
-                            proc = subprocess.Popen([self.crsctl, 'stat', 'res', '-p', '-w', dfilter], stdout=subprocess.PIPE)
-                            try:
-                                (stdout, stderr) = proc.communicate(timeout=10)
-                            except subprocess.TimeoutExpired:
-                                proc.kill()
-                                (stdout, stderr) = proc.communicate()
-                            lines = stdout.decode('utf-8').splitlines()
-                            while lines:
-                                db = self.parse_crs_output(lines)
-                                if db:
-                                    ORACLE_HOME = db.ORACLE_HOME
-                                    self.add_sid(ORACLE_SID=db.ORACLE_SID,
-                                                 ORACLE_HOME=db.ORACLE_HOME,
-                                                 DB_UNIQUE_NAME=db.DB_UNIQUE_NAME,
-                                                 crsname=db.crsname,
-                                                 running=True)
-                    if not ORACLE_HOME:
-                        own_uid = os.geteuid()
-                        ora_uid = os.stat(cmd_line_file).st_uid
-                        if self.crsctl:
-                            crs_uid = os.stat(self.crsctl).st_uid
-                        else:
-                            crs_uid = None
-                        if own_uid != 0 and own_uid != ora_uid:
-                            msg = 'I(uid={}) am not oracle process owner(uid={}) and I am not root'.format(own_uid, ora_uid)
-                            self.module_fail_json(msg, changed=False)
+            self.add_sid(ORACLE_SID=ORACLE_SID, ORACLE_HOME=ORACLE_HOME, running=True)
 
-                    self.add_sid(ORACLE_SID=ORACLE_SID, ORACLE_HOME=ORACLE_HOME, running=True)
-
-            # except FileNotFoundError: # Python3
-            except EnvironmentError as e:
-                # print("Missing file ignored: {} ({})".format(cmd_line_file, e))
-                pass
 
     def list_crs_instances(self):
         if self.crsctl:
@@ -447,8 +450,7 @@ def main():
         else:
             h.facts_item[sid]['status'] = ['DOWN']
 
-    # print(str(h.homes))
-    print(str(h.facts_item))
+    print(json.dumps(h.facts_item, sort_keys=True, indent=2))
 
 
 if __name__ == '__main__':
