@@ -18,6 +18,14 @@ options:
       - If not provided, environment variable ORACLE_HOME has to be set
     required: False
     aliases: ['oh']
+  sid:
+    description:
+      - Sid(System identifier) of newly created database
+      - NOTE: Database can have SID, DB_NAME, DB_UNIQUE_NAME and Cluster resource name. DBCA is quite cryptic when generating these names
+      - When sid is omitted, db_name=TESTDB, db_unique_name=TESTDB_LA, ORACLE_SID becomes TESTDBLA1, Cluster resource name becomes testdb_la
+      - db_unique_name has precedence over db_name when sid is not specified
+    required: False
+    aliases: ['oracle_sid']  
   db_name:
     description: The name of the database
     required: True
@@ -298,7 +306,7 @@ def check_db_exists(module, ohomes):
         return True
 
 
-def create_db(module):
+def create_db(module, ohomes):
     oracle_home         = module.params["oracle_home"]
     db_name             = module.params["db_name"]
     db_unique_name      = module.params["db_unique_name"]
@@ -339,6 +347,20 @@ def create_db(module):
             break
     else:
         skip_memory = False
+
+    # Override dbconfig_type on RAC when not specified
+    if not dbconfig_type and ohomes.oracle_crs:
+        module.params['dbconfig_type'] = dbconfig_type = 'RAC'
+
+    if not nodelist and dbconfig_type == 'RAC':
+        olsnodes_bin = os.path.join(os.path.dirname(ohomes.crsctl), 'olsnodes')
+        (rc, stdout, stderr) = module.run_command(olsnodes_bin)
+        if rc == 0:
+            nodelist = stdout.splitlines()
+            module.params['nodelist'] = nodelist
+        else:
+            module.fail_json(msg="Error executing olsnodes, {}, {}".format(stdout, stderr),
+                             changed=True, stdout=stdout, stderr=stderr)
 
     command = "%s/bin/dbca -createDatabase -silent " % oracle_home
     if responsefile is not None:
@@ -441,6 +463,10 @@ def create_db(module):
 
     paramslist = dict()
     if db_unique_name:
+        # DBCA Silent Mode Is Not Setting DB_UNIQUE_NAME Even Though It Is Specified In DBCA Template File. (Doc ID 1508337.1)
+        # The workaround is to set the DB_UNIQUE_NAME in the command line parameter '-initParams db_unique_name=<a value>', e.g.
+        # TODO SID parameter?
+        # https://community.oracle.com/mosc/discussion/4328864/dbca-create-database-with-db-name-db-unique-name
         paramslist.update({'db_name': db_name})
         paramslist.update({'db_unique_name': db_unique_name})
 
@@ -452,11 +478,10 @@ def create_db(module):
 
     if paramslist:
         # Convert dict to list of k:v pairs and then join it.
-        command += ' -initParams ' + ",".join(["{}:{}".format(_[0], str(_[1])) for _ in paramslist.items()])
+        command += ' -initParams ' + ",".join(["{}={}".format(_[0], str(_[1])) for _ in paramslist.items()])
 
     msg = "command: %s" % command
-    # module.warn(msg)
-    # module.fail_json(msg=msg, changed=False)
+    module.warn(msg)
     env = {'ORACLE_HOME': oracle_home, 'PATH': '%s/bin/:/bin:/sbin:/usr/bin:/usr/sbin' % oracle_home}
     (rc, stdout, stderr) = module.run_command(command, environ_update=env)
     # module.warn('dcdba: %s ' % stdout)
@@ -464,10 +489,9 @@ def create_db(module):
     # module.warn('dcdba: %s ' % rc)
     if rc != 0:
         msg = 'Error - STDOUT: %s, STDERR: %s, COMMAND: %s' % (stdout, stderr, command)
-        module.fail_json(msg=msg, changed=False)
+        module.fail_json(msg=msg, changed=True, stdout=stdout, stderr=stderr)
     else:
-        verbosemsg = 'STDOUT: %s,  COMMAND: %s' % (stdout, command)
-        return True, verbosemsg
+        return 'STDOUT: %s, STDERR: %s COMMAND: %s' % (stdout, stderr, command)
 
 
 def remove_db(module, ohomes):
@@ -476,13 +500,14 @@ def remove_db(module, ohomes):
     db_unique_name = module.params["db_unique_name"] or ''
     sys_password = module.params["sys_password"]
 
-    # if ohomes.oracle_gi_managed:
-    #     # if db_unique_name:
-    #     #     db_to_remove = db_unique_name
-    #     # else:
-    #     #     db_to_remove = db_name
-    # else:
-    db_to_remove = db_name
+    sid = guess_oracle_sid(module, ohomes)
+    if ohomes.oracle_gi_managed:
+        if db_unique_name:
+            db_to_remove = db_unique_name
+        else:
+            db_to_remove = db_name
+    else:
+        db_to_remove = db_name
 
     dbca = os.path.join(oracle_home, 'bin', 'dbca')
     command = [dbca, '-deleteDatabase', '-silent', '-sourceDB', db_to_remove, '-sysDBAUserName', 'sys', '-sysDBAPassword', sys_password]
@@ -825,7 +850,7 @@ def main():
     module = AnsibleModule(
         argument_spec = dict(
             oracle_home         = dict(default=None, aliases=['oh']),
-            sid                 = dict(required=False),
+            sid                 = dict(required=False, aliases=['oracle_sid']),
             db_name             = dict(required=True, aliases=['db', 'database_name', 'name']),
             db_unique_name      = dict(required=False, aliases=['dbunqn', 'unique_name']),
             sys_password        = dict(required=False, no_log=True, aliases=['syspw', 'sysdbapassword', 'sysdbapw']),
@@ -900,22 +925,6 @@ def main():
     ohomes.parse_oratab()
     #ohomes.oracle_gi_managed = False# TODO REMOVE - override GI presence for testing
 
-    # Override dbconfig_type on RAC when not specified
-    dbconfig_type = module.params['dbconfig_type']
-    if not dbconfig_type and ohomes.oracle_crs:
-        module.params['dbconfig_type'] = dbconfig_type = 'RAC'
-
-    nodelist = module.params["nodelist"]
-    if not nodelist and dbconfig_type == 'RAC':
-        olsnodes_bin = os.path.join(os.path.dirname(ohomes.crsctl), 'olsnodes')
-        (rc, stdout, stderr) = module.run_command(olsnodes_bin)
-        if rc == 0:
-            nodelist = stdout.splitlines()
-            module.params['nodelist'] = nodelist
-        else:
-            module.fail_json(msg="Error executing olsnodes, {}, {}".format(stdout, stderr),
-                             changed=True, stdout=stdout, stderr=stderr)
-
     # Connection details for database
     if db_unique_name:
         service_name = db_unique_name
@@ -965,14 +974,12 @@ def main():
 
     elif state == 'present':
         if not check_db_exists(module, ohomes):
-            if create_db(module):
-                # Try to detect ORACLE_SID of the new running database
-                ohomes.list_crs_instances()
-                ohomes.list_processes()
-                ohomes.parse_oratab()
-                ensure_db_state(module, ohomes, newdb=True)
-            else:
-                module.fail_json(msg=msg, changed=False)
+            msg = create_db(module, ohomes)
+            # Try to detect ORACLE_SID of the new running database
+            ohomes.list_crs_instances()
+            ohomes.list_processes()
+            ohomes.parse_oratab()
+            ensure_db_state(module, ohomes, newdb=True)
         else:
             ensure_db_state(module, ohomes, newdb=False)
 
