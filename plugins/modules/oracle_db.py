@@ -747,18 +747,20 @@ def stop_db(module, ohomes):
     oracle_home    = module.params["oracle_home"]
     db_name        = module.params["db_name"]
     db_unique_name = module.params["db_unique_name"]
-
+    sid = guess_oracle_sid(module, ohomes)
     if ohomes.oracle_gi_managed:
-        # if db_unique_name:
-        #     db_name = db_unique_name
+        crsname = ohomes.facts_item[sid]['crsname']
+        if not crsname and db_unique_name:
+            crsname = db_unique_name
+        if not crsname:
+            crsname = db_name
         srvctl = os.path.join(oracle_home, 'bin', 'srvctl')
-        command = [srvctl, 'stop', 'database', '-d', db_name, '-o', 'immediate']
+        command = [srvctl, 'stop', 'database', '-d', crsname, '-o', 'immediate']
         (rc, stdout, stderr) = module.run_command(command)
         if rc != 0 or stdout.startswith('PRCD-') or stderr.startswith('PRCD-'):
             msg = 'Error - STDOUT: %s, STDERR: %s, COMMAND: %s' % (stdout, stderr, " ".join(command))
             module.fail_json(msg=msg, changed=False)
     else:
-        sid = guess_oracle_sid(module, ohomes)
         os.environ['ORACLE_SID'] = sid
         shutdown_sql = '''
         connect / as sysdba
@@ -778,18 +780,21 @@ def start_db(module, ohomes):
     oracle_home    = module.params["oracle_home"]
     db_name        = module.params["db_name"]
     db_unique_name = module.params["db_unique_name"]
+    sid = guess_oracle_sid(module, ohomes)
 
     if ohomes.oracle_gi_managed:
-        # if db_unique_name:
-        #     db_name = db_unique_name
+        crsname = ohomes.facts_item[sid]['crsname']
+        if not crsname and db_unique_name:
+            crsname = db_unique_name
+        if not crsname:
+            crsname = db_name
         srvctl = os.path.join(oracle_home, 'bin', 'srvctl')
-        command = [srvctl, 'start', 'database', '-d', db_name]
+        command = [srvctl, 'start', 'database', '-d', crsname]
         (rc, stdout, stderr) = module.run_command(command)
         if rc != 0 or stdout.startswith('PRCD') or stderr.startswith('PRCD'):
             msg = 'Error - STDOUT: %s, STDERR: %s, COMMAND: %s' % (stdout, stderr, " ".join(command))
             module.fail_json(msg=msg, changed=True, stdout=stdout, stderr=stderr)
     else:
-        sid = guess_oracle_sid(module, ohomes)
         os.environ['ORACLE_SID'] = sid
         startup_sql = '''
         connect / as sysdba
@@ -812,11 +817,17 @@ def start_instance(module, ohomes, open_mode, instance_name):
     sid = guess_oracle_sid(module, ohomes)
 
     if ohomes.oracle_gi_managed:
+        crsname = ohomes.facts_item[sid]['crsname']
+        if not crsname and db_unique_name:
+            crsname = db_unique_name
+        if not crsname:
+            crsname = db_name
+
         srvctl = os.path.join(oracle_home, 'bin', 'srvctl')
         if ohomes.facts_item[sid]['israc']:
-            command = [srvctl, 'start', 'instance', '-d', db_name, '-i', instance_name]
+            command = [srvctl, 'start', 'instance', '-d', crsname, '-i', instance_name]
         else:
-            command = [srvctl, 'start', 'database', '-d', db_name]
+            command = [srvctl, 'start', 'database', '-d', crsname]
         if open_mode:
             command.extend(['-o', open_mode])
         (rc, stdout, stderr) = module.run_command(command)
@@ -975,6 +986,8 @@ def main():
     elif state == 'present':
         if not check_db_exists(module, ohomes):
             msg = create_db(module, ohomes)
+            if 'WARNING' in msg:
+                module.warn(msg)
             # Try to detect ORACLE_SID of the new running database
             ohomes.list_crs_instances()
             ohomes.list_processes()
