@@ -13,6 +13,7 @@
   oracle_db:
     <<: *con_param
     db_name: "TESTDB"
+    db_unique_name: "TESTDB_A"    
     sys_password: X43ofljfksjfkhfr3fkh    
     state: absent
   register: _
@@ -50,6 +51,7 @@
   oracle_db:
     <<: *con_param
     db_name: "TESTDB"
+    db_unique_name: "TESTDB_A"    
     sys_password: X43ofljfksjfkhfr3fkh    
     state: absent
   register: _

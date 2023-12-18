@@ -1,5 +1,5 @@
 ---
-oracle_home: /oracle/u01/product/19.12.0.0
+oracle_home: /oracle/u01/product/19.21.0.0
 oracle_asm_dg: "+XDATA"
 
 ...
