@@ -236,6 +236,7 @@ EXAMPLES = '''
   oracle_db:
     oracle_home: '/oracle/u01/product/19.17.0.0'
     db_name: 'X01'
+    sys_password: "{{ sys_password }}"
     state: absent
 '''
 
