@@ -139,7 +139,7 @@ options:
   amm:
     description: Should Automatic Memory Management be used (memory_target, memory_max_target)
     required: False
-    Default: False
+    default: False
     choices: ['True', 'False']
   initparams:
     required: False
