@@ -1,3 +1,7 @@
+- https://astoradba.wordpress.com/2021/02/09/how-to-disable-mgmtdb/
+- crsctl stop res ora.crf -init -f -unsupported
+- crsctl modify resource ora.crf -attr AUTO_START=never -init -unsupported
+
 
 - oracle_db - create cluster database
 - oracle_db - module password/username ==> connect via listener
