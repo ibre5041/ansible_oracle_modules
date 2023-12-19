@@ -439,7 +439,8 @@ def main():
         ),
         required_together=[['username', 'password']],
         mutually_exclusive=[['schema_password', 'schema_password_hash']],
-        supports_check_mode=True
+        required_together=[['username', 'password']],
+        supports_check_mode=True,
     )
 
     schema = module.params["schema"]
