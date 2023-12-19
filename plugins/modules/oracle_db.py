@@ -147,7 +147,6 @@ options:
     description:
       - "List of key=value pairs"
       - 'e.g. initparams: { "sga_target": "1GB", "sga_max_size": "1GB" }'
-    required: False
   customscripts:
     description:
       - "List of scripts to run after database is created"
