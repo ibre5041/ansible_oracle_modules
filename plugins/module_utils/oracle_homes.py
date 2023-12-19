@@ -378,10 +378,10 @@ class oracle_homes():
         """
 
         header = None
-        delim = False
-        value = None
-        r = {}
-        out = process.communicate(input=sql.encode(), timeout=5)
+        delim  = False
+        value  = None
+        r      = {}
+        out = process.communicate(input=sql.encode(), timeout=10)
         for l in out[0].decode('utf-8').splitlines():
             # module_warn("{}:{}".format(oracle_sid,l.rstrip()))
             if l.strip() in ('STATUS', 'OPEN_MODE', 'ORA_DG_ON', 'DATABASE_ROLE'):
