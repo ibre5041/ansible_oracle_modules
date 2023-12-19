@@ -6,9 +6,9 @@ DOCUMENTATION = '''
 module: oracle_oratab
 short_description: Reads oratab to ansible_facts
 description:
-  - Reads SID and ORACLE_HOME path from oratab, crs and running processes to ansible_facts
-  - Should be able to detect all ORACLE_HOMEs on a server crs, restart, database, client, golden gate
-  - More datailed example is here: 
+  - "Reads SID and ORACLE_HOME path from oratab, crs and running processes to ansible_facts"
+  - "Should be able to detect all ORACLE_HOMEs on a server crs, restart, database, client, golden gate"
+  - "More datailed example is here:"
   - "https://github.com/ibre5041/ansible_oracle_modules_example/blob/main/oracle_oratab.yml"
 version_added: "3.0.0"
 options:

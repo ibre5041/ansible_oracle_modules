@@ -20,10 +20,10 @@ options:
     aliases: ['oh']
   sid:
     description:
-      - Sid(System identifier) of newly created database
-      - NOTE: Database can have SID, DB_NAME, DB_UNIQUE_NAME and Cluster resource name. DBCA is quite cryptic when generating these names
-      - When sid is omitted, db_name=TESTDB, db_unique_name=TESTDB_LA, ORACLE_SID becomes TESTDBLA1, Cluster resource name becomes testdb_la
-      - db_unique_name has precedence over db_name when sid is not specified
+      - "Sid(System identifier) of newly created database"
+      - "NOTE: Database can have SID, DB_NAME, DB_UNIQUE_NAME and Cluster resource name. DBCA is quite cryptic when generating these names"
+      - "When sid is omitted, db_name=TESTDB, db_unique_name=TESTDB_LA, ORACLE_SID becomes TESTDBLA1, Cluster resource name becomes testdb_la"
+      - "db_unique_name has precedence over db_name when sid is not specified"
     required: False
     aliases: ['oracle_sid']  
   db_name:
