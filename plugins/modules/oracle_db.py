@@ -10,7 +10,7 @@ description:
   - Stop/Start database
   - If a responsefile is available, it will be used. If initparams is defined, those will be attached to the createDatabase command
   - If no responsefile is created, the database will be created based on all other parameters
-  version_added: "3.0.0"
+version_added: "3.0.0"
 options:
   oracle_home:
     description:
@@ -29,24 +29,24 @@ options:
   db_name:
     description: The name of the database
     required: True
-    aliases: ['db','database_name','name']
+    aliases: ['db', 'database_name', 'name']
   db_unique_name:
     description: The database db_unique_name
     required: False
     default: None
-    aliases: ['dbunqn','unique_name']
+    aliases: ['dbunqn', 'unique_name']
   sys_password:
     description: Password for the sys user
     required: False
     default: None
-    aliases: ['syspw','sysdbapassword','sysdbapw']
+    aliases: ['syspw', 'sysdbapassword', 'sysdbapw']
   system_password:
     description:
       - Password for the system user
       - If not set, defaults to sys_password
-      required: False
-      default: None
-      aliases: ['systempw']
+    required: False
+    default: None
+    aliases: ['systempw']
   dbsnmp_password:
     description:
       - Password for the dbsnmp user
@@ -98,7 +98,7 @@ options:
     required: False
     default: FS
     aliases: ['storage']
-    choices: ['FS','ASM']
+    choices: ['FS', 'ASM']
   omf:
     description: Use OMF (Oracle manageded files)
     required: False
@@ -108,19 +108,19 @@ options:
     description: Type of database (SI,RAC,RON)
     required: False
     default: SI on standalone, RAC on clustered environment
-    choices: ['SI','RAC','RACONENODE']
+    choices: ['SI', 'RAC', 'RACONENODE']
   db_type:
     description: Default Type of database (MULTIPURPOSE, OLTP, DATA_WAREHOUSING)
     required: False
     default: MULTIPURPOSE
-    choices: ['MULTIPURPOSE','OLTP','DATA_WAREHOUSING']
+    choices: ['MULTIPURPOSE', 'OLTP', 'DATA_WAREHOUSING']
   racone_service:
     description:
       - If dbconfig_type = RACONENODE, a service has to be created along with the DB. This is the name of that service
       - If no name is defined, the service will be called "{{ db_name }}_ronserv"
-      required: False
-      default: None
-      aliases: ['ron_service']
+    required: False
+    default: None
+    aliases: ['ron_service']
   characterset:
     description: The database characterset
     required: False
@@ -133,14 +133,14 @@ options:
     required: False
     default: ['2048']
   nodelist:
-    description:  The list of nodes a RAC DB should be created on
+    description: The list of nodes a RAC DB should be created on
     default: On RAC cluster default value is a list of all nodes
     required: False
   amm:
     description: Should Automatic Memory Management be used (memory_target, memory_max_target)
     required: False
     Default: False
-    choices: ['True','False']
+    choices: ['True', 'False']
   initparams:
     required: False
     type: dict
@@ -156,7 +156,7 @@ options:
   default_tablespace_type:
     description: Database default tablespace type (DEFAULT_TBS_TYPE)
     default: bigfile
-    choices: ['smallfile','bigfile']
+    choices: ['smallfile', 'bigfile']
   default_tablespace:
     description: Database default permanent tablespace (DEFAULT_PERMANENT_TABLESPACE)
     default: None
@@ -169,35 +169,35 @@ options:
     description: Puts the database is archivelog mode
     required: False
     default: False
-    choices: ['True','False']
+    choices: ['True', 'False']
     type: bool
   force_logging:
     description: Enables force logging for the Database
     required: False
     default: False
-    choices: ['True','False']
+    choices: ['True', 'False']
     type: bool
   supplemental_logging:
     description: Enables supplemental (minimal) logging for the Database (basically 'add supplemental log data')
     required: False
     default: False
-    choices: ['True','False']
+    choices: ['True', 'False']
     type: bool
   flashback:
     description: Enables flashback for the database
     required: False
     default: False
-    choices: ['True','False']
+    choices: ['True', 'False']
     type: bool
   state:
     description: The intended state of the database
     default: present
-    choices: ['present','absent', 'stopped', 'started', 'restarted']
+    choices: ['present', 'absent', 'stopped', 'started', 'restarted']
 notes:
     - cx_Oracle needs to be installed
     - 'Parameters initparams and db_options used to be of type list of strings ["JSERVER:true", "APEX:false"]'
     - 'Now they are a dictionary { "JSERVER": true, "APEX": false}'
-requirements: [ "cx_Oracle" ]
+requirements: ["cx_Oracle"]
 author: 
     - Mikael Sandström, oravirt@gmail.com, @oravirt
     - Ivan Brezina
