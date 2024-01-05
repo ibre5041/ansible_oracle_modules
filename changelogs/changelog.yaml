@@ -2,3 +2,12 @@ ancestor: null
 releases:
   3.1.8:
     release_date: '2023-12-19'
+  3.1.9:
+    changes:
+      breaking_changes:
+      - oracle_db interface changed, fixes, support for RAC
+      minor_changes:
+      - more documentation
+      - more tests
+      - suppot for RAC on RHEL 9
+    release_date: '2024-01-05'

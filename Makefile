@@ -23,4 +23,9 @@ test:
 check:	build
 	python3 -m galaxy_importer.main ${TARGET}
 
+doc:
+	antsibull-changelog release
+	echo "place changes into changelogs/changelog.yaml"
+	antsibull-changelog lint-changelog-yaml changelogs/changelog.yaml
+	antsibull-changelog generate
 all:
