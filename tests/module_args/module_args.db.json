@@ -1,0 +1,28 @@
+{
+    "ANSIBLE_MODULE_ARGS": {
+	"oracle_home": "/oracle/u01/product/19.21.0.0",
+	"db_name": "TEST19C",
+	"sid": "TEST19C",
+	"db_unique_name": "TEST19C_1",
+	"sys_password": "X43ofljfksjfkhfr3fkh",
+	"db_options": {
+	    "JSERVER": "True",
+	    "ORACLE_TEXT": "False",
+	    "IMEDIA": "False",
+	    "CWMLITE": "False",
+	    "SPATIAL": "False",
+	    "OMS": "False",
+	    "APEX": "False",
+	    "DV": "False"
+	},
+	"initparams": {
+	    "memory_target": "0",
+	    "memory_max_target": "0",
+	    "sga_target": "1500MB",
+	    "sga_max_size": "1500MB"
+	},
+	"storage_type": "ASM",
+	"datafile_dest": "+XDATA",
+	"state": "present"
+    }
+}

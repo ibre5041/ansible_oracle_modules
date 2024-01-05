@@ -1,0 +1,7 @@
+{
+    "ANSIBLE_MODULE_ARGS": {
+        "oracle_home": "/oracle/product/19.21.0.0/db1",
+        "creates_sql": "select count(*) from dba_tab_privs where table_name = 'SQLJUTL' and grantee = 'PUBLIC'",
+        "sqlscript": "@?/rdbms/admin/utlrp"
+    }
+}
