@@ -1,0 +1,8 @@
+{
+    "ANSIBLE_MODULE_ARGS": {
+        "mode": "sysdba",
+        "name": "sga_target",
+        "state": "absent",
+        "scope": "spfile"
+    }
+}
