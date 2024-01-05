@@ -901,7 +901,8 @@ def main():
         mutually_exclusive=[['memory_percentage', 'memory_totalmb']],
         supports_check_mode=False,
         required_if=[
-            ["state", "present", ["datafile_dest", "recoveryfile_dest", "sys_password"]]
+            ["state", "present", ["datafile_dest", "sys_password"]],
+            ["state", "absent", ["sys_password"]]
         ]
     )
 
