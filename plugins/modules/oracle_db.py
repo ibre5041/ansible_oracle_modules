@@ -10,7 +10,7 @@ description:
   - Stop/Start database
   - If a responsefile is available, it will be used. If initparams is defined, those will be attached to the createDatabase command
   - If no responsefile is created, the database will be created based on all other parameters
-  version_added: "3.0.0"
+version_added: "3.0.0"
 options:
   oracle_home:
     description:
@@ -18,27 +18,35 @@ options:
       - If not provided, environment variable ORACLE_HOME has to be set
     required: False
     aliases: ['oh']
+  sid:
+    description:
+      - "Sid(System identifier) of newly created database"
+      - "NOTE: Database can have SID, DB_NAME, DB_UNIQUE_NAME and Cluster resource name. DBCA is quite cryptic when generating these names"
+      - "When sid is omitted, db_name=TESTDB, db_unique_name=TESTDB_LA, ORACLE_SID becomes TESTDBLA1, Cluster resource name becomes testdb_la"
+      - "db_unique_name has precedence over db_name when sid is not specified"
+    required: False
+    aliases: ['oracle_sid']  
   db_name:
     description: The name of the database
     required: True
-    aliases: ['db','database_name','name']
+    aliases: ['db', 'database_name', 'name']
   db_unique_name:
     description: The database db_unique_name
     required: False
     default: None
-    aliases: ['dbunqn','unique_name']
+    aliases: ['dbunqn', 'unique_name']
   sys_password:
     description: Password for the sys user
     required: False
     default: None
-    aliases: ['syspw','sysdbapassword','sysdbapw']
+    aliases: ['syspw', 'sysdbapassword', 'sysdbapw']
   system_password:
     description:
       - Password for the system user
       - If not set, defaults to sys_password
-      required: False
-      default: None
-      aliases: ['systempw']
+    required: False
+    default: None
+    aliases: ['systempw']
   dbsnmp_password:
     description:
       - Password for the dbsnmp user
@@ -90,7 +98,7 @@ options:
     required: False
     default: FS
     aliases: ['storage']
-    choices: ['FS','ASM']
+    choices: ['FS', 'ASM']
   omf:
     description: Use OMF (Oracle manageded files)
     required: False
@@ -100,19 +108,19 @@ options:
     description: Type of database (SI,RAC,RON)
     required: False
     default: SI on standalone, RAC on clustered environment
-    choices: ['SI','RAC','RACONENODE']
+    choices: ['SI', 'RAC', 'RACONENODE']
   db_type:
     description: Default Type of database (MULTIPURPOSE, OLTP, DATA_WAREHOUSING)
     required: False
     default: MULTIPURPOSE
-    choices: ['MULTIPURPOSE','OLTP','DATA_WAREHOUSING']
+    choices: ['MULTIPURPOSE', 'OLTP', 'DATA_WAREHOUSING']
   racone_service:
     description:
       - If dbconfig_type = RACONENODE, a service has to be created along with the DB. This is the name of that service
       - If no name is defined, the service will be called "{{ db_name }}_ronserv"
-      required: False
-      default: None
-      aliases: ['ron_service']
+    required: False
+    default: None
+    aliases: ['ron_service']
   characterset:
     description: The database characterset
     required: False
@@ -125,21 +133,20 @@ options:
     required: False
     default: ['2048']
   nodelist:
-    description:  The list of nodes a RAC DB should be created on
+    description: The list of nodes a RAC DB should be created on
     default: On RAC cluster default value is a list of all nodes
     required: False
   amm:
     description: Should Automatic Memory Management be used (memory_target, memory_max_target)
     required: False
-    Default: False
-    choices: ['True','False']
+    default: False
+    choices: ['True', 'False']
   initparams:
     required: False
     type: dict
     description:
       - "List of key=value pairs"
       - 'e.g. initparams: { "sga_target": "1GB", "sga_max_size": "1GB" }'
-    required: False
   customscripts:
     description:
       - "List of scripts to run after database is created"
@@ -148,7 +155,7 @@ options:
   default_tablespace_type:
     description: Database default tablespace type (DEFAULT_TBS_TYPE)
     default: bigfile
-    choices: ['smallfile','bigfile']
+    choices: ['smallfile', 'bigfile']
   default_tablespace:
     description: Database default permanent tablespace (DEFAULT_PERMANENT_TABLESPACE)
     default: None
@@ -161,35 +168,35 @@ options:
     description: Puts the database is archivelog mode
     required: False
     default: False
-    choices: ['True','False']
+    choices: ['True', 'False']
     type: bool
   force_logging:
     description: Enables force logging for the Database
     required: False
     default: False
-    choices: ['True','False']
+    choices: ['True', 'False']
     type: bool
   supplemental_logging:
     description: Enables supplemental (minimal) logging for the Database (basically 'add supplemental log data')
     required: False
     default: False
-    choices: ['True','False']
+    choices: ['True', 'False']
     type: bool
   flashback:
     description: Enables flashback for the database
     required: False
     default: False
-    choices: ['True','False']
+    choices: ['True', 'False']
     type: bool
   state:
     description: The intended state of the database
     default: present
-    choices: ['present','absent', 'stopped', 'started', 'restarted']
+    choices: ['present', 'absent', 'stopped', 'started', 'restarted']
 notes:
     - cx_Oracle needs to be installed
     - 'Parameters initparams and db_options used to be of type list of strings ["JSERVER:true", "APEX:false"]'
     - 'Now they are a dictionary { "JSERVER": true, "APEX": false}'
-requirements: [ "cx_Oracle" ]
+requirements: ["cx_Oracle"]
 author: 
     - Mikael Sandström, oravirt@gmail.com, @oravirt
     - Ivan Brezina
@@ -206,19 +213,19 @@ EXAMPLES = '''
     #dbsnmp_password:
     #template:
     db_options:
-      - JSERVER: True
-      - ORACLE_TEXT: False
-      - IMEDIA: False
-      - CWMLITE: False
-      - SPATIAL: False
-      - OMS: False
-      - APEX: False
-      - DV: False
+      JSERVER: True
+      ORACLE_TEXT: False
+      IMEDIA: False
+      CWMLITE: False
+      SPATIAL: False
+      OMS: False
+      APEX: False
+      DV: False
     initparams:
-      - memory_target: 0
-      - memory_max_target: 0
-      - sga_target: 1500MB
-      - sga_max_size: 1500MB
+      memory_target: 0
+      memory_max_target: 0
+      sga_target: 1500MB
+      sga_max_size: 1500MB
     storage_type: ASM
     datafile_dest: +XDATA
     state: present
@@ -229,6 +236,7 @@ EXAMPLES = '''
   oracle_db:
     oracle_home: '/oracle/u01/product/19.17.0.0'
     db_name: 'X01'
+    sys_password: "{{ sys_password }}"
     state: absent
 '''
 
@@ -298,7 +306,7 @@ def check_db_exists(module, ohomes):
         return True
 
 
-def create_db(module):
+def create_db(module, ohomes):
     oracle_home         = module.params["oracle_home"]
     db_name             = module.params["db_name"]
     db_unique_name      = module.params["db_unique_name"]
@@ -339,6 +347,20 @@ def create_db(module):
             break
     else:
         skip_memory = False
+
+    # Override dbconfig_type on RAC when not specified
+    if not dbconfig_type and ohomes.oracle_crs:
+        module.params['dbconfig_type'] = dbconfig_type = 'RAC'
+
+    if not nodelist and dbconfig_type == 'RAC':
+        olsnodes_bin = os.path.join(os.path.dirname(ohomes.crsctl), 'olsnodes')
+        (rc, stdout, stderr) = module.run_command(olsnodes_bin)
+        if rc == 0:
+            nodelist = stdout.splitlines()
+            module.params['nodelist'] = nodelist
+        else:
+            module.fail_json(msg="Error executing olsnodes, {}, {}".format(stdout, stderr),
+                             changed=True, stdout=stdout, stderr=stderr)
 
     command = "%s/bin/dbca -createDatabase -silent " % oracle_home
     if responsefile is not None:
@@ -441,6 +463,10 @@ def create_db(module):
 
     paramslist = dict()
     if db_unique_name:
+        # DBCA Silent Mode Is Not Setting DB_UNIQUE_NAME Even Though It Is Specified In DBCA Template File. (Doc ID 1508337.1)
+        # The workaround is to set the DB_UNIQUE_NAME in the command line parameter '-initParams db_unique_name=<a value>', e.g.
+        # TODO SID parameter?
+        # https://community.oracle.com/mosc/discussion/4328864/dbca-create-database-with-db-name-db-unique-name
         paramslist.update({'db_name': db_name})
         paramslist.update({'db_unique_name': db_unique_name})
 
@@ -452,11 +478,10 @@ def create_db(module):
 
     if paramslist:
         # Convert dict to list of k:v pairs and then join it.
-        command += ' -initParams ' + ",".join(["{}:{}".format(_[0], str(_[1])) for _ in paramslist.items()])
+        command += ' -initParams ' + ",".join(["{}={}".format(_[0], str(_[1])) for _ in paramslist.items()])
 
     msg = "command: %s" % command
-    # module.warn(msg)
-    # module.fail_json(msg=msg, changed=False)
+    module.warn(msg)
     env = {'ORACLE_HOME': oracle_home, 'PATH': '%s/bin/:/bin:/sbin:/usr/bin:/usr/sbin' % oracle_home}
     (rc, stdout, stderr) = module.run_command(command, environ_update=env)
     # module.warn('dcdba: %s ' % stdout)
@@ -464,10 +489,9 @@ def create_db(module):
     # module.warn('dcdba: %s ' % rc)
     if rc != 0:
         msg = 'Error - STDOUT: %s, STDERR: %s, COMMAND: %s' % (stdout, stderr, command)
-        module.fail_json(msg=msg, changed=False)
+        module.fail_json(msg=msg, changed=True, stdout=stdout, stderr=stderr)
     else:
-        verbosemsg = 'STDOUT: %s,  COMMAND: %s' % (stdout, command)
-        return True, verbosemsg
+        return 'STDOUT: %s, STDERR: %s COMMAND: %s' % (stdout, stderr, command)
 
 
 def remove_db(module, ohomes):
@@ -476,13 +500,14 @@ def remove_db(module, ohomes):
     db_unique_name = module.params["db_unique_name"] or ''
     sys_password = module.params["sys_password"]
 
-    # if ohomes.oracle_gi_managed:
-    #     # if db_unique_name:
-    #     #     db_to_remove = db_unique_name
-    #     # else:
-    #     #     db_to_remove = db_name
-    # else:
-    db_to_remove = db_name
+    sid = guess_oracle_sid(module, ohomes)
+    if ohomes.oracle_gi_managed:
+        if db_unique_name:
+            db_to_remove = db_unique_name
+        else:
+            db_to_remove = db_name
+    else:
+        db_to_remove = db_name
 
     dbca = os.path.join(oracle_home, 'bin', 'dbca')
     command = [dbca, '-deleteDatabase', '-silent', '-sourceDB', db_to_remove, '-sysDBAUserName', 'sys', '-sysDBAPassword', sys_password]
@@ -722,18 +747,20 @@ def stop_db(module, ohomes):
     oracle_home    = module.params["oracle_home"]
     db_name        = module.params["db_name"]
     db_unique_name = module.params["db_unique_name"]
-
+    sid = guess_oracle_sid(module, ohomes)
     if ohomes.oracle_gi_managed:
-        # if db_unique_name:
-        #     db_name = db_unique_name
+        crsname = ohomes.facts_item[sid]['crsname']
+        if not crsname and db_unique_name:
+            crsname = db_unique_name
+        if not crsname:
+            crsname = db_name
         srvctl = os.path.join(oracle_home, 'bin', 'srvctl')
-        command = [srvctl, 'stop', 'database', '-d', db_name, '-o', 'immediate']
+        command = [srvctl, 'stop', 'database', '-d', crsname, '-o', 'immediate']
         (rc, stdout, stderr) = module.run_command(command)
         if rc != 0 or stdout.startswith('PRCD-') or stderr.startswith('PRCD-'):
             msg = 'Error - STDOUT: %s, STDERR: %s, COMMAND: %s' % (stdout, stderr, " ".join(command))
             module.fail_json(msg=msg, changed=False)
     else:
-        sid = guess_oracle_sid(module, ohomes)
         os.environ['ORACLE_SID'] = sid
         shutdown_sql = '''
         connect / as sysdba
@@ -753,18 +780,21 @@ def start_db(module, ohomes):
     oracle_home    = module.params["oracle_home"]
     db_name        = module.params["db_name"]
     db_unique_name = module.params["db_unique_name"]
+    sid = guess_oracle_sid(module, ohomes)
 
     if ohomes.oracle_gi_managed:
-        # if db_unique_name:
-        #     db_name = db_unique_name
+        crsname = ohomes.facts_item[sid]['crsname']
+        if not crsname and db_unique_name:
+            crsname = db_unique_name
+        if not crsname:
+            crsname = db_name
         srvctl = os.path.join(oracle_home, 'bin', 'srvctl')
-        command = [srvctl, 'start', 'database', '-d', db_name]
+        command = [srvctl, 'start', 'database', '-d', crsname]
         (rc, stdout, stderr) = module.run_command(command)
         if rc != 0 or stdout.startswith('PRCD') or stderr.startswith('PRCD'):
             msg = 'Error - STDOUT: %s, STDERR: %s, COMMAND: %s' % (stdout, stderr, " ".join(command))
             module.fail_json(msg=msg, changed=True, stdout=stdout, stderr=stderr)
     else:
-        sid = guess_oracle_sid(module, ohomes)
         os.environ['ORACLE_SID'] = sid
         startup_sql = '''
         connect / as sysdba
@@ -787,11 +817,17 @@ def start_instance(module, ohomes, open_mode, instance_name):
     sid = guess_oracle_sid(module, ohomes)
 
     if ohomes.oracle_gi_managed:
+        crsname = ohomes.facts_item[sid]['crsname']
+        if not crsname and db_unique_name:
+            crsname = db_unique_name
+        if not crsname:
+            crsname = db_name
+
         srvctl = os.path.join(oracle_home, 'bin', 'srvctl')
         if ohomes.facts_item[sid]['israc']:
-            command = [srvctl, 'start', 'instance', '-d', db_name, '-i', instance_name]
+            command = [srvctl, 'start', 'instance', '-d', crsname, '-i', instance_name]
         else:
-            command = [srvctl, 'start', 'database', '-d', db_name]
+            command = [srvctl, 'start', 'database', '-d', crsname]
         if open_mode:
             command.extend(['-o', open_mode])
         (rc, stdout, stderr) = module.run_command(command)
@@ -825,7 +861,7 @@ def main():
     module = AnsibleModule(
         argument_spec = dict(
             oracle_home         = dict(default=None, aliases=['oh']),
-            sid                 = dict(required=False),
+            sid                 = dict(required=False, aliases=['oracle_sid']),
             db_name             = dict(required=True, aliases=['db', 'database_name', 'name']),
             db_unique_name      = dict(required=False, aliases=['dbunqn', 'unique_name']),
             sys_password        = dict(required=False, no_log=True, aliases=['syspw', 'sysdbapassword', 'sysdbapw']),
@@ -900,22 +936,6 @@ def main():
     ohomes.parse_oratab()
     #ohomes.oracle_gi_managed = False# TODO REMOVE - override GI presence for testing
 
-    # Override dbconfig_type on RAC when not specified
-    dbconfig_type = module.params['dbconfig_type']
-    if not dbconfig_type and ohomes.oracle_crs:
-        module.params['dbconfig_type'] = dbconfig_type = 'RAC'
-
-    nodelist = module.params["nodelist"]
-    if not nodelist and dbconfig_type == 'RAC':
-        olsnodes_bin = os.path.join(os.path.dirname(ohomes.crsctl), 'olsnodes')
-        (rc, stdout, stderr) = module.run_command(olsnodes_bin)
-        if rc == 0:
-            nodelist = stdout.splitlines()
-            module.params['nodelist'] = nodelist
-        else:
-            module.fail_json(msg="Error executing olsnodes, {}, {}".format(stdout, stderr),
-                             changed=True, stdout=stdout, stderr=stderr)
-
     # Connection details for database
     if db_unique_name:
         service_name = db_unique_name
@@ -965,14 +985,14 @@ def main():
 
     elif state == 'present':
         if not check_db_exists(module, ohomes):
-            if create_db(module):
-                # Try to detect ORACLE_SID of the new running database
-                ohomes.list_crs_instances()
-                ohomes.list_processes()
-                ohomes.parse_oratab()
-                ensure_db_state(module, ohomes, newdb=True)
-            else:
-                module.fail_json(msg=msg, changed=False)
+            msg = create_db(module, ohomes)
+            if 'WARNING' in msg:
+                module.warn(msg)
+            # Try to detect ORACLE_SID of the new running database
+            ohomes.list_crs_instances()
+            ohomes.list_processes()
+            ohomes.parse_oratab()
+            ensure_db_state(module, ohomes, newdb=True)
         else:
             ensure_db_state(module, ohomes, newdb=False)
 
