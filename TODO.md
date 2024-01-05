@@ -7,6 +7,9 @@
 - oracle_db - module password/username ==> connect via listener
 - oracle_db - -enableArchive
 - oracle_db_home - add option for RO ORACLE_HOME
+  ./bin/roohctl -enable  -nodeList rac19-b-node-1,rac19-b-node-2
+  ./bin/roohctl -disable -nodeList rac19-b-node-1,rac19-b-node-2
+
 - adrpure: ADR base = "/oracle/u01/base" + show home | grep SID => alert log location
 
         fatal: [rac19-b-node-1]: FAILED! => {"changed": false, "msg": "Could not connect to database - ORA-12541: TNS:no listener, connect descriptor: (DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=localhost)(PORT=1521))(CONNECT_DATA=(SERVICE_NAME=TEST19C_1)))"}
