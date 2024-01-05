@@ -183,6 +183,7 @@ oracle_os_packages_rhel9:
   - python3-pip
   - nvme-cli
   - sysstat
+  - chkconfig
 
 oracle_os_packages_crs:
   - gcc-c++
