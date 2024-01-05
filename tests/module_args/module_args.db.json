@@ -6,23 +6,39 @@
 	"db_unique_name": "TEST19C_1",
 	"sys_password": "X43ofljfksjfkhfr3fkh",
 	"db_options": {
-	    "JSERVER": "True",
-	    "ORACLE_TEXT": "False",
-	    "IMEDIA": "False",
-	    "CWMLITE": "False",
-	    "SPATIAL": "False",
-	    "OMS": "False",
-	    "APEX": "False",
-	    "DV": "False"
+	    "JSERVER": true,
+	    "ORACLE_TEXT": false,
+	    "IMEDIA": false,
+	    "CWMLITE": false,
+	    "SPATIAL": false,
+	    "OMS": false,
+	    "APEX": false,
+	    "DV": false
 	},
 	"initparams": {
-	    "memory_target": "0",
-	    "memory_max_target": "0",
+	    "memory_target": 0,
+	    "memory_max_target": 0,
 	    "sga_target": "1500MB",
 	    "sga_max_size": "1500MB"
 	},
 	"storage_type": "ASM",
 	"datafile_dest": "+XDATA",
-	"state": "present"
+	"recoveryfile_dest": "+XDATA",
+	"state": "present",
+	"_ansible_check_mode": false,
+	"_ansible_no_log": false,
+	"_ansible_debug": false,
+	"_ansible_diff": false,
+	"_ansible_verbosity": 0,
+	"_ansible_version": "2.9.27.post0",
+	"_ansible_module_name": "oracle_db",
+	"_ansible_syslog_facility": "LOG_USER",
+	"_ansible_selinux_special_fs": ["fuse", "nfs", "vboxsf", "ramfs", "9p", "vfat"],
+	"_ansible_string_conversion_action": "warn",
+	"_ansible_socket": null,
+	"_ansible_shell_executable": "/bin/sh",
+	"_ansible_keep_remote_files": true,
+	"_ansible_tmpdir": null,
+	"_ansible_remote_tmp": "~/.ansible/tmp"
     }
 }
