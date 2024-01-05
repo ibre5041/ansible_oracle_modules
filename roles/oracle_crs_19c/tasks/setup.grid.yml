@@ -35,7 +35,7 @@
         owner: "{{ oracle_os_user }}"
 
     - name: "gridSetup.sh (part I)"
-      shell: "./gridSetup.sh -silent -responseFile {{ oracle_install_dir_temp }}/{{ oracle_gi_response_file }}"
+      shell: "./gridSetup.sh -silent -responseFile {{ oracle_install_dir_temp }}/{{ oracle_gi_response_file }} ORACLE_HOME_NAME={{ oracle_home_name }}"
       args:
         chdir: "{{ oracle_home }}"
         creates: "{{ oracle_inventory_location }}/oraInst.loc"

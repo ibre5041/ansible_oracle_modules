@@ -18,7 +18,7 @@
         replace: '\1'
       when: first_rac_node is defined
 
-    - shell: "./runInstaller -responseFile {{ oracle_install_dir_temp }}/{{ oracle_oh_response_file }} -silent -ignorePrereqFailure"
+    - shell: "./runInstaller -responseFile {{ oracle_install_dir_temp }}/{{ oracle_oh_response_file }} -silent -ignorePrereqFailure ORACLE_HOME_NAME={{ oracle_home_name }}"
       args:
         chdir: "{{ oracle_home }}"
         creates: "{{ oracle_home }}/oraInst.loc"
