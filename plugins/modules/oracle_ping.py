@@ -90,8 +90,7 @@ def main():
         supports_check_mode=True
     )
 
-    oc = oracleConnection(module)
-    db = check_directory_exists(oc)
+    oracleConnection(module)
     module.exit_json(msg="Connection successful", changed=False)
 
 
