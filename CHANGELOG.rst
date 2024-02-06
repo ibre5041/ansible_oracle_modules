@@ -5,6 +5,14 @@ Ibre5041.Ansible_Oracle_Modules Release Notes
 .. contents:: Topics
 
 
+v3.1.10
+=======
+
+Minor Changes
+-------------
+
+- added support for names ORACLE_HOMEs (oracle_home_name)
+
 v3.1.9
 ======
 
