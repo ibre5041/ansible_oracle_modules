@@ -1,0 +1,15 @@
+{
+    "ANSIBLE_MODULE_ARGS": {
+      "mode": "sysdba",
+      "userenv": false,
+      "database": false,
+      "instance": false,
+      "password_file": true,
+      "redo": "summary",
+      "standby": "summary",
+      "parameter": [
+        "audit_file_dest",
+        "dg_broker_start"
+      ]
+    }
+}

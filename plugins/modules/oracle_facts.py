@@ -134,13 +134,17 @@ def detect_password_file(module):
     if not PASSWORD:
         orabasehome = os.path.join(h.crs_home, 'bin', 'orabasehome')
         ORABASEHOME = None
-        proc = subprocess.Popen([orabasehome], stdout=subprocess.PIPE)
-        for line in iter(proc.stdout.readline, ''):
-            if line.decode('utf-8').strip():
-                ORABASEHOME = line.decode('utf-8').strip()
-            proc.poll()
-            if line == b'':
-                break
+        try:
+            proc = subprocess.Popen([orabasehome], stdout=subprocess.PIPE)
+            for line in iter(proc.stdout.readline, ''):
+                if line.decode('utf-8').strip():
+                    ORABASEHOME = line.decode('utf-8').strip()
+                proc.poll()
+                if line == b'':
+                    break
+        except FileNotFoundError as e:
+            # assuming were on Oracle 12c or lower, $ORACLE_HOME/bin/orabasehome is not present
+            ORABASEHOME = oracle_home
 
         if ORABASEHOME:
             pwfile = os.path.join(ORABASEHOME, 'dbs', 'orapw{}'.format(oracle_sid))
