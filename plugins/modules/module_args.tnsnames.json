@@ -1,0 +1,8 @@
+{
+    "ANSIBLE_MODULE_ARGS": {
+        "path": "listener.ora",
+        "alias": "SID_LIST_ASM_LISTENER_LBREZINAI01",
+        "attribute_path": "SID_LIST/SID_DESC/ORACLE_HOME",
+        "attribute_value": "/optoracle/grid/product/19.21.0.0"
+    }
+}

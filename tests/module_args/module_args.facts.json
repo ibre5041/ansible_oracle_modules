@@ -1,10 +1,13 @@
 {
     "ANSIBLE_MODULE_ARGS": {
       "mode": "sysdba",
-      "userenv": false,
-      "database": false,
-      "instance": false,
+      "userenv": true,
+      "database": true,
+      "instance": true,
+      "patch_level": true,
       "password_file": true,
+      "tablespaces": true,
+      "temp": true,
       "redo": "summary",
       "standby": "summary",
       "parameter": [

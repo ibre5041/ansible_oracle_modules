@@ -331,8 +331,8 @@ def main():
     if conn.version < "10.2":
         module.fail_json(msg="Database version must be 10gR2 or greater", changed=False)
     #
-    if module.check_mode:
-        module.exit_json(changed=False)
+    # if module.check_mode:
+    #     module.exit_json(changed=False)
     #
     sid = os.environ['ORACLE_SID']
     facts = {sid: {'version': conn.version}}
