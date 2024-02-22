@@ -118,25 +118,30 @@ def detect_paths(module, conn):
         SPFILE = None
         PASSWORD = None
 
-    if not PASSWORD:
+    PFILE = None
+    ORABASEHOME = None
+    try:
         orabasehome = os.path.join(h.crs_home, 'bin', 'orabasehome')
-        ORABASEHOME = None
-        try:
-            proc = subprocess.Popen([orabasehome], stdout=subprocess.PIPE)
-            for line in iter(proc.stdout.readline, ''):
-                if line.decode('utf-8').strip():
-                    ORABASEHOME = line.decode('utf-8').strip()
-                proc.poll()
-                if line == b'':
-                    break
-        except FileNotFoundError as e:
-            # assuming were on Oracle 12c or lower, $ORACLE_HOME/bin/orabasehome is not present
-            ORABASEHOME = oracle_home
+        proc = subprocess.Popen([orabasehome], stdout=subprocess.PIPE)
+        for line in iter(proc.stdout.readline, ''):
+            if line.decode('utf-8').strip():
+                ORABASEHOME = line.decode('utf-8').strip()
+            proc.poll()
+            if line == b'':
+                break
+    except FileNotFoundError as e:
+        # assuming were on Oracle 12c or lower, $ORACLE_HOME/bin/orabasehome is not present
+        ORABASEHOME = oracle_home
 
-        if ORABASEHOME:
-            pwfile = os.path.join(ORABASEHOME, 'dbs', 'orapw{}'.format(oracle_sid))
-            if os.access(pwfile, os.R_OK):
-                PASSWORD = pwfile
+    if not PASSWORD and ORABASEHOME:
+        pwfile = os.path.join(ORABASEHOME, 'dbs', 'orapw{}'.format(oracle_sid))
+        if os.access(pwfile, os.R_OK):
+            PASSWORD = pwfile
+
+    if not PFILE and ORABASEHOME:
+        pfile = os.path.join(ORABASEHOME, 'dbs', 'init{}.ora'.format(oracle_sid))
+        if os.access(pfile, os.R_OK):
+            PFILE = pfile
 
     if not SPFILE:
         SQL = "select name, value, isdefault from v$parameter where name = 'spfile'"
@@ -144,7 +149,7 @@ def detect_paths(module, conn):
         if resultset:
             SPFILE = resultset['value']
 
-    return {'password_file': PASSWORD, 'spfile': SPFILE, "crs_home": h.crs_home}
+    return {'password_file': PASSWORD, 'spfile': SPFILE, "pfile": PFILE, "crs_home": h.crs_home}
 
 
 def query_database(module, conn):
