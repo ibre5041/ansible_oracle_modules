@@ -21,14 +21,14 @@ options:
     description: Query values from v$database
     required: false
     default: true
+  patch_level:
+    description: Query registry to get database patch level. DB must be OPEN to display this value
+    required: false
+    default: true
   userenv:
     description: Query values from userenv
     required: false
     default: true
-  option:
-    description: Query values from v$option
-    required: false
-    default: false
   parameter:
     description: Query values from userenv
     required: false
@@ -146,6 +146,34 @@ def query_database(module, conn):
     if 'CDB' not in database:
         database.update({'CDB': 'NO'})
     return database
+
+
+def query_patch_level(module, conn, instance):
+    version = instance['version']
+    if version.startswith('11'):
+        SQL = """ SELECT nvl(max(ID) KEEP (DENSE_RANK LAST ORDER BY ACTION_TIME),0) as bundle
+            FROM sys.registry$history where BUNDLE_SERIES='PSU' """
+        bundle = conn.execute_select_to_dict(SQL, fetchone=True)
+        if bundle and bundle['bundle']:
+            version = version.rstrip('0') + str(bundle['bundle'])
+    if version.startswith('12'):
+       SQL = """ select MIN(BUNDLE_ID) KEEP (DENSE_RANK LAST ORDER BY ACTION_TIME) BUNDLE_ID
+            from dba_registry_sqlpatch where status = 'SUCCESS' """
+       bundle = conn.execute_select_to_dict(SQL, fetchone=True)
+       if bundle and bundle['bundle_id']:
+           version = version.rstrip('0') + str(bundle['bundle_id'])
+    elif int(version[0:2]) >= 18:
+        SQL = """ SELECT distinct REGEXP_SUBSTR(description, '[0-9]{2}.[0-9]{1,2}.[0-9].[0-9].[0-9]{6}') as VER
+            from dba_registry_sqlpatch
+            where TARGET_VERSION in
+            (SELECT max(TARGET_VERSION) KEEP (DENSE_RANK LAST ORDER BY ACTION_TIME) as VER
+            FROM dba_registry_sqlpatch where status='SUCCESS' and FLAGS not like '%J%') and ACTION = 'APPLY' """
+        bundle = conn.execute_select_to_dict(SQL, fetchone=True)
+        if bundle and bundle['ver']:
+            version = str(bundle['ver'])
+
+    return version
+
 
 def query_instance(module, conn):
     SQL = "select * from V$INSTANCE"
@@ -271,8 +299,8 @@ def main():
             password_file=dict(default=False, type='bool', no_log=False),
             instance=dict(default=False, type='bool'),
             database=dict(default=True, type='bool'),
+            patch_level=dict(default=False, type='bool'),
             userenv=dict(default=True, type='bool'),
-            option=dict(default=False, type='bool'),
             parameter=dict(default=[], type='list'),
             tablespaces=dict(default=False, type='bool'),
             temp=dict(default=False, type='bool'),
@@ -299,13 +327,17 @@ def main():
         password_file = detect_password_file(module)
         db.update({'password_file': password_file})
 
+    instance = query_instance(module, conn)
     if module.params["instance"]:
-        instance = query_instance(module, conn)
         db.update({'database': instance})
 
     database = query_database(module, conn)
     if module.params["database"]:
         db.update({'database': database})
+
+    if module.params["patch_level"]:
+        patch_level = query_patch_level(module, conn, instance)
+        db.update({'patch_level': patch_level})
 
     if module.params["tablespaces"]:
         tablespaces = query_tablespaces(module, conn)
@@ -326,10 +358,6 @@ def main():
     if module.params['standby']:
         standby = query_standby(module, conn)
         db.update({'standby': standby})
-
-    if module.params['option']:
-        option = star_query(conn, "v$option")
-        db.update({'option': option})
 
     if module.params['parameter']:
         parameters = query_params(module, conn)
