@@ -7,36 +7,57 @@ module: oracle_facts
 short_description: Returns some facts about Oracle DB
 description:
   - Returns some facts about Oracle DB
-  - See connection parameters for oracle_ping  
+  - See connection parameters for oracle_ping
 version_added: "3.0.0"
 options:
   password_file:
     description: Detect location of password file
-    required: False
+    required: false
   instance:
     description: Query values from v$instance
-    required: False
-    default: False
+    required: false
+    default: false
   database:
     description: Query values from v$database
-    required: False
-    default: True
+    required: false
+    default: true
   userenv:
     description: Query values from userenv
-    required: False
-    default: True
+    required: false
+    default: true
+  option:
+    description: Query values from v$option
+    required: false
+    default: false
+  parameter:
+    description: Query values from userenv
+    required: false
+    default: false
+  tablespaces:
+    description: Dislay information about permanent tablespaces
+    required: false
+    default: false
+  temp:
+    description: Dislay information about temporary tablespaces
+    required: false
+    default: false
   redo:
     description: 
       - Query info about redologs
-      - "summary => return array aggregated by threads: [{THREAD:1, COUNT:3, SIZE_MB: 512, MIN_SEQ: 1, MAX_SEQ: 3 }]
-      - "detail => return array of rows from v$log
+      - "summary => return array aggregated by threads: [{THREAD:1, COUNT:3, SIZE_MB: 512, MIN_SEQ: 1, MAX_SEQ: 3 }]"
+      - "detail => return array of rows from v$log"
     required: False
+    default: None
+    choices: [None, 'detail', 'summary']
+  standby:
+    description: Query info about standby redologs
+    required: false
     default: None
     choices: [None, 'detail', 'summary']
 notes:
   - cx_Oracle needs to be installed
   - Oracle RDBMS 10gR2 or later required
-requirements: [ "cx_Oracle" ]
+requirements: ["cx_Oracle"]
 author:
   - Ilmar Kerm, ilmar.kerm@gmail.com, @ilmarkerm
   - Ivan Brezina
@@ -59,31 +80,10 @@ EXAMPLES = '''
       - instance_name
       - service_names
   register: database_facts
+
 - name: database facts
   debug:
     var: database_facts
-
-- hosts: localhost
-  vars:
-    oraclehost: 192.168.56.101
-    oracleport: 1521
-    oracleservice: orcl
-    oracleuser: system
-    oraclepassword: oracle
-    oracle_env:
-      ORACLE_HOME: /usr/lib/oracle/12.1/client64
-      LD_LIBRARY_PATH: /usr/lib/oracle/12.1/client64/lib
-  tasks:
-    - name: gather database facts
-      oracle_facts:
-        hostname: "{{ oraclehost }}"
-        port: "{{ oracleport }}"
-        service_name: "{{ oracleservice }}"
-        user: "{{ oracleuser }}"
-        password: "{{ oraclepassword }}"
-      register: dbfacts
-    - debug:
-        var: dbfacts
 '''
 
 import os
@@ -101,6 +101,7 @@ def detect_password_file(module):
     if h.crs_home:
         srvctl = os.path.join(h.crs_home, 'bin', 'srvctl')
         proc = subprocess.Popen([srvctl, 'config', 'database', '-d', oracle_sid], stdout=subprocess.PIPE)
+
         for line in iter(proc.stdout.readline, ''):
             if line.decode('utf-8').startswith('Oracle home:'):
                 ORACLE_HOME = line.decode('utf-8').split(': ')[1].strip()
