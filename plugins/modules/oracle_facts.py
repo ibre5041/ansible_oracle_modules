@@ -11,7 +11,10 @@ description:
 version_added: "3.0.0"
 options:
   password_file:
-    description: Detect location of password file
+    description: 
+      - Detect location of password file
+      - "Also detects other paths like: crs_home, pfile and spfile path"
+      - "This only works with mode: sysdba, when executed on db server, these paths can not be queried remotely"
     required: false
     aliases: ['paths']
   instance:
