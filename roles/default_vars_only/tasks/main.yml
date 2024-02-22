@@ -4,7 +4,8 @@
 - name: virt-what
   yum:
     name: virt-what
-
+  failed_when: False            # This might be executed without root, but I do not want to fail it
+  
 - name: Check if inside AWS.
   shell: "virt-what | grep aws"
   register: aws_uri_check
