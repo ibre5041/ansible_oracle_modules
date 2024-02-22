@@ -26,7 +26,10 @@ options:
     required: False
     default: True
   redo:
-    description: Query info about redologs
+    description: 
+      - Query info about redologs
+      - "summary => return array aggregated by threads: [{THREAD:1, COUNT:3, SIZE_MB: 512, MIN_SEQ: 1, MAX_SEQ: 3 }]
+      - "detail => return array of rows from v$log
     required: False
     default: None
     choices: [None, 'detail', 'summary']
@@ -84,29 +87,11 @@ EXAMPLES = '''
 '''
 
 import os
-import sys
-
-
-def rows_to_dict_list(cursor):
-    columns = [i[0] for i in cursor.description]
-    return [dict(zip(columns, row)) for row in cursor]
-
-
-def query_result(connection, query, params = []):
-    c = connection.cursor()
-    c.execute(query, params)
-    res = rows_to_dict_list(c)
-    c.close()
-    return res
-
-
-def star_query(connection, rowsource):
-    return query_result(connection, "SELECT * FROM %s" % rowsource)
 
 
 def detect_password_file(module):
-    oracle_sid = sid = os.environ['ORACLE_SID']
-    oracle_home = sid = os.environ['ORACLE_HOME']
+    oracle_sid = os.environ['ORACLE_SID']
+    oracle_home = os.environ['ORACLE_HOME']
 
     h = oracle_homes(module)
     h.list_crs_instances()
@@ -155,13 +140,15 @@ def detect_password_file(module):
 
 
 def query_database(module, conn):
-    database = star_query(conn, 'v$database')[0]
+    SQL = "select * from V$DATABASE"
+    database = conn.execute_select_to_dict(SQL, fetchone=True)
     if 'CDB' not in database:
         database.update({'CDB': 'NO'})
     return database
 
 def query_instance(module, conn):
-    instance = star_query(conn, 'v$instance')[0]
+    SQL = "select * from V$INSTANCE"
+    instance = conn.execute_select_to_dict(SQL, fetchone=True)
     return instance
 
 
@@ -181,7 +168,7 @@ def query_tablespaces(module, conn):
         group by ts.name, ts.bigfile 
         order by 1,2"""
 
-    tablespaces = query_result(conn, SQL)
+    tablespaces = conn.execute_select_to_dict(SQL)
     return tablespaces
 
 
@@ -201,7 +188,7 @@ def query_temp(module, conn):
         group by ts.name, ts.bigfile 
         order by 1,2"""
 
-    temp = query_result(conn, SQL)
+    temp = conn.execute_select_to_dict(SQL)
     return temp
 
 
@@ -218,19 +205,21 @@ def query_userenv(module, conn):
         sql += ", to_number(sys_context('USERENV','CURRENT_EDITION_ID')) CURRENT_EDITION_ID " \
                ", sys_context('USERENV','CURRENT_EDITION_NAME') CURRENT_EDITION_NAME "
     sql += " FROM DUAL"
-    userenv = query_result(conn, sql)[0]
+    userenv = conn.execute_select_to_dict(sql, fetchone=True)
     return userenv
 
 
 def query_redo(module, conn):
     if module.params['redo'].lower() == 'summary':
-        SQL = "select thread# THREAD, count(1) as COUNT, max(round(bytes/1024/1024)) as SIZE_MB" \
-              ", min(group#) min_seq, max(group#) max_seq " \
-              "from v$log group by THREAD#"
+        SQL = """
+        select thread# THREAD, count(1) as COUNT, max(round(bytes/1024/1024)) as SIZE_MB
+        , min(group#) min_seq, max(group#) max_seq
+        from v$log group by THREAD#"""
     else:
-        SQL = "select group#, thread#, sequence#, round(bytes/1024/1024) mb, blocksize, archived, status " \
-              "from v$log order by thread#,group#"
-    redolog = query_result(conn, SQL)
+        SQL = """
+        select group# as GROUP, thread# as THREAD, sequence#, round(bytes/1024/1024) mb, blocksize, archived, status
+        from v$log order by thread#,group#"""
+    redolog = conn.execute_select_to_dict(SQL)
     return redolog
 
 
@@ -242,7 +231,7 @@ def query_standby(module, conn):
     else:
         SQL = "select group#, thread#, sequence#, round(bytes/1024/1024) mb, blocksize, archived, status " \
               "from v$standby_log order by thread#,group#"
-    redolog = query_result(conn, SQL)
+    redolog = conn.execute_select_to_dict(SQL)
     return redolog
 
 
@@ -260,10 +249,10 @@ def query_params(module, conn):
     else:
         filter = ''
     SQL = 'select name, value, isdefault from v$parameter ' + filter
-    resultset = query_result(conn, SQL)
+    resultset = conn.execute_select_to_dict(SQL)
     result = {}
     for p in resultset:
-        result[p['NAME']] = {'isdefault': p['ISDEFAULT'], 'value': p['VALUE']}
+        result[p['name']] = {'isdefault': p['isdefault'], 'value': p['value']}
     return result
 
 
@@ -278,7 +267,7 @@ def main():
             service_name  = dict(required=False, aliases=['sn']),
             oracle_home   = dict(required=False, aliases=['oh']),
             
-            password_file=dict(default=False, type='bool'),
+            password_file=dict(default=False, type='bool', no_log=False),
             instance=dict(default=False, type='bool'),
             database=dict(default=True, type='bool'),
             userenv=dict(default=True, type='bool'),
@@ -293,7 +282,7 @@ def main():
     )
 
     # Connect to database
-    conn = oracle_connect(module)
+    conn = oracleConnection(module)
 
     if conn.version < "10.2":
         module.fail_json(msg="Database version must be 10gR2 or greater", changed=False)
@@ -313,8 +302,8 @@ def main():
         instance = query_instance(module, conn)
         db.update({'database': instance})
 
+    database = query_database(module, conn)
     if module.params["database"]:
-        database = query_database(module, conn)
         db.update({'database': database})
 
     if module.params["tablespaces"]:
@@ -345,18 +334,18 @@ def main():
         parameters = query_params(module, conn)
         db.update({'parameter': parameters})
 
-    rac = query_result(conn, "SELECT inst_id, instance_name, host_name, startup_time FROM gv$instance ORDER BY inst_id")
+    rac = conn.execute_select_to_dict("SELECT inst_id, instance_name, host_name, startup_time FROM gv$instance ORDER BY inst_id")
 
     try:
         if database['CDB'] == 'YES':
-            pdb = query_result(conn, "SELECT con_id, rawtohex(guid) guid_hex, name, open_mode FROM v$pdbs ORDER BY name")
+            pdb = conn.execute_select_to_dict("SELECT con_id, rawtohex(guid) guid_hex, name, open_mode FROM v$pdbs ORDER BY name")
         else:
             pdb = []
     except:
         pdb = []
 
     db.update({'rac': rac, 'pdb': pdb})
-    module.exit_json(msg='', changed=False, ansible_facts=facts)
+    module.exit_json(msg="Database parameters queried. Check ansible_facts['{}']".format(sid), changed=False, ansible_facts=facts)
 
 
 from ansible.module_utils.basic import *
@@ -365,13 +354,13 @@ from ansible.module_utils.basic import *
 # While this file is placed in <project-dir>/library
 # No collections are used                              
 #try:
-#    from ansible.module_utils.oracle_utils import oracle_connect
+#    from ansible.module_utils.oracle_utils import oracleConnection
 #    from ansible.module_utils.oracle_homes import oracle_homes
 #except:
 #    pass
 
 try:
-    from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_utils import oracle_connect
+    from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_utils import oracleConnection
     from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_homes import oracle_homes
 except:    
     pass
