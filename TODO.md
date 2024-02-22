@@ -2,6 +2,9 @@
 - crsctl stop res ora.crf -init -f -unsupported
 - crsctl modify resource ora.crf -attr AUTO_START=never -init -unsupported
 
+- module.no_log_values = frozenset({ password })
+  from ansible.module_utils.basic import heuristic_log_sanitize
+  msg = heuristic_log_sanitize('token="secret", user="person", token_entry="test=secret"', frozenset(['secret']))
 
 - oracle_db - create cluster database
 - oracle_db - module password/username ==> connect via listener
