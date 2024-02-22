@@ -13,6 +13,7 @@ options:
   password_file:
     description: Detect location of password file
     required: false
+    aliases: ['paths']
   instance:
     description: Query values from v$instance
     required: false
@@ -89,7 +90,7 @@ EXAMPLES = '''
 import os
 
 
-def detect_password_file(module):
+def detect_paths(module, conn):
     oracle_sid = os.environ['ORACLE_SID']
     oracle_home = os.environ['ORACLE_HOME']
 
@@ -137,7 +138,13 @@ def detect_password_file(module):
             if os.access(pwfile, os.R_OK):
                 PASSWORD = pwfile
 
-    return PASSWORD
+    if not SPFILE:
+        SQL = "select name, value, isdefault from v$parameter where name = 'spfile'"
+        resultset = conn.execute_select_to_dict(SQL, fetchone=True)
+        if resultset:
+            SPFILE = resultset['value']
+
+    return {'password_file': PASSWORD, 'spfile': SPFILE, "crs_home": h.crs_home}
 
 
 def query_database(module, conn):
@@ -296,7 +303,7 @@ def main():
             service_name  = dict(required=False, aliases=['sn']),
             oracle_home   = dict(required=False, aliases=['oh']),
             
-            password_file=dict(default=False, type='bool', no_log=False),
+            password_file=dict(default=False, type='bool', aliases=['paths'], no_log=False),
             instance=dict(default=False, type='bool'),
             database=dict(default=True, type='bool'),
             patch_level=dict(default=False, type='bool'),
@@ -324,8 +331,8 @@ def main():
     db = facts[sid]
 
     if module.params["password_file"]:
-        password_file = detect_password_file(module)
-        db.update({'password_file': password_file})
+        paths = detect_paths(module, conn)
+        db.update(paths)
 
     instance = query_instance(module, conn)
     if module.params["instance"]:
