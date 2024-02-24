@@ -75,6 +75,10 @@ EXAMPLES = '''
   run_once: True
 '''
 
+
+import cx_Oracle
+
+
 # Ansible code
 def main():
     global lconn, conn, msg, module
@@ -105,10 +109,6 @@ def main():
     groups = module.params["groups"]
     log_type = module.params["log_type"]
     # threads = module.params["threads"]
-
-    # Check for required modules
-    if not cx_oracle_exists:
-        module.fail_json(msg="The cx_Oracle module is required. 'pip install cx_Oracle' should do the trick. If cx_Oracle is installed, make sure ORACLE_HOME is set")
 
     conn = oracle_connect(module)
 
