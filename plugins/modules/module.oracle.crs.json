@@ -1,7 +1,16 @@
 {
     "ANSIBLE_MODULE_ARGS": {
-        "type": "asm",
-        "name": "asm",
-        "listener": "LISTENER"
+        "type": "db",
+        "name": "TMP12102",
+        "oraclehome": "/opt/oracle/ormerck/product/19.21.0.0/db1",
+        "domain": "MERCK",
+        "spfile": "+DG1/TMP12102/spfiletmp12102.ora",
+        "pwfile": "/opt/oracle/ormerck/product/19.21.0.0/db1/dbs/orapwTMP12102",
+        "dbname": "TMP12102",
+        "startoption": "read only",
+        "stopoption": "immediate",
+        "role": "PHYSICAL_STANDBY",
+        "diskgroup": "DG1,FRA1",
+        "state": "present"
     }
 }

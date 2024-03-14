@@ -12,6 +12,8 @@ options:
     name:
         description:
             - Name of the resource
+            - "asm for ASM instance"
+            - "db unique name for database"
         required: true
         default: None
     type:
@@ -40,6 +42,19 @@ options:
             - ASM instance parameter diskstring
             - "Use only with: type=asm"
         required: false
+
+    -db <db_unique_name>           Unique name for the database
+    -dbname <db_name>              Database name (DB_NAME), if different from the unique name given by the -db option
+    -instance <inst_name>          Instance name
+    -oraclehome <path>             Oracle home path
+    -user <oracle_user>            Oracle user
+    -domain <domain_name>          Domain for database. Must be set if database has DB_DOMAIN set.
+    -spfile <spfile>               Server parameter file path
+    -pwfile <password_file_path>   Password file path
+    -role <role>                   Role of the database (PRIMARY, PHYSICAL_STANDBY, LOGICAL_STANDBY, SNAPSHOT_STANDBY)
+    -startoption <start_options>   Startup options for the database. Examples of startup options are OPEN, MOUNT, or "READ ONLY".
+    -stopoption <stop_options>     Stop options for the database. Examples of shutdown options are NORMAL, TRANSACTIONAL, IMMEDIATE, or ABORT.
+
 
 notes:
     - cx_Oracle needs to be installed
@@ -300,7 +315,7 @@ def crs_config(resource_type, resource_name, module, ohomes):
     (rc, stdout, stderr) = module.run_command(command)
 
     if rc or stderr:
-        module.fail_json(msg='crsctl stat res -p', changed=False)
+        module.fail_json(msg='Failed command: crsctl stat res -p, {}'.format(stderr), changed=False)
 
     name = None
     retval = dict()
@@ -312,9 +327,9 @@ def crs_config(resource_type, resource_name, module, ohomes):
                 resource.update({key: value})
             if key == 'NAME':
                 if value.startswith('ora.'):
-                    name = value[len('ora.'):]
+                    name = value[len('ora.'):].split('.')[0].lower()
                 else:
-                    name = value
+                    name = value.split('.')[0].lower()
         except ValueError as e:
             retval[name] = resource
             resource = dict()
@@ -345,11 +360,11 @@ def configure_asm(config, module, ohomes):
 
     current_set = set()
     if curent_resource and 'SPFILE' in config[resource_name]:
-        current_set.add(('SPFILE', config[resource_name]['SPFILE']))
+        current_set.add(('spfile', config[resource_name]['SPFILE']))
     if curent_resource and 'PWFILE' in config[resource_name]:
-        current_set.add(('PWFILE', config[resource_name]['PWFILE']))
+        current_set.add(('pwfile', config[resource_name]['PWFILE']))
     if curent_resource and 'ASM_DISKSTRING' in config[resource_name]:
-        current_set.add(('ASM_DISKSTRING', config[resource_name]['ASM_DISKSTRING']))
+        current_set.add(('diskstring', config[resource_name]['ASM_DISKSTRING']))
 
     changes = wanted_set.difference(current_set)
 
@@ -392,6 +407,85 @@ def configure_asm(config, module, ohomes):
                      , command=[' '.join(srvctl)], changed=True)
 
 
+def configure_db(config, module, ohomes):
+    resource_name = module.params["name"].lower()
+    try:
+        curent_resource = config[resource_name]
+    except KeyError as e:
+        curent_resource = set()
+
+    state = module.params["state"]
+
+    wanted_set = set()
+    for pname in ['spfile', 'pwfile', 'db', 'dbname', 'instance', 'oraclehome', 'domain', 'role', 'startoption', 'stopoption', 'diskgroup']:
+        param = module.params[pname]
+        if param:
+            wanted_set.add((pname, param))
+
+    current_set = set()
+    if curent_resource and 'SPFILE' in config[resource_name]:
+        current_set.add(('spfile', config[resource_name]['SPFILE']))
+    if curent_resource and 'PWFILE' in config[resource_name]:
+        current_set.add(('pwfile', config[resource_name]['PWFILE']))
+
+    if curent_resource and 'DB_UNIQUE_NAME' in config[resource_name]:
+        # -db <db_unique_name>           Unique name for the database
+        current_set.add(('db', config[resource_name]['DB_UNIQUE_NAME']))
+
+    if curent_resource and 'USR_ORA_DB_NAME' in config[resource_name]:
+        # -dbname < db_name > Database name(DB_NAME), if different from the unique name given by the -db option
+        current_set.add(('dbname', config[resource_name]['USR_ORA_DB_NAME']))
+
+    if curent_resource and 'ORACLE_HOME' in config[resource_name]:
+        current_set.add(('oraclehome', config[resource_name]['ORACLE_HOME']))
+
+    if curent_resource and 'USR_ORA_DOMAIN' in config[resource_name]:
+        current_set.add(('domain', config[resource_name]['USR_ORA_DOMAIN']))
+
+    if curent_resource and 'ROLE' in config[resource_name]:
+        current_set.add(('role', config[resource_name]['ROLE']))
+
+    if curent_resource and 'USR_ORA_OPEN_MODE' in config[resource_name]:
+        current_set.add(('startoption', config[resource_name]['USR_ORA_OPEN_MODE']))
+
+    if curent_resource and 'USR_ORA_STOP_MODE' in config[resource_name]:
+        current_set.add(('stopoption', config[resource_name]['USR_ORA_STOP_MODE']))
+
+    # TODO: START_DEPENDENCIES=hard(ora.DG1.dg,ora.FRA1.dg) weak(type:ora.listener.type,uniform:ora.ons) pullup(ora.DG1.dg,ora.FRA1.dg)
+    if curent_resource and 'START_DEPENDENCIES' in config[resource_name]:
+        current_set.add(('diskgroup', config[resource_name]['START_DEPENDENCIES']))
+
+    changes = wanted_set.difference(current_set)
+    srvctl = [os.path.join(ohomes.crs_home, "bin", "srvctl")]
+    if (not curent_resource) and state == 'present':
+        srvctl.extend(['add', 'database', '-d', resource_name])
+    elif curent_resource and state == 'present':
+        srvctl.extend(['modify', 'database', '-d', resource_name])
+    elif curent_resource and state == 'absent':
+        srvctl.extend(['remove', 'database', '-d', resource_name, '-noprompt'])
+    elif (not curent_resource) and state == 'absent':
+        module.exit_json(msg='Database resource is already absent', command=[], changed=False)
+    else:
+        module.fail_json(msg='Unsupported state for Database instance: {}'.format(state), changed=False)
+
+    for change in changes:
+        (param, value) = change
+        srvctl.extend(['-'+param, value])
+
+    if len(srvctl) <= 5:
+        module.exit_json(msg='Database resource is already in desired state'
+                         #, resource=curent_resource
+                         , command=[], changed=False)
+
+    (rc, stdout, stderr) = module.run_command(srvctl)
+    if rc or stderr:
+        module.fail_json(msg='srvctl failed: {}'.format(stderr)
+                         #, resource=curent_resource
+                         , command=[' '.join(srvctl)], changed=True)
+    module.exit_json(msg='Database resource reconfigured'
+                     #, resource=list(changes)
+                     , command=[' '.join(srvctl)], changed=True)
+
 
 def main():
     module = AnsibleModule(
@@ -403,7 +497,17 @@ def main():
             listener  = dict(required=False),
             spfile    = dict(required=False),
             pwfile    = dict(required=False),
-            diskstring= dict(required=False)
+            diskstring= dict(required=False),
+            # DB parameters
+            db        = dict(required=False),
+            dbname    = dict(required=False),
+            instance  = dict(required=False),
+            oraclehome = dict(required=False),
+            domain    = dict(required=False),
+            role      = dict(required=False, choices = ['PRIMARY', 'PHYSICAL_STANDBY', 'LOGICAL_STANDBY', 'SNAPSHOT_STANDBY']),
+            startoption = dict(required=False),
+            stopoption = dict(required=False),
+            diskgroup = dict(required=False)
         ),
     )
 
@@ -422,6 +526,8 @@ def main():
 
     if resource_type == 'asm':
         configure_asm(config, module, ohomes)
+    elif resource_type == 'db':
+        configure_db(config, module, ohomes)
 
     module.exit_json(msg="Unhandled exit", changed=False)
 
