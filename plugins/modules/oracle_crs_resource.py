@@ -7,6 +7,7 @@ module: oracle_crs_resource
 short_description: Manage CRS/HAS resources
 description:
     - Manage CRS/HAS resources
+    - ASM instance, Database and Listener resources are supported
 version_added: "3.1.7.0"
 options:
     name:
@@ -21,7 +22,7 @@ options:
             - Type of the resource
         required: true
         default: None
-        choices: ['asm', 'db', listener', 'service']
+        choices: ['asm', 'db', listener']
     listener:
         description:
             - ASM instance LISTENER
@@ -30,31 +31,61 @@ options:
     spfile:
         description:
             - ASM instance SPFILE
-            - "Use only with: type=asm"            
+            - "Use only with: type=asm or type=db"       
         required: false
     pwfile:
         description:
             - ASM instance password file
-            - "Use only with: type=asm"
+            - "Use only with: type=asm or type=asm
         required: false
     diskstring:
         description:
             - ASM instance parameter diskstring
             - "Use only with: type=asm"
         required: false
-
-    -db <db_unique_name>           Unique name for the database
-    -dbname <db_name>              Database name (DB_NAME), if different from the unique name given by the -db option
-    -instance <inst_name>          Instance name
-    -oraclehome <path>             Oracle home path
-    -user <oracle_user>            Oracle user
-    -domain <domain_name>          Domain for database. Must be set if database has DB_DOMAIN set.
-    -spfile <spfile>               Server parameter file path
-    -pwfile <password_file_path>   Password file path
-    -role <role>                   Role of the database (PRIMARY, PHYSICAL_STANDBY, LOGICAL_STANDBY, SNAPSHOT_STANDBY)
-    -startoption <start_options>   Startup options for the database. Examples of startup options are OPEN, MOUNT, or "READ ONLY".
-    -stopoption <stop_options>     Stop options for the database. Examples of shutdown options are NORMAL, TRANSACTIONAL, IMMEDIATE, or ABORT.
-
+    db:
+        description:
+            - "<db_unique_name> Unique name for the database"
+            - "Use only with: type=db"
+        required: false
+    dbname:
+        description:
+            - "<db_name> Database name (DB_NAME), if different from the unique name given by the -db option"
+            - "Use only with: type=db"
+        required: false
+    instance:
+        description:
+            - "<inst_name> Instance name"
+            - "Use only with: type=db"
+        required: false
+    oraclehome:
+        description:        
+            - "oraclehome <path> Oracle home path"
+            - "Use only with: type=db"
+        required: false
+    domain:
+        description:
+            - "<domain_name> Domain for database. Must be set if database has DB_DOMAIN set"
+            - "Use only with: type=db"
+        required: false
+    role:
+        description:
+            - <role> Role of the database"
+            - "Use only with: type=db"
+        choices: ['PRIMARY', 'PHYSICAL_STANDBY', 'LOGICAL_STANDBY', 'SNAPSHOT_STANDBY']
+        required: false
+    startoptions:
+        description:
+            - "<start_options>   Startup options for the database"
+            - "Use only with: type=db"
+        choices: ['OPEN', 'MOUNT', 'READ ONLY']
+        required: false
+    stopoption:
+        description:
+            - "<stop_options> Stop options for the database"
+            - "Use only with: type=db"
+        choices: ['NORMAL', 'TRANSACTIONAL', 'IMMEDIATE', 'ABORT']
+        required: false
 
 notes:
     - cx_Oracle needs to be installed
@@ -78,6 +109,21 @@ oracle_crs_resource:
 '''
 
 import os
+from ansible.module_utils.basic import *
+
+# In these we do import from local project sub-directory <project-dir>/module_utils
+# While this file is placed in <project-dir>/library
+# No collections are used
+# try:
+#    from ansible.module_utils.oracle_homes import oracle_homes
+# except:
+#    pass
+
+# In these we do import from collections
+try:
+    from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_homes import *
+except:
+    pass
 
 
 def get_change(change_set, change):
@@ -85,218 +131,6 @@ def get_change(change_set, change):
         return next(v for (a, v) in change_set if a == change)
     except StopIteration:
         return None
-
-# Check if the service exists
-def check_service_exists(oc, module, msg, name, database_name):
-    oracle_home = module.params["oracle_home"]
-    if gimanaged:
-        command = "%s/bin/srvctl config service -d %s -s %s" % (oracle_home, database_name, name)
-        (rc, stdout, stderr) = module.run_command(command)
-        if rc != 0:
-            if 'PRCR-1001' in stdout: #<-- service doesn't exist
-                return False
-            else:
-                msg = 'Error: command: %s. stdout: %s, stderr: %s' % (command, stdout, stderr)
-                return False
-        elif 'Service name: %s' % name in stdout: #<-- service already exist
-            #msg = 'Service %s already exists in database %s' % (name, database_name)
-            return True
-        else:
-            msg = stdout
-            return True
-
-
-def create_service(oc, module, msg):
-    oracle_home = module.params["oracle_home"]
-
-    database_name       = module.params["database_name"]
-    name                = module.params["name"]
-    preferred_instances = module.params["preferred_instances"]
-    available_instances = module.params["available_instances"]
-    role                = module.params["role"]
-    pdb                 = module.params["pdb"]
-    clbgoal             = module.params["clbgoal"]
-    rlbgoal             = module.params["rlbgoal"]
-
-    if gimanaged:
-        command = "%s/bin/srvctl add service -d %s -s %s" % (oracle_home, database_name, name)
-        if preferred_instances:
-            command += ' -r %s' % preferred_instances
-
-        if available_instances:
-            command += ' -a %s' % available_instances
-
-        if pdb:
-            command += ' -pdb %s' % pdb
-
-        if role:
-            command += ' -l %s' % role
-
-        if clbgoal:
-            command += ' -clbgoal %s' % clbgoal
-
-        if rlbgoal:
-            command += ' -rlbgoal %s' % rlbgoal
-
-        # module.fail_json(msg=command)
-        (rc, stdout, stderr) = module.run_command(command)
-        if rc != 0:
-            if 'PRKO-3117' in stdout: #<-- service already exist
-                msg = 'Service %s already exists in database %s' % (name, database_name)
-                module.exit_json(msg=msg, changed=False)
-            else:
-                msg = 'Error: %s, command is %s' % (stdout, command)
-                return False
-        else:
-            if pdb:
-                database_name = pdb
-            return True
-
-
-def ensure_service_state(oc, module, msg):
-    oracle_home = module.params["oracle_home"]
-
-    database_name       = module.params["database_name"]
-    name                = module.params["name"]
-    state               = module.params["state"]
-    preferred_instances = module.params["preferred_instances"]
-    available_instances = module.params["available_instances"]
-    clbgoal             = module.params["clbgoal"]
-    rlbgoal             = module.params["rlbgoal"]
-
-    configchange = False
-    if not newservice:
-        _wanted_ai = ['']
-        _wanted_pi = ['']
-        _wanted_config = {}
-        if rlbgoal is not None:
-            _wanted_config['rlb'] = rlbgoal
-        else:
-            _wanted_config['rlb'] = 'NONE'
-            rlbgoal = 'NONE'
-        if clbgoal is not None:
-            _wanted_config['clb'] = clbgoal
-        else:
-            _wanted_config['clb'] = 'LONG'
-            clbgoal = 'LONG'
-
-        modify_conf = '%s/bin/srvctl modify service -d %s -s %s' % (oracle_home, database_name, name)
-        modify_inst = '%s/bin/srvctl modify service -d %s -s %s -modifyconfig' % (oracle_home, database_name, name)
-        _inst_temp = ""
-        _conf_temp = ""
-        total_mod = []
-
-        if available_instances and available_instances is not None:
-            _wanted_ai = available_instances.split(',')
-        if preferred_instances and preferred_instances is not None:
-            _wanted_pi = preferred_instances.split(',')
-
-        _curr_config,_curr_config_ai,_curr_config_pi = _get_service_config(oc, module, msg, oracle_home, name, database_name)
-
-        # Compare instance configurations
-        if _wanted_pi != _curr_config_pi:
-            _inst_temp += ' -preferred %s' % preferred_instances
-        if _wanted_ai != _curr_config_ai and '' not in _wanted_ai:
-            _inst_temp += ' -available %s' % available_instances
-
-        if len(_inst_temp) > 0:
-            modify_inst += _inst_temp
-            total_mod.append(modify_inst)
-
-        # Compare other configuration
-        if not _wanted_config == _curr_config:
-            _conf_temp += ' -clbgoal %s -rlbgoal %s' % (clbgoal, rlbgoal)
-            # if clbgoal is not None:
-            #     _conf_temp += ' -clbgoal %s ' % (clbgoal)
-            # if rlbgoal is not None:
-            #     _conf_temp += ' -rlbgoal %s' % (rlbgoal)
-            modify_conf += _conf_temp
-            total_mod.append(modify_conf)
-
-        # module.exit_json(msg="%s,     %s, %s" % (total_mod, _wanted_config, _curr_config))
-        if len(total_mod) > 0:
-            for cmd in total_mod:
-                (rc, stdout, stderr) = module.run_command(cmd)
-                if rc != 0:
-                    if rc != 0:
-                        msg = "Error modifying service. Command: %s, stdout: %s, stderr: %s" % (cmd,stdout,stderr)
-                        module.fail_json(msg=msg, changed=False)
-            configchange = True
-
-    if state == 'present':
-        if newservice:
-            module.exit_json(msg="Service %s (%s) successfully created" % (name, database_name), changed=True)
-        else:
-            msg = "Service %s (%s) is in the intended state" % (name, database_name)
-            if configchange:
-                msg += 'after configchanges had been applied'
-                change=True
-            module.exit_json(msg=msg, changed=change)
-
-    if state == 'started':
-        change = False
-        if start_service(oc, module, msg, name, database_name, configchange):
-            change = True
-            msg = 'Service %s (%s) successfully created/started' % (name, database_name)
-            if configchange:
-                msg += ' and config changes have been applied'
-                change = True
-            module.exit_json(msg=msg, changed=change)
-
-    if state == 'stopped':
-        if stop_service(oc, module, msg, name, database_name):
-            msg = 'Service %s (%s) successfully stopped' % (name, database_name)
-            change = True
-            if configchange:
-                msg += ' and config changes have been applied'
-                change=True
-            module.exit_json(msg=msg, changed=change)
-        else:
-            msg = 'Service %s (%s) already stopped' % (name, database_name)
-            change = False
-            if configchange:
-                msg += ' but config changes have been applied'
-                change=True
-            module.exit_json(msg=msg, changed=change)
-
-
-def remove_service(oc, module, msg, name, database_name, force):
-    oracle_home = module.params["oracle_home"]
-    stop_service(oc, module, msg, name, database_name)
-    if gimanaged:
-        command = "%s/bin/srvctl remove service -d %s -s %s" % (oracle_home, database_name, name)
-        if force:
-            command += ' -f'
-
-        (rc, stdout, stderr) = module.run_command(command)
-        if rc != 0:
-            if 'PRCR-1001' in stdout: #<-- service doesn' exist
-                return False
-            else:
-                msg = 'Removal of service %s in database %s failed: %s' % (name,database_name,stdout)
-                module.fail_json(msg=msg, changed=False)
-        else:
-            return True
-
-
-def check_service_status(cursor, module, msg, name, database_name, state):
-    oracle_home = module.params["oracle_home"]
-    if gimanaged:
-        command = "%s/bin/srvctl status service -d %s -s %s" % (oracle_home, database_name, name)
-        (rc, stdout, stderr) = module.run_command(command)
-
-        if rc != 0:
-            msg = 'Checking status of service %s in database %s failed: %s' % (name,database_name,stdout)
-            module.fail_json(msg=msg, changed=False)
-
-        elif state == "status":
-            module.exit_json(msg=stdout.rstrip('\n'), changed=False)
-
-        elif 'is not running' in stdout:
-            return False
-        else:
-            #msg = 'service %s already running in database %s' % (name,database_name)
-            return True
 
 
 def crs_config(resource_type, resource_name, module, ohomes):
@@ -394,16 +228,16 @@ def configure_asm(config, module, ohomes):
 
     if len(srvctl) <= 3:
         module.exit_json(msg='ASM instance is already in desired state'
-                         #, resource=curent_resource
+                         # , resource=curent_resource
                          , command=[], changed=False)
 
     (rc, stdout, stderr) = module.run_command(srvctl)
     if rc or stderr:
         module.fail_json(msg='srvctl failed: {}'.format(stderr)
-                         #, resource=curent_resource
+                         # , resource=curent_resource
                          , command=[' '.join(srvctl)], changed=True)
     module.exit_json(msg='ASM instance reconfigured'
-                     #, resource=list(changes)
+                     # , resource=list(changes)
                      , command=[' '.join(srvctl)], changed=True)
 
 
@@ -417,7 +251,8 @@ def configure_db(config, module, ohomes):
     state = module.params["state"]
 
     wanted_set = set()
-    for pname in ['spfile', 'pwfile', 'db', 'dbname', 'instance', 'oraclehome', 'domain', 'role', 'startoption', 'stopoption', 'diskgroup']:
+    for pname in ['spfile', 'pwfile', 'db', 'dbname', 'instance', 'oraclehome', 'domain', 'role', 'startoption',
+                  'stopoption', 'diskgroup']:
         param = module.params[pname]
         if param:
             wanted_set.add((pname, param))
@@ -470,73 +305,47 @@ def configure_db(config, module, ohomes):
 
     for change in changes:
         (param, value) = change
-        srvctl.extend(['-'+param, value])
+        srvctl.extend(['-' + param, value])
 
     if len(srvctl) <= 5:
         module.exit_json(msg='Database resource is already in desired state'
-                         #, resource=curent_resource
+                         # , resource=curent_resource
                          , command=[], changed=False)
 
     (rc, stdout, stderr) = module.run_command(srvctl)
     if rc or stderr:
         module.fail_json(msg='srvctl failed: {}'.format(stderr)
-                         #, resource=curent_resource
+                         # , resource=curent_resource
                          , command=[' '.join(srvctl)], changed=True)
     module.exit_json(msg='Database resource reconfigured'
-                     #, resource=list(changes)
+                     # , resource=list(changes)
                      , command=[' '.join(srvctl)], changed=True)
 
 
 def main():
     module = AnsibleModule(
-        argument_spec = dict(
-            name      = dict(required=True),
-            type      = dict(required=True, choices=['asm', 'db', 'listener', 'service']),
-            state     = dict(default="present", choices=["present", "absent", "started", "stopped", "restarted"]),
+        argument_spec=dict(
+            name=dict(required=True),
+            type=dict(required=True, choices=['asm', 'db', 'listener']),
+            state=dict(default="present", choices=["present", "absent", "started", "stopped", "restarted"]),
             # ASM parameters
-            listener  = dict(required=False),
-            spfile    = dict(required=False),
-            pwfile    = dict(required=False),
-            diskstring= dict(required=False),
+            listener=dict(required=False),
+            spfile=dict(required=False),
+            pwfile=dict(required=False),
+            diskstring=dict(required=False),
             # DB parameters
-            db        = dict(required=False),
-            dbname    = dict(required=False),
-            instance  = dict(required=False),
-            oraclehome = dict(required=False),
-            domain    = dict(required=False),
-            role      = dict(required=False, choices = ['PRIMARY', 'PHYSICAL_STANDBY', 'LOGICAL_STANDBY', 'SNAPSHOT_STANDBY']),
-            startoption = dict(required=False),
-            stopoption = dict(required=False),
-            diskgroup = dict(required=False),
+            db=dict(required=False),
+            dbname=dict(required=False),
+            instance=dict(required=False),
+            oraclehome=dict(required=False),
+            domain=dict(required=False),
+            role=dict(required=False, choices=['PRIMARY', 'PHYSICAL_STANDBY', 'LOGICAL_STANDBY', 'SNAPSHOT_STANDBY']),
+            startoption=dict(required=False),
+            stopoption=dict(required=False),
+            diskgroup=dict(required=False),
             # LISTENER parameters
-            skip = dict(required=False, type=boolean),
-            endpoints = dict(required=False, type=list),
-            # Service parameters
-            db <db_unique_name>           Unique name for the database
-            service "<serv,...>"          Comma separated service names
-            role <role>                   Role of the service (primary, physical_standby, logical_standby, snapshot_standby)
-            policy <policy>               Management policy for the service (AUTOMATIC or MANUAL)
-            failovertype                  (NONE | SESSION | SELECT | TRANSACTION | AUTO)      Failover type
-            failovermethod                (NONE | BASIC)     Failover method
-            failoverdelay <failover_delay> Failover delay (in seconds)
-            failoverretry <failover_retries> Number of attempts to retry connection
-            failover_restore <failover_restore>  Option to restore initial environment for Application Continuity and TAF (NONE or LEVEL1)
-            edition <edition>             Edition (or "" for empty edition value)
-            pdb <pluggable_database>      Pluggable database name
-            maxlag <max_lag_time>         Maximum replication lag time in seconds (Non-negative integer, default value is 'ANY')
-            clbgoal                       (SHORT | LONG)                   Connection Load Balancing Goal. Default is LONG.
-            rlbgoal                       (SERVICE_TIME | THROUGHPUT | NONE)     Runtime Load Balancing Goal
-            notification                  (TRUE | FALSE)  Enable Fast Application Notification (FAN) for OCI connections
-            global <global>               Global attribute (TRUE or FALSE)
-            sql_translation_profile <sql_translation_profile> Specify a database object for SQL translation profile
-            commit_outcome                (TRUE | FALSE)          Commit outcome
-            retention <retention>         Specifies the number of seconds the commit outcome is retained
-            replay_init_time <replay_initiation_time> Seconds after which replay will not be initiated
-            session_state <session_state> Session state consistency (STATIC or DYNAMIC)
-            tablefamilyid <table_family_id> Set table family ID for a given service
-            drain_timeout <drain_timeout> Service drain timeout specified in seconds
-            stopoption <stop_options>     Options to stop service (e.g. TRANSACTIONAL or IMMEDIATE)
-            force                         Force the add operation even though a listener is not configured for a network
+            skip=dict(required=False, type=boolean),
+            endpoints=dict(required=False, type=list),
         ),
         supports_check_mode=True,
     )
@@ -560,25 +369,6 @@ def main():
         configure_db(config, module, ohomes)
 
     module.exit_json(msg="Unhandled exit", changed=False)
-
-
-from ansible.module_utils.basic import *
-
-# In these we do import from local project sub-directory <project-dir>/module_utils
-# While this file is placed in <project-dir>/library
-# No collections are used
-#try:
-#    from ansible.module_utils.oracle_utils import oracleConnection
-#    from ansible.module_utils.oracle_homes import oracle_homes
-#except:
-#    pass
-
-# In these we do import from collections
-try:
-    from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_utils import oracleConnection
-    from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_homes import *
-except:
-    pass
 
 
 if __name__ == '__main__':
