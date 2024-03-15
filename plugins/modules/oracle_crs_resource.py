@@ -12,7 +12,7 @@ options:
     name:
         description:
             - Name of the resource
-            - "asm for ASM instance"
+            - '"asm" for ASM instance'
             - "db unique name for database"
         required: true
         default: None
@@ -507,8 +507,38 @@ def main():
             role      = dict(required=False, choices = ['PRIMARY', 'PHYSICAL_STANDBY', 'LOGICAL_STANDBY', 'SNAPSHOT_STANDBY']),
             startoption = dict(required=False),
             stopoption = dict(required=False),
-            diskgroup = dict(required=False)
+            diskgroup = dict(required=False),
+            # LISTENER parameters
+            skip = dict(required=False, type=boolean),
+            endpoints = dict(required=False, type=list),
+            # Service parameters
+            db <db_unique_name>           Unique name for the database
+            service "<serv,...>"          Comma separated service names
+            role <role>                   Role of the service (primary, physical_standby, logical_standby, snapshot_standby)
+            policy <policy>               Management policy for the service (AUTOMATIC or MANUAL)
+            failovertype                  (NONE | SESSION | SELECT | TRANSACTION | AUTO)      Failover type
+            failovermethod                (NONE | BASIC)     Failover method
+            failoverdelay <failover_delay> Failover delay (in seconds)
+            failoverretry <failover_retries> Number of attempts to retry connection
+            failover_restore <failover_restore>  Option to restore initial environment for Application Continuity and TAF (NONE or LEVEL1)
+            edition <edition>             Edition (or "" for empty edition value)
+            pdb <pluggable_database>      Pluggable database name
+            maxlag <max_lag_time>         Maximum replication lag time in seconds (Non-negative integer, default value is 'ANY')
+            clbgoal                       (SHORT | LONG)                   Connection Load Balancing Goal. Default is LONG.
+            rlbgoal                       (SERVICE_TIME | THROUGHPUT | NONE)     Runtime Load Balancing Goal
+            notification                  (TRUE | FALSE)  Enable Fast Application Notification (FAN) for OCI connections
+            global <global>               Global attribute (TRUE or FALSE)
+            sql_translation_profile <sql_translation_profile> Specify a database object for SQL translation profile
+            commit_outcome                (TRUE | FALSE)          Commit outcome
+            retention <retention>         Specifies the number of seconds the commit outcome is retained
+            replay_init_time <replay_initiation_time> Seconds after which replay will not be initiated
+            session_state <session_state> Session state consistency (STATIC or DYNAMIC)
+            tablefamilyid <table_family_id> Set table family ID for a given service
+            drain_timeout <drain_timeout> Service drain timeout specified in seconds
+            stopoption <stop_options>     Options to stop service (e.g. TRANSACTIONAL or IMMEDIATE)
+            force                         Force the add operation even though a listener is not configured for a network
         ),
+        supports_check_mode=True,
     )
 
     ohomes = oracle_homes()
