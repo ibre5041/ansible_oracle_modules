@@ -3,7 +3,6 @@
 
 DOCUMENTATION = '''
 ---
----
 module: oracle_crs_resource
 short_description: Manage CRS/HAS resources type listener
 description:
@@ -76,104 +75,161 @@ except:
     pass
 
 
-def get_change(change_set, change):
-    try:
-        return next(v for (a, v) in change_set if a == change)
-    except StopIteration:
-        return None
+class oracle_crs_listener:
+    def __init__(self, module, ohomes):
+        self.module = module
+        self.ohomes = ohomes
+        self.resource_name = module.params['name']
+        self.commands = []
+        self.changed = False
+        self.curent_resource = None
+        self.get_crs_config('listener')
+        self.srvctl = os.path.join(self.ohomes.crs_home, "bin", "srvctl")
 
+    def run_change_command(self, command):
+        self.commands.append(command)
+        self.changed = True
+        if self.module.check_mode:
+            return 0, '', ''
+        (rc, stdout, stderr) = self.module.run_command(command)
+        if rc or stderr:
+            self.module.fail_json(msg='srvctl failed({}): {}'.format(rc, stderr)
+                                  , commands=self.commands
+                                  , changed=self.changed)
+        return rc, stdout, stderr
 
-def crs_config(resource_type, resource_name, module, ohomes):
-    if resource_type == 'asm':
-        dfilter = '(TYPE = ora.asm.type)'
-    elif resource_type == 'db':
-        dfilter = '(TYPE = ora.database.type)'
-    elif resource_type == 'listener':
-        dfilter = '(TYPE = ora.listener.type)'
-    elif resource_type == 'service':
-        dfilter = '(TYPE = ora.service.type)'
-    else:
-        module.fail_json(msg='Unknown resource type: {}'.format(resource_type), changed=False)
-
-    command = [ohomes.crsctl, 'stat', 'res', '-p', '-w', dfilter]
-    (rc, stdout, stderr) = module.run_command(command)
-
-    if rc or stderr:
-        module.fail_json(msg='Failed command: crsctl stat res -p, {}'.format(stderr), changed=False)
-
-    name = None
-    retval = dict()
-    resource = dict()
-    for line in stdout.splitlines():
+    @staticmethod
+    def get_change(change_set, change):
         try:
-            (key, value) = line.split('=', 1)
-            if value:
-                resource.update({key: value})
-            if key == 'NAME':
-                if value.startswith('ora.'):
-                    name = value[len('ora.'):].split('.')[0].lower()
-                else:
-                    name = value.split('.')[0].lower()
-        except ValueError as e:
-            retval[name] = resource
-            resource = dict()
-    return retval
+            return next(v for (a, v) in change_set if a == change)
+        except StopIteration:
+            return None
+
+    def get_crs_config(self, resource_type):
+        if resource_type == 'asm':
+            dfilter = '(TYPE = ora.asm.type)'
+        elif resource_type == 'db':
+            dfilter = '(TYPE = ora.database.type)'
+        elif resource_type == 'listener':
+            dfilter = '(TYPE = ora.listener.type)'
+        elif resource_type == 'service':
+            dfilter = '(TYPE = ora.service.type)'
+        else:
+            self.module.fail_json(msg='Unknown resource type: {}'.format(resource_type)
+                                  , commands=self.commands
+                                  , changed=self.changed)
+
+        command = [self.ohomes.crsctl, 'stat', 'res', '-p', '-w', dfilter]
+        (rc, stdout, stderr) = self.module.run_command(command)
+
+        if rc or stderr:
+            self.module.fail_json(msg='Failed command: crsctl stat res -p, {}'.format(stderr)
+                                  , commands=self.commands
+                                  , changed=self.changed)
+
+        name = None
+        retval = dict()
+        resource = dict()
+        for line in stdout.splitlines():
+            try:
+                (key, value) = line.split('=', 1)
+                if value:
+                    resource.update({key: value})
+                if key == 'NAME':
+                    if value.startswith('ora.'):
+                        name = value[len('ora.'):].split('.')[0].lower()
+                    else:
+                        name = value.split('.')[0].lower()
+            except ValueError as e:
+                retval[name] = resource
+                resource = dict()
+        self.curent_resource = retval.get(self.resource_name.lower(), dict())
 
 
+    def configure_listener(self):
+        state = self.module.params["state"]
+        resource_name = self.module.params['name'].upper()
 
-def configure_listener(config, module, ohomes):
-    resource_name = module.params["name"].lower()
-    try:
-        curent_resource = config[resource_name]
-    except KeyError as e:
-        curent_resource = set()
+        wanted_set = set()
+        for pname in ['oraclehome', 'endpoints']:
+            param = self.module.params[pname]
+            if param:
+                wanted_set.add((pname, param))
 
-    state = module.params["state"]
+        current_set = set()
+        current_set.add(('oraclehome', self.curent_resource.get('ORACLE_HOME', None)))
+        current_set.add(('endpoints', self.curent_resource.get('ENDPOINTS', None)))
 
-    wanted_set = set()
-    for pname in ['oraclehome', 'endpoints']:
-        param = module.params[pname]
-        if param:
-            wanted_set.add((pname, param))
+        apply = False
+        changes = wanted_set.difference(current_set)
+        srvctl = [self.srvctl]
+        if (not self.curent_resource) and state in ['present', 'started', 'stopped', 'restarted']:
+            srvctl.extend(['add', 'listener', '-l', resource_name])
+            if self.module.params['skip']:
+                srvctl.append('-skip')
+            apply = True
+        elif self.curent_resource and state in ['present', 'started', 'stopped', 'restarted']:
+            srvctl.extend(['modify', 'listener', '-l', resource_name])
+        elif self.curent_resource and state == 'absent':
+            srvctl.extend(['remove', 'listener', '-l', resource_name])
+            apply = True
+        elif (not self.curent_resource) and state == 'absent':
+            self.module.exit_json(msg='Listener resource is already absent', commands=self.commands, changed=self.changed)
+        else:
+            self.module.fail_json(msg='Unsupported state for Listener resource: {}'.format(state)
+                                  , commands=self.commands
+                                  , changed=self.changed)
 
-    current_set = set()
-    if curent_resource and 'ORACLE_HOME' in config[resource_name]:
-        current_set.add(('oraclehome', config[resource_name]['ORACLE_HOME']))
+        for change in changes:
+            (param, value) = change
+            srvctl.extend(['-' + param, value])
+            apply = True
 
-    if curent_resource and 'ENDPOINTS' in config[resource_name]:
-        current_set.add(('endpoints', config[resource_name]['ENDPOINTS']))
+        if changes or apply:
+            (rc, stdout, stderr) = self.run_change_command(srvctl)
 
-    apply = False
-    changes = wanted_set.difference(current_set)
-    srvctl = [os.path.join(ohomes.crs_home, "bin", "srvctl")]
-    if (not curent_resource) and state == 'present':
-        srvctl.extend(['add', 'listener', '-l', resource_name])
-        if module.params['skip']:
-            srvctl.append('-skip')
-        apply = True
-    elif curent_resource and state == 'present':
-        srvctl.extend(['modify', 'listener', '-l', resource_name])
-    elif curent_resource and state == 'absent':
-        srvctl.extend(['remove', 'listener', '-l', resource_name])
-        apply = True        
-    elif (not curent_resource) and state == 'absent':
-        module.exit_json(msg='Listener resource is already absent', command=[], changed=False)
-    else:
-        module.fail_json(msg='Unsupported state for Listener resource: {}'.format(state), changed=False)
 
-    for change in changes:
-        (param, value) = change
-        srvctl.extend(['-' + param, value])
-        apply = True        
+    def ensure_listener_state(self):
+        enabled = self.curent_resource.get('ENABLED', '0') # 0/1 or '0'/'1'
+        enabled = bool(int(enabled))
+        enable = self.module.params['enabled']
+        if enable and not enabled:
+            srvctl = [self.srvctl, 'enable', 'listener', '-l', self.resource_name]
+            (rc, stdout, stderr) = self.run_change_command(srvctl)
 
-    if not changes and not apply:
-        module.exit_json(msg='Listener resource is already in desired state', command=[], changed=False)
+        if not enable and enabled:
+            srvctl = [self.srvctl, 'disable', 'listener', '-l', self.resource_name]
+            (rc, stdout, stderr) = self.run_change_command(srvctl)
 
-    (rc, stdout, stderr) = module.run_command(srvctl)
-    if rc or stderr:
-        module.fail_json(msg='srvctl failed: {}'.format(stderr), command=[' '.join(srvctl)], changed=True)
-    module.exit_json(msg='Listener resource reconfigured', command=[' '.join(srvctl)], changed=True)
+        srvctl = [self.srvctl, 'status', 'listener', '-l', self.resource_name]
+        (rc, stdout, stderr) = self.module.run_command(srvctl)
+        running = None
+        for line in stdout.splitlines():
+            if line.endswith('is not running'):
+                running = False
+            if line.endswith('is running'):
+                running = True
 
+        if running is None:
+            self.module.fail_json("Could not check if {} is running".format(self.resource_name)
+                                  , commands=self.commands
+                                  , changed=self.changed)
+
+        state = self.module.params['state']
+        if state == 'stopped' and running:
+            srvctl = [self.srvctl, 'stop', 'listener', '-l', self.resource_name]
+            (rc, stdout, stderr) = self.run_change_command(srvctl)
+
+        if state == 'started' and not running:
+            srvctl = [self.srvctl, 'start', 'listener', '-l', self.resource_name]
+            (rc, stdout, stderr) = self.run_change_command(srvctl)
+
+        if state == 'restarted':
+            if running:
+                srvctl = [self.srvctl, 'stop', 'listener', '-l', self.resource_name]
+                (rc, stdout, stderr) = self.run_change_command(srvctl)
+            srvctl = [self.srvctl, 'start', 'listener', '-l', self.resource_name]
+            (rc, stdout, stderr) = self.run_change_command(srvctl)
 
 def main():
     module = AnsibleModule(
@@ -197,11 +253,13 @@ def main():
     if not ohomes.oracle_gi_managed:
         module.fail_json(msg="Oracle CRS/HAS was not detected", changed=False)
 
-    resource_name = module.params["name"]
+    listener = oracle_crs_listener(module, ohomes)
+    listener.configure_listener()
+    listener.ensure_listener_state()
 
-    config = crs_config(resource_type, resource_name, module, ohomes)
-    configure_listener(config, module, ohomes)        
-    module.exit_json(msg="Unhandled exit", changed=False)
+    if listener.changed:
+        module.exit_json(msg='Listener resource was reconfigured', commands=listener.commands, changed=listener.changed)
+    module.exit_json(msg='Listener was already in intended state', commands=listener.commands, changed=listener.changed)
 
 
 if __name__ == '__main__':
