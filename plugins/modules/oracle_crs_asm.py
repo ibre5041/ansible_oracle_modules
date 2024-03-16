@@ -3,40 +3,41 @@
 
 DOCUMENTATION = '''
 ---
-module: oracle_crs_listener
-short_description: Manage CRS/HAS resources type listener
+module: oracle_crs_asm
+short_description: Manage CRS/HAS resource type asm
 description:
-  - Manage CRS/HAS Listener resources
+  - Manage CRS/HAS ASM resource
 version_added: "3.1.7.0"
 options:
   name:
     description:
-      - "<lsnr_name>          Listener name (default name is LISTENER)"
+      - "<asm_name>          ASM name (default name is ASM)"
     required: false
-    default: LISTENER
+    default: ASM
   state:
     description:
       - Resource state
     choices: ['present', 'absent', 'started', 'stopped', 'restarted']
   enabled:
     description:
-      - Enables the listener
+      - Enables the ASM
     type: bool
     default: true
-  oraclehome:
+  listener:
     description:
-      - "<path> Oracle home path (default value is CRS_HOME)"
-    required: false      
-    default: CRS_HOME      
-  skip:
-    description:
-      - Skip the checking of ports
+      - "<lsnr_name> ASM instance Listener name"
     required: false
-    type: bool
-  endpoints:
+  spfile:
     description:
-      - "Comma separated TCP ports or listener endpoints"
-      - "[TCP:]<port>[, ...][/IPC:<key>][/NMP:<pipe_name>][/TCPS:<s_port>][/SDP:<port>][/EXADIRECT:<port>]"
+      - "<spfile> Server parameter file path"
+    required: false
+  pwfile:
+    description:
+      - "<password_file_path> Password file path"
+    required: false
+  diskstring:
+    description:
+      - "<asm_diskstring> ASM diskgroup discovery string"
     required: false
 notes:
   - Should be executed with privileges of Oracle CRS installation owner
@@ -45,16 +46,15 @@ author: Ivan Brezina
 
 EXAMPLES = '''
 - name: Register listener ASM_LISTENER
-  oracle_crs_listener:
-    name: ASM_LISTENER
-    endpoints: TCP:1522
-    enabled: true
+  oracle_crs_asm:
+    name: asm
+    listener: LISTENER
 
-- name: Restart listener ASM_LISTENER
-  oracle_crs_resource:
-    name: ASM_LISTENER
-    endpoints: TCP:1521
+- name: Restart ASM
+  oracle_crs_asm:
+    name: asm
     state: restarted
+    force: true
 '''
 
 import os
@@ -75,7 +75,7 @@ except:
     pass
 
 
-class oracle_crs_listener:
+class oracle_crs_asm:
     def __init__(self, module, ohomes):
         self.module = module
         self.ohomes = ohomes
@@ -83,7 +83,7 @@ class oracle_crs_listener:
         self.commands = []
         self.changed = False
         self.curent_resource = None
-        self.get_crs_config('listener')
+        self.get_crs_config('asm')
         self.srvctl = os.path.join(self.ohomes.crs_home, "bin", "srvctl")
 
     def run_change_command(self, command):
@@ -146,37 +146,37 @@ class oracle_crs_listener:
         self.curent_resource = retval.get(self.resource_name.lower(), dict())
 
 
-    def configure_listener(self):
+    def configure_asm(self):
         state = self.module.params["state"]
         resource_name = self.module.params['name'].upper()
 
         wanted_set = set()
-        for pname in ['oraclehome', 'endpoints']:
+        for pname in ['listener', 'spfile', 'pwfile', 'diskstring']:
             param = self.module.params[pname]
             if param:
                 wanted_set.add((pname, param))
 
         current_set = set()
-        current_set.add(('oraclehome', self.curent_resource.get('ORACLE_HOME', None)))
-        current_set.add(('endpoints', self.curent_resource.get('ENDPOINTS', None)))
+        # current_set.add(('listener', self.curent_resource.get('LISTENER', None)))
+        current_set.add(('spfile', self.curent_resource.get('SPFILE', None)))
+        current_set.add(('pwfile', self.curent_resource.get('PWFILE', None)))
+        current_set.add(('diskstring', self.curent_resource.get('ASM_DISKSTRING', None)))
 
         apply = False
         changes = wanted_set.difference(current_set)
         srvctl = [self.srvctl]
         if (not self.curent_resource) and state in ['present', 'started', 'stopped', 'restarted']:
-            srvctl.extend(['add', 'listener', '-l', resource_name])
-            if self.module.params['skip']:
-                srvctl.append('-skip')
+            srvctl.extend(['add', 'asm'])
             apply = True
         elif self.curent_resource and state in ['present', 'started', 'stopped', 'restarted']:
-            srvctl.extend(['modify', 'listener', '-l', resource_name])
+            srvctl.extend(['modify', 'asm'])
         elif self.curent_resource and state == 'absent':
-            srvctl.extend(['remove', 'listener', '-l', resource_name])
+            srvctl.extend(['remove', 'asm'])
             apply = True
         elif (not self.curent_resource) and state == 'absent':
-            self.module.exit_json(msg='Listener resource is already absent', commands=self.commands, changed=self.changed)
+            self.module.exit_json(msg='ASM resource is already absent', commands=self.commands, changed=self.changed)
         else:
-            self.module.fail_json(msg='Unsupported state for Listener resource: {}'.format(state)
+            self.module.fail_json(msg='Unsupported state for ASM resource: {}'.format(state)
                                   , commands=self.commands
                                   , changed=self.changed)
 
@@ -189,25 +189,25 @@ class oracle_crs_listener:
             (rc, stdout, stderr) = self.run_change_command(srvctl)
 
 
-    def ensure_listener_state(self):
+    def ensure_asm_state(self):
         enabled = self.curent_resource.get('ENABLED', '0') # 0/1 or '0'/'1'
         enabled = bool(int(enabled))
         enable = self.module.params['enabled']
         if enable and not enabled:
-            srvctl = [self.srvctl, 'enable', 'listener', '-l', self.resource_name]
+            srvctl = [self.srvctl, 'enable', 'asm']
             (rc, stdout, stderr) = self.run_change_command(srvctl)
 
         if not enable and enabled:
-            srvctl = [self.srvctl, 'disable', 'listener', '-l', self.resource_name]
+            srvctl = [self.srvctl, 'disable', self.resource_name]
             (rc, stdout, stderr) = self.run_change_command(srvctl)
 
-        srvctl = [self.srvctl, 'status', 'listener', '-l', self.resource_name]
+        srvctl = [self.srvctl, 'status', 'asm']
         (rc, stdout, stderr) = self.module.run_command(srvctl)
         running = None
         for line in stdout.splitlines():
-            if line.endswith('is not running'):
+            if 'is not running' in line:
                 running = False
-            if line.endswith('is running'):
+            if 'is running' in line:
                 running = True
 
         if running is None:
@@ -217,18 +217,22 @@ class oracle_crs_listener:
 
         state = self.module.params['state']
         if state == 'stopped' and running:
-            srvctl = [self.srvctl, 'stop', 'listener', '-l', self.resource_name]
+            srvctl = [self.srvctl, 'stop', 'asm']
+            if self.module.params['force']:
+                srvctl.append('-force')
             (rc, stdout, stderr) = self.run_change_command(srvctl)
 
         if state == 'started' and not running:
-            srvctl = [self.srvctl, 'start', 'listener', '-l', self.resource_name]
+            srvctl = [self.srvctl, 'start', 'asm']
             (rc, stdout, stderr) = self.run_change_command(srvctl)
 
         if state == 'restarted':
             if running:
-                srvctl = [self.srvctl, 'stop', 'listener', '-l', self.resource_name]
+                srvctl = [self.srvctl, 'stop', 'asm']
+                if self.module.params['force']:
+                    srvctl.append('-force')
                 (rc, stdout, stderr) = self.run_change_command(srvctl)
-            srvctl = [self.srvctl, 'start', 'listener', '-l', self.resource_name]
+            srvctl = [self.srvctl, 'start', 'asm']
             (rc, stdout, stderr) = self.run_change_command(srvctl)
 
 def main():
@@ -237,10 +241,12 @@ def main():
             name=dict(required=True),
             state=dict(default="present", choices=["present", "absent", "started", "stopped", "restarted"]),
             enabled=dict(default=True, required=False, type='bool'),
-            # LISTENER parameters
-            oraclehome=dict(default='%CRS_HOME%', required=False),
-            skip=dict(default=False, required=False, type='bool'),
-            endpoints=dict(required=False),
+            # ASM parameters
+            listener=dict(required=False),
+            spfile=dict(required=False),
+            pwfile=dict(required=False),
+            diskstring=dict(required=False),
+            force=dict(default=True, required=False, type='bool')
         ),
         supports_check_mode=True,
     )
@@ -253,13 +259,13 @@ def main():
     if not ohomes.oracle_gi_managed:
         module.fail_json(msg="Oracle CRS/HAS was not detected", changed=False)
 
-    listener = oracle_crs_listener(module, ohomes)
-    listener.configure_listener()
-    listener.ensure_listener_state()
+    asm = oracle_crs_asm(module, ohomes)
+    asm.configure_asm()
+    asm.ensure_asm_state()
 
-    if listener.changed:
-        module.exit_json(msg='Listener resource was reconfigured', commands=listener.commands, changed=listener.changed)
-    module.exit_json(msg='Listener was already in intended state', commands=listener.commands, changed=listener.changed)
+    if asm.changed:
+        module.exit_json(msg='ASM resource was reconfigured', commands=asm.commands, changed=asm.changed)
+    module.exit_json(msg='ASM was already in intended state', commands=asm.commands, changed=asm.changed)
 
 
 if __name__ == '__main__':
