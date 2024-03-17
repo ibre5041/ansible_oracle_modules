@@ -1,0 +1,7 @@
+{
+    "ANSIBLE_MODULE_ARGS": {
+        "name": "TMP12102",
+        "oraclehome": "/opt/oracle/ormerck/product/19.21.0.0/db1",
+        "enabled": true
+    }
+}
