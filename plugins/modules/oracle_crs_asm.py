@@ -11,7 +11,7 @@ version_added: "3.1.7.0"
 options:
   name:
     description:
-      - "<asm_name>          ASM name (default name is ASM)"
+      - "<asm_name> ASM name (default name is ASM)"
     required: false
     default: ASM
   state:
