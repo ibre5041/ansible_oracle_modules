@@ -1,0 +1,108 @@
+---
+
+# $ srvctl config listener -l listener
+# Name: LISTENER
+# Type: Database Listener
+# Home: /opt/oracle/grid/product/19.21.0.0
+# End points: TCP:1521
+# Listener is enabled.
+
+- name: Remove listener
+  oracle_crs_listener:
+    name: LISTENER
+    state: absent
+    force: true
+  failed_when: false
+
+- name: Create listener (check mode)
+  oracle_crs_listener:
+    name: LISTENER
+    state: present
+  check_mode: yes    
+  register: _
+  failed_when: not 'add listener' in _.commands[0] or not _.changed
+ 
+- name: Create listener (apply mode)
+  oracle_crs_listener:
+    name: LISTENER
+    state: present
+  check_mode: no
+  register: _
+  failed_when: not 'add listener' in _.commands[0] or not _.changed
+
+- name: Create listener (apply mode - no change)
+  oracle_crs_listener:
+    name: LISTENER
+    state: present
+  check_mode: yes    
+  register: _
+  failed_when: _.commands or _.changed
+  
+- name: Disable listener
+  oracle_crs_listener:
+    name: LISTENER
+    state: present
+    enabled: false
+  register: _
+  failed_when: not 'disable listener' in _.commands[0] or not _.changed  
+
+- name: Disable listener
+  debug:
+    var: _
+  
+- name: Enable listener
+  oracle_crs_listener:
+    name: LISTENER
+    state: present
+    enabled: true
+  register: _
+  failed_when: not 'enable listener' in _.commands[0] or not _.changed
+  
+- name: Enable listener
+  debug:
+    var: _
+  
+- name: Stop listener
+  oracle_crs_listener:
+    name: LISTENER
+    state: stopped
+    enabled: false
+  register: _
+  failed_when: not ('stop listener' in _.commands[0] or 'stop listener' in _.commands[1])  or not _.changed
+
+- name: Stop listener
+  debug:
+    var: _
+  
+- name: Start listener
+  oracle_crs_listener:
+    name: LISTENER
+    state: started
+    enabled: false    
+  register: _
+  failed_when: not _.changed
+
+- name: Restart listener
+  oracle_crs_listener:
+    name: LISTENER
+    state: restarted
+    enabled: false    
+  register: _
+  failed_when: not _.changed    
+  
+- name: Stop listener
+  oracle_crs_listener:
+    name: LISTENER
+    state: stopped
+    enabled: false    
+  register: _
+  failed_when: not _.changed
+
+- name: Restart listener
+  oracle_crs_listener:
+    name: LISTENER
+    state: restarted
+    enabled: false    
+  register: _
+  failed_when: not (_.commands | length != 1) or not _.changed
+  

@@ -87,7 +87,7 @@ class oracle_crs_listener:
         self.srvctl = os.path.join(self.ohomes.crs_home, "bin", "srvctl")
 
     def run_change_command(self, command):
-        self.commands.append(command)
+        self.commands.append(' '.join(command))
         self.changed = True
         if self.module.check_mode:
             return 0, '', ''
@@ -172,6 +172,8 @@ class oracle_crs_listener:
             srvctl.extend(['modify', 'listener', '-l', resource_name])
         elif self.curent_resource and state == 'absent':
             srvctl.extend(['remove', 'listener', '-l', resource_name])
+            if self.module.params['force']:
+                srvctl.append('-force')            
             apply = True
         elif (not self.curent_resource) and state == 'absent':
             self.module.exit_json(msg='Listener resource is already absent', commands=self.commands, changed=self.changed)
@@ -190,6 +192,9 @@ class oracle_crs_listener:
 
 
     def ensure_listener_state(self):
+        if self.module.params['state'] == 'absent':
+            return
+        
         enabled = self.curent_resource.get('ENABLED', '0') # 0/1 or '0'/'1'
         enabled = bool(int(enabled))
         enable = self.module.params['enabled']
@@ -210,7 +215,7 @@ class oracle_crs_listener:
             if line.endswith('is running'):
                 running = True
 
-        if running is None:
+        if running is None and not self.module.check_mode:
             self.module.fail_json("Could not check if {} is running".format(self.resource_name)
                                   , commands=self.commands
                                   , changed=self.changed)
@@ -241,6 +246,7 @@ def main():
             oraclehome=dict(default='%CRS_HOME%', required=False),
             skip=dict(default=False, required=False, type='bool'),
             endpoints=dict(required=False),
+            force=dict(default=True, required=False, type='bool')
         ),
         supports_check_mode=True,
     )
