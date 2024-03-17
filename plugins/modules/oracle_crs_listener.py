@@ -11,7 +11,7 @@ version_added: "3.1.7.0"
 options:
   name:
     description:
-      - "<lsnr_name>          Listener name (default name is LISTENER)"
+      - "<lsnr_name> Listener name (default name is LISTENER)"
     required: false
     default: LISTENER
   state:
