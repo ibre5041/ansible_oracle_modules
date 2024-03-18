@@ -22,6 +22,12 @@ options:
       - Enables the database
     type: bool
     default: true
+  force:
+    description:
+      - "Force stop, will stop database and any associated services and any dependent resources"
+      - "Force remove (ignore dependencies)"
+    type: bool
+    default: false
   oraclehome:
     description:        
       - "oraclehome <path> Oracle home path"
@@ -115,7 +121,7 @@ class oracle_crs_db:
         self.srvctl = os.path.join(self.ohomes.crs_home, "bin", "srvctl")
 
     def run_change_command(self, command):
-        self.commands.append(command)
+        self.commands.append(' '.join(command))
         self.changed = True
         if self.module.check_mode:
             return 0, '', ''
@@ -202,12 +208,14 @@ class oracle_crs_db:
         changes = wanted_set.difference(current_set)
         srvctl = [self.srvctl]
         if (not self.curent_resource) and state in ['present', 'started', 'stopped', 'restarted']:
-            srvctl.extend(['add', 'db', '-d', resource_name])
+            srvctl.extend(['add', 'database', '-d', resource_name])
             apply = True
         elif self.curent_resource and state in ['present', 'started', 'stopped', 'restarted']:
-            srvctl.extend(['modify', 'db', '-d', resource_name])
+            srvctl.extend(['modify', 'database', '-d', resource_name])
         elif self.curent_resource and state == 'absent':
-            srvctl.extend(['remove', 'db', '-d', resource_name])
+            srvctl.extend(['remove', 'database', '-d', resource_name, '-noprompt'])
+            if self.module.params['force']:
+                srvctl.append('-force')
             apply = True
         elif (not self.curent_resource) and state == 'absent':
             self.module.exit_json(msg='db resource is already absent', commands=self.commands, changed=self.changed)
@@ -226,18 +234,21 @@ class oracle_crs_db:
 
 
     def ensure_db_state(self):
+        if self.module.params['state'] == 'absent':
+            return
+        
         enabled = self.curent_resource.get('ENABLED', '1') # 0/1 or '0'/'1'
         enabled = bool(int(enabled))
         enable = self.module.params['enabled']
         if enable and not enabled:
-            srvctl = [self.srvctl, 'enable', 'db', '-d', self.resource_name]
+            srvctl = [self.srvctl, 'enable', 'database', '-d', self.resource_name]
             (rc, stdout, stderr) = self.run_change_command(srvctl)
 
         if not enable and enabled:
-            srvctl = [self.srvctl, 'disable', 'db', '-d', self.resource_name]
+            srvctl = [self.srvctl, 'disable', 'database', '-d', self.resource_name]
             (rc, stdout, stderr) = self.run_change_command(srvctl)
 
-        srvctl = [self.srvctl, 'status', 'db', '-d', self.resource_name]
+        srvctl = [self.srvctl, 'status', 'database', '-d', self.resource_name]
         (rc, stdout, stderr) = self.module.run_command(srvctl)
         running = None
         for line in stdout.splitlines():
@@ -246,25 +257,25 @@ class oracle_crs_db:
             if 'is running' in line:
                 running = True
 
-        if running is None:
+        if running is None and not self.module.check_mode:
             self.module.fail_json("Could not check if {} is running".format(self.resource_name)
                                   , commands=self.commands
                                   , changed=self.changed)
 
         state = self.module.params['state']
         if state == 'stopped' and running:
-            srvctl = [self.srvctl, 'stop', 'db', '-d', self.resource_name]
+            srvctl = [self.srvctl, 'stop', 'database', '-d', self.resource_name]
             (rc, stdout, stderr) = self.run_change_command(srvctl)
 
         if state == 'started' and not running:
-            srvctl = [self.srvctl, 'start', 'db', '-d', self.resource_name]
+            srvctl = [self.srvctl, 'start', 'database', '-d', self.resource_name]
             (rc, stdout, stderr) = self.run_change_command(srvctl)
 
         if state == 'restarted':
             if running:
-                srvctl = [self.srvctl, 'stop', 'db', '-d', self.resource_name]
+                srvctl = [self.srvctl, 'stop', 'database', '-d', self.resource_name]
                 (rc, stdout, stderr) = self.run_change_command(srvctl)
-            srvctl = [self.srvctl, 'start', 'db', '-d', self.resource_name]
+            srvctl = [self.srvctl, 'start', 'database', '-d', self.resource_name]
             (rc, stdout, stderr) = self.run_change_command(srvctl)
 
 
@@ -274,8 +285,9 @@ def main():
             name=dict(required=True),
             state=dict(default="present", choices=["present", "absent", "started", "stopped", "restarted"]),
             enabled=dict(default=True, required=False, type='bool'),
+            force=dict(default=False, required=False, type='bool'),
             # db parameters
-            oraclehome=dict(required=True),
+            oraclehome=dict(required=False),
             domain=dict(required=False),
             spfile=dict(required=False),
             pwfile=dict(required=False),
@@ -287,6 +299,7 @@ def main():
             policy=dict(required=False, choices=['AUTOMATIC', 'MANUAL', 'NORESTART', 'USERONLY']),
             diskgroup=dict(required=False),
         ),
+        required_if=[('present', 'present', ('oraclehome'))],
         supports_check_mode=True,
     )
 
