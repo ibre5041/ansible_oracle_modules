@@ -11,7 +11,7 @@ version_added: "3.1.7.0"
 options:
   name:
     description:
-      - "-service "<serv,...>" Comma separated service names"
+      - "-service <serv,...> Comma separated service names"
       - "Or just this for single service name"
     required: true
   db:
@@ -34,30 +34,104 @@ options:
       - "Force the add operation even though a listener is not configured for a network"
     type: bool
     default: false
-    -role <role>                   Role of the service (primary, physical_standby, logical_standby, snapshot_standby)
-    -policy <policy>               Management policy for the service (AUTOMATIC or MANUAL)
-    -failovertype                  (NONE | SESSION | SELECT | TRANSACTION | AUTO)      Failover type
-    -failovermethod                (NONE | BASIC)     Failover method
-    -failoverdelay <failover_delay> Failover delay (in seconds)
-    -failoverretry <failover_retries> Number of attempts to retry connection
-    -failover_restore <failover_restore>  Option to restore initial environment for Application Continuity and TAF (NONE or LEVEL1)
-    -edition <edition>             Edition (or "" for empty edition value)
-    -pdb <pluggable_database>      Pluggable database name
-    -maxlag <max_lag_time>         Maximum replication lag time in seconds (Non-negative integer, default value is 'ANY')
-    -clbgoal                       (SHORT | LONG)                   Connection Load Balancing Goal. Default is LONG.
-    -rlbgoal                       (SERVICE_TIME | THROUGHPUT | NONE)     Runtime Load Balancing Goal
-    -notification                  (TRUE | FALSE)  Enable Fast Application Notification (FAN) for OCI connections
-    -global <global>               Global attribute (TRUE or FALSE)
-    -sql_translation_profile <sql_translation_profile> Specify a database object for SQL translation profile
-    -commit_outcome                (TRUE | FALSE)          Commit outcome
-    -retention <retention>         Specifies the number of seconds the commit outcome is retained
-    -replay_init_time <replay_initiation_time> Seconds after which replay will not be initiated
-    -session_state <session_state> Session state consistency (STATIC or DYNAMIC)
-    -tablefamilyid <table_family_id> Set table family ID for a given service
-    -drain_timeout <drain_timeout> Service drain timeout specified in seconds
-    -stopoption <stop_options>     Options to stop service (e.g. TRANSACTIONAL or IMMEDIATE)
-
-    
+    required: false
+  role:
+    description:
+      - "-role <role> Role of the service"
+    choices: ['PRIMARY', 'PHYSICAL_STANDBY', 'LOGICAL_STANDBY', 'SNAPSHOT_STANDBY']
+    required: false
+  policy:
+    description:
+      - "-policy <policy> Management policy for the service (AUTOMATIC or MANUAL)"
+    choices: ['AUTOMATIC', 'MANUAL']
+    required: false
+  failovertype:
+    description:
+      - "-failovertype (NONE | SESSION | SELECT | TRANSACTION | AUTO) Failover type"
+    choices: ['NONE', 'SESSION', 'SELECT', 'TRANSACTION', 'AUTO']
+    required: false
+  failovermethod:
+    description:
+      - "-failovermethod (NONE | BASIC) Failover method"
+    choices: ['NONE', 'BASIC']
+    required: false
+  failoverdelay:
+    description:
+      - "-failoverdelay <failover_delay> Failover delay (in seconds)"
+    required: false
+  failoverretry:
+    description:
+      - "-failoverretry <failover_retries> Number of attempts to retry connection"
+    required: false
+  failover_restore:
+    description:
+      - "-failover_restore <failover_restore> Option to restore initial environment for Application Continuity and TAF (NONE or LEVEL1)"
+    choices: ['NONE', 'LEVEL1']
+    required: false
+  edition:
+    description:
+      - '-edition <edition> Edition (or "" for empty edition value)'
+    required: false
+  pdb:
+    description:
+      - "-pdb <pluggable_database> Pluggable database name"
+    required: false
+  maxlag:
+    description:
+      - "-maxlag <max_lag_time> Maximum replication lag time in seconds (Non-negative integer, default value is 'ANY')"
+    required: false
+  clbgoal:
+    description:
+      - "-clbgoal (SHORT | LONG) Connection Load Balancing Goal. Default is LONG."
+    choices: ['SHORT', 'LONG']
+    required: false
+  rlbgoal:
+    description:
+      - "-rlbgoal (SERVICE_TIME | THROUGHPUT | NONE) Runtime Load Balancing Goal"
+    choices: ['SERVICE_TIME', 'THROUGHPUT', 'NONE']
+  notification:
+    description:
+      - "-notification (TRUE | FALSE)  Enable Fast Application Notification (FAN) for OCI connections"
+    type: bool
+  global:
+    description:
+      - "-global <global> Global attribute (TRUE or FALSE)"
+    type: bool
+  sql_translation_profile:
+    description:
+      - "-sql_translation_profile <sql_translation_profile> Specify a database object for SQL translation profile"
+    required: false
+  commit_outcome:
+    description:
+      - "-commit_outcome (TRUE | FALSE) Commit outcome"
+    type: bool
+    required: false
+  retention:
+    description:
+      - "-retention <retention> Specifies the number of seconds the commit outcome is retained"
+    required: false
+  replay_init_time:
+    description:
+      - "-replay_init_time <replay_initiation_time> Seconds after which replay will not be initiated"
+    required: false
+  session_state:
+    description:
+      - "-session_state <session_state> Session state consistency (STATIC or DYNAMIC)"
+    choices: ['STATIC', 'DYNAMIC']
+    required: false
+  tablefamilyid:
+    description:
+      - "-tablefamilyid <table_family_id> Set table family ID for a given service"
+    required: false
+  drain_timeout:
+    description:
+      - "-drain_timeout <drain_timeout> Service drain timeout specified in seconds"
+    required: false
+  stopoption:
+    description:
+      - "-stopoption <stop_options>     Options to stop service (e.g. TRANSACTIONAL or IMMEDIATE)"
+    choices: ['TRANSACTIONAL', 'IMMEDIATE']
+    required: false
 notes:
   - Should be executed with privileges of Oracle CRS installation owner
 author: Ivan Brezina
@@ -261,29 +335,63 @@ class oracle_crs_service:
 
 
 def main():
-    module = AnsibleModule(
-        argument_spec=dict(
-            name=dict(required=True),
-            state=dict(default="present", choices=["present", "absent", "started", "stopped", "restarted"]),
-            enabled=dict(default=True, required=False, type='bool'),
-            force=dict(default=False, required=False, type='bool'),
-            # db parameters
-            oraclehome=dict(required=False),
-            domain=dict(required=False),
-            spfile=dict(required=False),
-            pwfile=dict(required=False),
-            role=dict(required=False, choices=['PRIMARY', 'PHYSICAL_STANDBY', 'LOGICAL_STANDBY', 'SNAPSHOT_STANDBY']),
-            startoption=dict(required=False, choices=['OPEN', 'MOUNT', 'READ ONLY']),
-            stopoption=dict(required=False, choices=['NORMAL', 'TRANSACTIONAL', 'IMMEDIATE', 'ABORT']),
-            dbname=dict(required=False),
-            instance=dict(required=False),
-            policy=dict(required=False, choices=['AUTOMATIC', 'MANUAL', 'NORESTART', 'USERONLY']),
-            diskgroup=dict(required=False),
-        ),
-        required_if=[('present', 'present', ('oraclehome'))],
-        supports_check_mode=True,
+    argument_spec=dict(
+        name=dict(required=True),
+        state=dict(default="present", choices=["present", "absent", "started", "stopped", "restarted"]),
+        enabled=dict(default=True, required=False, type='bool'),
+        force=dict(default=False, required=False, type='bool'),
+        # service parameters
+        # <db_unique_name> Unique name for the database
+        db=dict(required=False),
+        # <role> Role of the service (primary, physical_standby, logical_standby, snapshot_standby)
+        role=dict(required=False, choices=['PRIMARY', 'PHYSICAL_STANDBY', 'LOGICAL_STANDBY', 'SNAPSHOT_STANDBY']),
+        # <policy> Management policy for the service (AUTOMATIC or MANUAL)
+        policy=dict(required=False, choices=['AUTOMATIC', 'MANUAL']),
+        # Failover type (NONE | SESSION | SELECT | TRANSACTION | AUTO)
+        failovertype=dict(required=False, choices=['NONE', 'SESSION', 'SELECT', 'TRANSACTION', 'AUTO']),
+        # (NONE | BASIC) Failover method
+        failovermethod=dict(required=False, choices=['NONE', 'BASIC']),
+        # <failover_delay> Failover delay (in seconds)
+        failoverdelay=dict(required=False),
+        # <failover_retries> Number of attempts to retry connection
+        failoverretry=dict(required=False),
+        # <failover_restore> Option to restore initial environment for Application Continuity and TAF (NONE or LEVEL1)
+        failover_restore=dict(required=False),
+        # <edition> Edition (or "" for empty edition value)
+        edition=dict(required=False),
+        # <pluggable_database> Pluggable database name
+        pdb=dict(required=False),
+        # <max_lag_time> Maximum replication lag time in seconds (Non-negative integer, default value is 'ANY
+        maxlag=dict(required=False),
+        # (SHORT | LONG) Connection Load Balancing Goal. Default is LONG.
+        clbgoal=dict(required=False, choices=['SHORT', 'LONG']),
+        # (SERVICE_TIME | THROUGHPUT | NONE)     Runtime Load Balancing Goal
+        rlbgoal=dict(required=False, choices=['SERVICE_TIME', 'THROUGHPUT', 'NONE']),
+        # (TRUE | FALSE)  Enable Fast Application Notification (FAN) for OCI connections
+        notification=dict(required=False, type='bool'),
+        # <global> Global attribute (TRUE or FALSE)
+        ## global=dict(required=False, type='bool'),
+        # <sql_translation_profile> Specify a database object for SQL translation profile
+        sql_translation_profile=dict(required=False),
+        # (TRUE | FALSE) Commit outcome
+        commit_outcome=dict(required=False, type='bool'),
+        # <retention> Specifies the number of seconds the commit outcome is retained
+        retention=dict(required=False),
+        # <replay_initiation_time> Seconds after which replay will not be initiated
+        replay_init_time=dict(required=False),
+        # <session_state> Session state consistency (STATIC or DYNAMIC)
+        session_state=dict(required=False, choices=['STATIC', 'DYNAMIC']),
+        # <table_family_id> Set table family ID for a given service
+        tablefamilyid=dict(required=False),
+        # <drain_timeout> Service drain timeout specified in seconds
+        drain_timeout=dict(required=False),
+        # <stop_options> Options to stop service (e.g. TRANSACTIONAL or IMMEDIATE)
+        stopoption=dict(required=False, choices=['TRANSACTIONAL', 'IMMEDIATE']),
     )
-
+    # global is Python keyword, use this hack to use 'global' as ansible module parameter
+    argument_spec.update({'global': dict(required=False, type='bool')})
+    module = AnsibleModule(argument_spec=argument_spec, supports_check_mode=True)
+    
     ohomes = oracle_homes()
     ohomes.list_crs_instances()
     ohomes.list_processes()
