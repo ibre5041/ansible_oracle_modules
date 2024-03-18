@@ -210,9 +210,9 @@ class oracle_crs_listener:
         (rc, stdout, stderr) = self.module.run_command(srvctl)
         running = None
         for line in stdout.splitlines():
-            if line.endswith('is not running'):
+            if 'is not running' in line.endswith:
                 running = False
-            if line.endswith('is running'):
+            if 'is running' in line.endswith:
                 running = True
 
         if running is None and not self.module.check_mode:
