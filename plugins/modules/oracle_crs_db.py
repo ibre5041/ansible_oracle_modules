@@ -84,6 +84,7 @@ EXAMPLES = '''
 - name: Register Database
   oracle_crs_db:
     name: TMP12102 
+    oraclehome: /opt/oracle/product/19.21.0.0/db1
 
 - name: Restart Database
   oracle_crs_db:

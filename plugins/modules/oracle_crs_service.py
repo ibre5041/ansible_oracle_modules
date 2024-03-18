@@ -145,6 +145,17 @@ EXAMPLES = '''
 - name: Create service
   oracle_crs_service:
     name: PRIMARY_SERVICE
+    db: DBSID
+    state: present
+    enabled: true
+  register: _
+
+- name: Restart database service
+  oracle_crs_service:
+    name: PRIMARY_SERVICE
+    db: DBSID
+    state: restarted
+  register: _
 '''
 
 import os
