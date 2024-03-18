@@ -1,0 +1,67 @@
+---
+
+- name: First remove the service
+  oracle_crs_service:
+    name: TMP12102_PRIMARY
+    db: TMP12102
+    state: absent
+    force: true
+  register: _
+  
+- name: First remove the service
+  debug: var=_
+  
+- name: Register database service (check mode)
+  oracle_crs_service:
+    name: TMP12102_PRIMARY
+    db: TMP12102_PRIMARY    
+    state: present
+  check_mode: yes    
+  register: _
+  failed_when: not 'add service' in _.commands[0] or not _.changed or _.failed
+
+- name: Register database service (check mode)
+  debug: var=_
+
+- name: Alter database attributes (DG Standby)
+  oracle_crs_service:
+    name: TMP12102_PRIMARY
+    db: TMP12102
+    state: present
+    role: PHYSICAL_STANDBY
+    policy: MANUAL
+    failovertype: TRANSACTION
+    commit_outcome: True
+    failoverdelay: 301
+    failoverretry: 5
+    clbgoal: SHORT
+    rlbgoal: THROUGHPUT
+    drain_timeout: 5
+    stopoption: IMMEDIATE
+  register: _
+
+- name: Alter database attributes (DG Standby)
+  debug: var=_
+
+- name: Alter database attributes (DG Standby) (Again no change)
+  oracle_crs_service:
+    name: TMP12102_PRIMARY
+    db: TMP12102
+    state: present
+    role: PHYSICAL_STANDBY
+    policy: MANUAL
+    failovertype: TRANSACTION
+    commit_outcome: True
+    failoverdelay: 301
+    failoverretry: 5
+    clbgoal: SHORT
+    rlbgoal: THROUGHPUT
+    drain_timeout: 5
+    stopoption: IMMEDIATE
+  register: _
+  failed_when: _.changed or _.failed
+  
+- name: Alter database attributes (DG Standby)
+  debug: var=_
+
+...

@@ -1,5 +1,6 @@
 ---
 
 - include_tasks: simple.yml
+- include_tasks: complex.yml  
 
 ...

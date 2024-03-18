@@ -380,7 +380,7 @@ def main():
         force=dict(default=False, required=False, type='bool'),
         # service parameters
         # <db_unique_name> Unique name for the database
-        db=dict(required=False),
+        db=dict(required=True),
         # <role> Role of the service (primary, physical_standby, logical_standby, snapshot_standby)
         role=dict(required=False, choices=['PRIMARY', 'PHYSICAL_STANDBY', 'LOGICAL_STANDBY', 'SNAPSHOT_STANDBY']),
         # <policy> Management policy for the service (AUTOMATIC or MANUAL)

@@ -53,15 +53,15 @@
     db: TMP12102
     state: present
     role: PHYSICAL_STANDBY
-    policy: MANUAL
-    failovertype: TRANSACTION
-    commit_outcome: True
-    failoverdelay: 301
-    failoverretry: 5
-    clbgoal: SHORT
-    rlbgoal: THROUGHPUT
-    drain_timeout: 5
-    stopoption: IMMEDIATE
+    # policy: MANUAL
+    # failovertype: TRANSACTION
+    # commit_outcome: True
+    # failoverdelay: 301
+    # failoverretry: 5
+    # clbgoal: SHORT
+    # rlbgoal: THROUGHPUT
+    # drain_timeout: 5
+    # stopoption: IMMEDIATE
   register: _
 
 - name: Alter database attributes (DG Standby)
@@ -73,15 +73,15 @@
     db: TMP12102
     state: present
     role: PHYSICAL_STANDBY
-    policy: MANUAL
-    failovertype: TRANSACTION
-    commit_outcome: True
-    failoverdelay: 301
-    failoverretry: 5
-    clbgoal: SHORT
-    rlbgoal: THROUGHPUT
-    drain_timeout: 5
-    stopoption: IMMEDIATE
+    # policy: MANUAL
+    # failovertype: TRANSACTION
+    # commit_outcome: True
+    # failoverdelay: 301
+    # failoverretry: 5
+    # clbgoal: SHORT
+    # rlbgoal: THROUGHPUT
+    # drain_timeout: 5
+    # stopoption: IMMEDIATE
   register: _
   failed_when: _.changed or _.failed
   
@@ -111,88 +111,97 @@
 - name: Restart database service
   debug: var=_
 
-# - name: Disable database
-#   oracle_crs_service:
-#     name: TMP12102
-#     state: present
-#     enabled: false
-#   register: _
-#   failed_when: not 'disable database' in _.commands[0] or not _.changed or _.failed
+- name: Disable database
+  oracle_crs_service:
+    name: TMP12102_PRIMARY
+    db: TMP12102
+    state: present
+    enabled: false
+  register: _
+  failed_when: not 'disable service' in _.commands[0] or not _.changed or _.failed
 
-# - name: Disable database
-#   debug: var=_
+- name: Disable database
+  debug: var=_
   
-# - name: Enable database
-#   oracle_crs_service:
-#     name: TMP12102
-#     state: present
-#     enabled: true
-#   register: _
-#   failed_when: not 'enable database' in _.commands[0] or not _.changed or _.failed
+- name: Enable database service
+  oracle_crs_service:
+    name: TMP12102_PRIMARY
+    db: TMP12102
+    state: present
+    enabled: true
+  register: _
+  failed_when: not 'enable service' in _.commands[0] or not _.changed or _.failed
+
+- name: Enable listener service
+  debug: var=_
+
+- name: Stop database service
+  oracle_crs_service:
+    name: TMP12102_PRIMARY
+    db: TMP12102
+    state: stopped
+    enabled: false
+  register: _
+  failed_when: not ('stop service' in _.commands[0] or 'stop service' in _.commands[1])  or not _.changed or _.failed
+
+- name: Stop database service
+  debug: var=_
+
+- name: Start disabled database - should fail
+  oracle_crs_service:
+    name: TMP12102_PRIMARY
+    db: TMP12102
+    state: started
+    enabled: false 
+  register: _
+  failed_when: not _.failed
+
+- name: Start disabled database - should fail
+  debug: var=_
+
+- name: Restart database (and enable it) I
+  oracle_crs_service:
+    name: TMP12102_PRIMARY
+    db: TMP12102
+    state: restarted
+    enabled: true
+  register: _
+  failed_when: not _.changed or _.failed
+
+- name: Restart database (and enable it) I
+  debug: var=_
+
+- name: Restart database (and enable it) II
+  oracle_crs_service:
+    name: TMP12102_PRIMARY
+    db: TMP12102    
+    state: restarted
+  register: _
+  failed_when: not _.changed or _.failed
+
+- name: Restart database (and enable it) II
+  debug: var=_
   
-# - name: Enable listener
-#   debug: var=_
+- name: Stop database
+  oracle_crs_service:
+    name: TMP12102_PRIMARY
+    db: TMP12102    
+    state: stopped
+    enabled: true
+  register: _
+  failed_when: not _.changed or _.failed
 
-# - name: Stop database
-#   oracle_crs_service:
-#     name: TMP12102
-#     state: stopped
-#     enabled: false
-#   register: _
-#   failed_when: not ('stop database' in _.commands[0] or 'stop database' in _.commands[1])  or not _.changed or _.failed
-
-# - name: Stop database
-#   debug: var=_
-
-# - name: Start disabled database - should fail
-#   oracle_crs_service:
-#     name: TMP12102
-#     state: started
-#     enabled: false 
-#   register: _
-#   failed_when: not _.failed
-
-# - name: Start disabled database - should fail
-#   debug: var=_
-
-# - name: Restart database (and enable it) I
-#   oracle_crs_service:
-#     name: TMP12102
-#     state: restarted
-#     enabled: true
-#   register: _
-#   failed_when: not _.changed or _.failed
-
-# - name: Restart database (and enable it) I
-#   debug: var=_
-
-# - name: Restart database (and enable it) II
-#   oracle_crs_service:
-#     name: TMP12102
-#     state: restarted
-#   register: _
-#   failed_when: not _.changed or _.failed
-
-# - name: Restart database (and enable it) II
-#   debug: var=_
+- name: Stop database
+  debug: var=_
   
-# - name: Stop database
-#   oracle_crs_service:
-#     name: TMP12102
-#     state: stopped
-#     enabled: true
-#   register: _
-#   failed_when: not _.changed or _.failed
+- name: Restart database III
+  oracle_crs_service:
+    name: TMP12102_PRIMARY
+    db: TMP12102    
+    state: restarted
+  register: _
+  failed_when: not (_.commands | length == 1) or not _.changed or _.failed
 
-# - name: Stop database
-#   debug: var=_
+- name: Restart database III
+  debug: var=_
   
-# - name: Restart database III
-#   oracle_crs_service:
-#     name: TMP12102
-#     state: restarted
-#   register: _
-#   failed_when: not (_.commands | length == 1) or not _.changed or _.failed
-
-# - name: Restart database III
-#   debug: var=_
