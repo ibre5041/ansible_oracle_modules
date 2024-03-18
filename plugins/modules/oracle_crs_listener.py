@@ -93,6 +93,9 @@ class oracle_crs_listener:
             return 0, '', ''
         (rc, stdout, stderr) = self.module.run_command(command)
         if rc or stderr:
+            # TODO Check and do ingore:
+            # PRCC-1010 : LISTENER was already enabled
+            # PRCR-1002 : Resource ora.LISTENER.lsnr is already enabled
             self.module.fail_json(msg='srvctl failed({}): {} {}'.format(rc, stdout, stderr)
                                   , commands=self.commands
                                   , changed=self.changed)
@@ -194,8 +197,9 @@ class oracle_crs_listener:
     def ensure_listener_state(self):
         if self.module.params['state'] == 'absent':
             return
-        
-        enabled = self.curent_resource.get('ENABLED', '0') # 0/1 or '0'/'1'
+
+        # Default value for listener ENABLED=1, when listener is created
+        enabled = self.curent_resource.get('ENABLED', '1') # 0/1 or '0'/'1'
         enabled = bool(int(enabled))
         enable = self.module.params['enabled']
         if enable and not enabled:
