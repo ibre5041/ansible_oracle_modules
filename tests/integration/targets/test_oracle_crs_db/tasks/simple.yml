@@ -1,0 +1,177 @@
+---
+
+# Database unique name: TMP12102
+# Database name: TMP12102
+# Oracle home: /opt/oracle/product/19.21.0.0/db1
+# Oracle user: oracle
+# Spfile: +DG1/TMP12102/spfiletmp12102.ora
+# Password file: /opt/oracle/product/19.21.0.0/db1/dbs/orapwTMP12102
+# Domain: CORP
+# Start options: read only
+# Stop options: immediate
+# Database role: PHYSICAL_STANDBY
+# Management policy: AUTOMATIC
+# Disk Groups: DG1,FRA1
+# Services:
+# OSDBA group:
+# OSOPER group:
+# Database instance: TMP12102
+
+- name: Unregister database from CRS
+  oracle_crs_db:
+    name: TMP12102
+    state: absent
+    force: true
+  register: _
+  
+- name: Unregister database from CRS
+  debug: var=_
+  
+- name: Register database (check mode)
+  oracle_crs_db:
+    name: TMP12102
+    state: present
+    oraclehome: "{{ oracle_home }}"
+  check_mode: yes    
+  register: _
+  # failed_when: not 'add database' in _.commands[0] or not _.changed or _.failed
+
+- name: Register database (check mode)
+  debug: var=_
+  
+- name: Register database (apply mode)
+  oracle_crs_db:
+    name: TMP12102
+    state: present
+    oraclehome: "{{ oracle_home }}"    
+  check_mode: no
+  register: _
+  failed_when: not 'add database' in _.commands[0] or not _.changed or _.failed
+
+- name: Register database (apply mode)
+  debug: var=_
+  
+- name: Register database (apply mode - no change)
+  oracle_crs_db:
+    name: TMP12102
+    state: present
+    oraclehome: "{{ oracle_home }}"        
+  check_mode: yes    
+  register: _
+  failed_when: _.commands or _.changed or _.failed
+
+- name: Register database (apply mode - no change)
+  debug: var=_
+
+- name: Alter database attributes (DG Standby)
+  oracle_crs_db:
+    name: TMP12102
+    state: present
+    oraclehome: "{{ oracle_home }}"        
+    domain: "{{ oracle_db_domain }}"
+    spfile: "{{ oracle_spfile }}"
+    pwfile: "{{ oracle_pwfile }}"
+    role: "{{ oracle_role }}"
+    startoption: "{{ oracle_startoption }}"
+    stopoption: "{{ oracle_stopoption }}"
+    dbname: "{{ oracle_dbname }}"
+  register: _
+
+- name: Alter database attributes (DG Standby)
+  debug: var=_
+
+- name: Start database
+  oracle_crs_db:
+    name: TMP12102
+    state: started
+  register: _
+  failed_when: not _.changed or _.failed
+
+- name: Start database
+  debug: var=_
+  
+- name: Disable database
+  oracle_crs_db:
+    name: TMP12102
+    state: present
+    enabled: false
+  register: _
+  failed_when: not 'disable database' in _.commands[0] or not _.changed or _.failed
+
+- name: Disable database
+  debug: var=_
+  
+- name: Enable database
+  oracle_crs_db:
+    name: TMP12102
+    state: present
+    enabled: true
+  register: _
+  failed_when: not 'enable database' in _.commands[0] or not _.changed or _.failed
+  
+- name: Enable listener
+  debug: var=_
+
+- name: Stop database
+  oracle_crs_db:
+    name: TMP12102
+    state: stopped
+    enabled: false
+  register: _
+  failed_when: not ('stop database' in _.commands[0] or 'stop database' in _.commands[1])  or not _.changed or _.failed
+
+- name: Stop database
+  debug: var=_
+
+- name: Start disabled database - should fail
+  oracle_crs_db:
+    name: TMP12102
+    state: started
+    enabled: false 
+  register: _
+  failed_when: not _.failed
+
+- name: Start disabled database - should fail
+  debug: var=_
+
+- name: Restart database (and enable it) I
+  oracle_crs_db:
+    name: TMP12102
+    state: restarted
+    enabled: true
+  register: _
+  failed_when: not _.changed or _.failed
+
+- name: Restart database (and enable it) I
+  debug: var=_
+
+- name: Restart database (and enable it) II
+  oracle_crs_db:
+    name: TMP12102
+    state: restarted
+  register: _
+  failed_when: not _.changed or _.failed
+
+- name: Restart database (and enable it) II
+  debug: var=_
+  
+- name: Stop database
+  oracle_crs_db:
+    name: TMP12102
+    state: stopped
+    enabled: true
+  register: _
+  failed_when: not _.changed or _.failed
+
+- name: Stop database
+  debug: var=_
+  
+- name: Restart database III
+  oracle_crs_db:
+    name: TMP12102
+    state: restarted
+  register: _
+  failed_when: not (_.commands | length == 1) or not _.changed or _.failed
+
+- name: Restart database III
+  debug: var=_

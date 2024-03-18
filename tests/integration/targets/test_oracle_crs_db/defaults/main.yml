@@ -1,0 +1,14 @@
+---
+
+oracle_home: /opt/oracle/product/19.21.0.0/db1
+oracle_db_domain: CORP
+oracle_spfile: "+DG1/TMP12102/spfiletmp12102.ora"
+oracle_pwfile: "/opt/oracle/product/19.21.0.0/db1/dbs/orapwTMP12102"
+oracle_role: "PHYSICAL_STANDBY"
+oracle_startoption: "READ ONLY"
+oracle_stopoption: "ABORT"
+oracle_sid: TMP12102
+oracle_dbname: "{{ oracle_sid }}"
+oracle_diskgroup: "DG1,FRA1"
+
+...
