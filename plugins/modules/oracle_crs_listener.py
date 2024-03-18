@@ -93,6 +93,10 @@ class oracle_crs_listener:
             return 0, '', ''
         (rc, stdout, stderr) = self.module.run_command(command)
         if rc or stderr:
+            for i in stderr.splitlines():
+                self.module.warn(i)
+            for i in stdout.splitlines():
+                self.module.warn(i)                
             # TODO Check and do ingore:
             # PRCC-1010 : LISTENER was already enabled
             # PRCR-1002 : Resource ora.LISTENER.lsnr is already enabled

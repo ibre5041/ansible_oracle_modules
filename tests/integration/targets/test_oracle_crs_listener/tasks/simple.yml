@@ -12,31 +12,53 @@
     name: LISTENER
     state: absent
     force: true
-  failed_when: false
-
+  register: _
+  
+- name: Remove listener
+  debug: var=_
+  
 - name: Create listener (check mode)
   oracle_crs_listener:
     name: LISTENER
     state: present
   check_mode: yes    
   register: _
-  failed_when: not 'add listener' in _.commands[0] or not _.changed
- 
+  failed_when: not 'add listener' in _.commands[0] or not _.changed or _.failed
+
+- name: Create listener (check mode)
+  debug: var=_
+  
 - name: Create listener (apply mode)
   oracle_crs_listener:
     name: LISTENER
     state: present
   check_mode: no
   register: _
-  failed_when: not 'add listener' in _.commands[0] or not _.changed
+  failed_when: not 'add listener' in _.commands[0] or not _.changed or _.failed
 
+- name: Create listener (apply mode)
+  debug: var=_
+  
 - name: Create listener (apply mode - no change)
   oracle_crs_listener:
     name: LISTENER
     state: present
   check_mode: yes    
   register: _
-  failed_when: _.commands or _.changed
+  failed_when: _.commands or _.changed or _.failed
+
+- name: Create listener (apply mode - no change)
+  debug: var=_
+  
+- name: Start listener
+  oracle_crs_listener:
+    name: LISTENER
+    state: started
+  register: _
+  failed_when: not _.changed or _.failed
+
+- name: Start listener
+  debug: var=_
   
 - name: Disable listener
   oracle_crs_listener:
@@ -44,11 +66,10 @@
     state: present
     enabled: false
   register: _
-  failed_when: not 'disable listener' in _.commands[0] or not _.changed  
+  failed_when: not 'disable listener' in _.commands[0] or not _.changed or _.failed
 
 - name: Disable listener
-  debug:
-    var: _
+  debug: var=_
   
 - name: Enable listener
   oracle_crs_listener:
@@ -56,53 +77,73 @@
     state: present
     enabled: true
   register: _
-  failed_when: not 'enable listener' in _.commands[0] or not _.changed
+  failed_when: not 'enable listener' in _.commands[0] or not _.changed or _.failed
   
 - name: Enable listener
-  debug:
-    var: _
-  
+  debug: var=_
+
 - name: Stop listener
   oracle_crs_listener:
     name: LISTENER
     state: stopped
     enabled: false
   register: _
-  failed_when: not ('stop listener' in _.commands[0] or 'stop listener' in _.commands[1])  or not _.changed
+  failed_when: not ('stop listener' in _.commands[0] or 'stop listener' in _.commands[1])  or not _.changed or _.failed
 
 - name: Stop listener
-  debug:
-    var: _
-  
-- name: Start listener
+  debug: var=_
+
+- name: Start disabled listener - should fail
   oracle_crs_listener:
     name: LISTENER
     state: started
-    enabled: false    
+    enabled: false 
   register: _
-  failed_when: not _.changed
+  failed_when: not _.failed
 
-- name: Restart listener
+- name: Start disabled listener - should fail
+  debug: var=_
+
+- name: Restart listener (and enable it) I
   oracle_crs_listener:
     name: LISTENER
     state: restarted
-    enabled: false    
+    enabled: true
   register: _
-  failed_when: not _.changed    
+  failed_when: not _.changed or _.failed
+
+- name: Restart listener (and enable it) I
+  debug: var=_
+
+- name: Restart listener (and enable it) II
+  oracle_crs_listener:
+    name: LISTENER
+    state: restarted
+  register: _
+  failed_when: not _.changed or _.failed
+
+- name: Restart listener (and enable it) II
+  debug: var=_
   
 - name: Stop listener
   oracle_crs_listener:
     name: LISTENER
     state: stopped
-    enabled: false    
+    enabled: true
   register: _
-  failed_when: not _.changed
+  failed_when: not _.changed or _.failed
 
-- name: Restart listener
+- name: Stop listener
+  debug: var=_
+  
+- name: Restart listener III
   oracle_crs_listener:
     name: LISTENER
     state: restarted
-    enabled: false    
   register: _
-  failed_when: not (_.commands | length != 1) or not _.changed
+  failed_when: not (_.commands | length == 1) or not _.changed or _.failed
+
+- name: Restart listener III
+  debug: var=_
+
   
