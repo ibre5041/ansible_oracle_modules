@@ -96,7 +96,7 @@ class oracle_crs_listener:
                 self.module.warn(i)
             for i in stdout.splitlines():
                 self.module.warn(i)                
-            # TODO Check and do ingore:
+            # TODO Check and do ignore:
             # PRCC-1010 : LISTENER was already enabled
             # PRCR-1002 : Resource ora.LISTENER.lsnr is already enabled
             self.module.fail_json(msg='srvctl failed({}): {} {}'.format(rc, stdout, stderr)

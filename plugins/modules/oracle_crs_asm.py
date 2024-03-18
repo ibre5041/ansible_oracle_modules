@@ -87,12 +87,16 @@ class oracle_crs_asm:
         self.srvctl = os.path.join(self.ohomes.crs_home, "bin", "srvctl")
 
     def run_change_command(self, command):
-        self.commands.append(command)
+        self.commands.append(' '.join(command))        
         self.changed = True
         if self.module.check_mode:
             return 0, '', ''
         (rc, stdout, stderr) = self.module.run_command(command)
         if rc or stderr:
+            for i in stderr.splitlines():
+                self.module.warn(i)
+            for i in stdout.splitlines():
+                self.module.warn(i)
             self.module.fail_json(msg='srvctl failed({}): {} {}'.format(rc, stdout, stderr)
                                   , commands=self.commands
                                   , changed=self.changed)
@@ -190,7 +194,8 @@ class oracle_crs_asm:
 
 
     def ensure_asm_state(self):
-        enabled = self.curent_resource.get('ENABLED', '0') # 0/1 or '0'/'1'
+        # Default value for listener ENABLED=1, when ASM is created        
+        enabled = self.curent_resource.get('ENABLED', '1') # 0/1 or '0'/'1'
         enabled = bool(int(enabled))
         enable = self.module.params['enabled']
         if enable and not enabled:
@@ -238,7 +243,7 @@ class oracle_crs_asm:
 def main():
     module = AnsibleModule(
         argument_spec=dict(
-            name=dict(required=True),
+            name=dict(default='asm', required=False),
             state=dict(default="present", choices=["present", "absent", "started", "stopped", "restarted"]),
             enabled=dict(default=True, required=False, type='bool'),
             # ASM parameters

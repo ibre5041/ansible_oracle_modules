@@ -1,0 +1,6 @@
+---
+
+oracle_crs_home: /opt/oracle/grid/product/19.21.0.0
+oracle_listener_name: LISTENER
+
+...

@@ -1,0 +1,120 @@
+---
+
+# $ srvctl config asm
+# ASM home: <CRS home>
+# Password file:
+# Backup of Password file:
+# ASM listener: LISTENER
+# Spfile: /opt/oracle/grid/product/12.1.0.2/dbs/init+ASM.ora
+# ASM diskgroup discovery string: /dev/oracleasm/disks/*
+
+- name: Start asm I
+  oracle_crs_asm:
+    state: started
+  register: _
+  failed_when: _.failed
+
+- name: Start asm I
+  debug: var=_
+
+- name: Start asm II
+  oracle_crs_asm:
+    state: started
+  register: _
+  failed_when: _.failed or _.changed
+
+- name: Start asm II
+  debug: var=_
+  
+- name: Disable asm
+  oracle_crs_asm:
+    state: present
+    enabled: false
+  register: _
+  #failed_when: not 'disable asm' in _.commands[0] or not _.changed or _.failed
+
+- name: Disable asm
+  debug: var=_
+  
+- name: Enable asm
+  oracle_crs_asm:
+    state: present
+    enabled: true
+  register: _
+  failed_when: not 'enable asm' in _.commands[0] or not _.changed or _.failed
+  
+- name: Enable asm
+  debug: var=_
+
+- name: Stop asm
+  oracle_crs_asm:
+    state: stopped
+    enabled: false
+    force: true
+  register: _
+  failed_when: not ('stop asm' in _.commands[0] or 'stop asm' in _.commands[1])  or not _.changed or _.failed
+
+- name: Stop asm
+  debug: var=_
+
+- name: Start disabled asm - should fail
+  oracle_crs_asm:
+    state: started
+    enabled: false 
+  register: _
+  failed_when: not _.failed
+
+- name: Start disabled asm - should fail
+  debug: var=_
+
+- name: Restart asm (and enable it) I
+  oracle_crs_asm:
+    state: restarted
+    enabled: true
+  register: _
+  failed_when: not _.changed or _.failed
+
+- name: Restart asm (and enable it) I
+  debug: var=_
+
+- name: Restart asm (and enable it) II
+  oracle_crs_asm:
+    state: restarted
+  register: _
+  failed_when: not _.changed or _.failed
+
+- name: Restart asm (and enable it) II
+  debug: var=_
+  
+- name: Stop asm
+  oracle_crs_asm:
+    state: stopped
+    enabled: true
+  register: _
+  failed_when: not _.changed or _.failed
+
+- name: Stop asm
+  debug: var=_
+
+- name: "Alter ASM Listener (NOTE: listener should already be pre-configured)"
+  oracle_crs_asm:
+    listener: LISTENER
+  register: _
+  
+- name: "Alter ASM Listener (NOTE: listener should already be pre-configured)"
+  oracle_crs_asm:
+    listener: ASM_LISTENER_LBREZINAI05
+  register: _
+  failed_when: not _.changed or _.failed or 'modify asm' not in _.commands[0]
+  
+- name: "Alter ASM Listener (NOTE: listener should already be pre-configured)"
+  debug: var=_
+  
+- name: Restart asm III
+  oracle_crs_asm:
+    state: restarted
+  register: _
+  failed_when: not (_.commands | length == 1) or not _.changed or _.failed
+
+- name: Restart asm III
+  debug: var=_
