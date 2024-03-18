@@ -53,7 +53,6 @@ EXAMPLES = '''
 - name: Restart listener ASM_LISTENER
   oracle_crs_resource:
     name: ASM_LISTENER
-    endpoints: TCP:1521
     state: restarted
 '''
 
