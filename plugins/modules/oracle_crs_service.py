@@ -266,11 +266,9 @@ class oracle_crs_service:
             , "stopoption"]:
             param = self.module.params[pname]
             if param and isinstance(param, bool):
-                wanted_set.add((pname, str(param).upper()))
-            elif param and pname == "stopoption": # stopoption is stored lowercase in CRS
-                wanted_set.add((pname, param.lower()))
-            elif param:
                 wanted_set.add((pname, param))
+            elif param:
+                wanted_set.add((pname, param.upper()))
 
         current_set = set()
         # current_set.add(("db", self.curent_resource.get('???', None)))
@@ -296,7 +294,7 @@ class oracle_crs_service:
         # current_set.add(("session_state", self.curent_resource.get('???', None)))
         current_set.add(("tablefamilyid", self.curent_resource.get('TABLE_FAMILY_ID', None)))
         current_set.add(("drain_timeout", self.curent_resource.get('DRAIN_TIMEOUT', None)))
-        current_set.add(("stopoption", self.curent_resource.get('STOP_OPTION', None)))
+        current_set.add(("stopoption", self.curent_resource.get('STOP_OPTION', None).upper())) # CRS stores is as lowercase
 
         apply = False
         changes = wanted_set.difference(current_set)
