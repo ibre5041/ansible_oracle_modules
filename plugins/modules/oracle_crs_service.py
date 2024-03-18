@@ -265,7 +265,11 @@ class oracle_crs_service:
             , "drain_timeout"
             , "stopoption"]:
             param = self.module.params[pname]
-            if param:
+            if param and isinstance(param, bool):
+                wanted_set.add((pname, str(param).upper()))
+            elif param and pname == "stopoption": # stopoption is stored lowercase in CRS
+                wanted_set.add((pname, param.lower()))
+            elif param:
                 wanted_set.add((pname, param))
 
         current_set = set()
@@ -275,7 +279,7 @@ class oracle_crs_service:
         current_set.add(("policy", self.curent_resource.get('MANAGEMENT_POLICY', None)))
         current_set.add(("failovertype", self.curent_resource.get('FAILOVER_TYPE', None)))
         current_set.add(("failovermethod", self.curent_resource.get('FAILOVER_METHOD', None)))
-        current_set.add(("failoverdelay", self.curent_resource.get('FAILOVER_DELAY', None)))
+        current_set.add(("failoverdelay", self.curent_resource.get('TAF_FAILOVER_DELAY', None)))
         current_set.add(("failoverretry", self.curent_resource.get('FAILOVER_RETRIES', None)))
         # current_set.add(("failover_restore", self.curent_resource.get('???', None)))
         current_set.add(("edition", self.curent_resource.get('EDITION', None)))
@@ -286,7 +290,7 @@ class oracle_crs_service:
         # current_set.add(("notification", self.curent_resource.get('???', None)))
         current_set.add(("global", self.curent_resource.get('GLOBAL', None)))
         current_set.add(("sql_translation_profile", self.curent_resource.get('SQL_TRANSLATION_PROFILE', None)))
-        current_set.add(("commit_outcome", self.curent_resource.get('COMMIT_OUTCOME', None)))
+        current_set.add(("commit_outcome", bool(self.curent_resource.get('COMMIT_OUTCOME', None)))) # CRS Stores COMMIT_OUTCOME as 0/1
         current_set.add(("retention", self.curent_resource.get('RETENTION', None)))
         current_set.add(("replay_init_time", self.curent_resource.get('REPLAY_INITIATION_TIME', None)))
         # current_set.add(("session_state", self.curent_resource.get('???', None)))
@@ -308,9 +312,9 @@ class oracle_crs_service:
                 srvctl.append('-force')
             apply = True
         elif (not self.curent_resource) and state == 'absent':
-            self.module.exit_json(msg='db resource is already absent', commands=self.commands, changed=self.changed)
+            self.module.exit_json(msg='Database service is already absent', commands=self.commands, changed=self.changed)
         else:
-            self.module.fail_json(msg='Unsupported state for db resource: {}'.format(state)
+            self.module.fail_json(msg='Unsupported state for service resource: {}'.format(state)
                                   , commands=self.commands
                                   , changed=self.changed)
 
@@ -441,8 +445,8 @@ def main():
     db.ensure_db_state()
 
     if db.changed:
-        module.exit_json(msg='Database resource was reconfigured', commands=db.commands, changed=db.changed)
-    module.exit_json(msg='Database was already in intended state', commands=db.commands, changed=db.changed)
+        module.exit_json(msg='Database service was reconfigured', commands=db.commands, changed=db.changed)
+    module.exit_json(msg='Database service was already in intended state', commands=db.commands, changed=db.changed)
 
 
 if __name__ == '__main__':
