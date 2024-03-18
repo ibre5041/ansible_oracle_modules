@@ -26,7 +26,6 @@ EXAMPLES = '''
 ---
 - name: Return GI facts
   oracle_gi_facts:
-    environment: "{{ oracle_env }}"
   register: _oracle_gi_facts
 
 - name: GI facts
