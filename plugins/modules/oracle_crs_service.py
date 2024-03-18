@@ -288,13 +288,13 @@ class oracle_crs_service:
         # current_set.add(("notification", self.curent_resource.get('???', None)))
         current_set.add(("global", self.curent_resource.get('GLOBAL', None)))
         current_set.add(("sql_translation_profile", self.curent_resource.get('SQL_TRANSLATION_PROFILE', None)))
-        current_set.add(("commit_outcome", bool(self.curent_resource.get('COMMIT_OUTCOME', None)))) # CRS Stores COMMIT_OUTCOME as 0/1
+        current_set.add(("commit_outcome", bool(int(self.curent_resource.get('COMMIT_OUTCOME', 0))))) # CRS Stores COMMIT_OUTCOME as 0/1
         current_set.add(("retention", self.curent_resource.get('RETENTION', None)))
         current_set.add(("replay_init_time", self.curent_resource.get('REPLAY_INITIATION_TIME', None)))
         # current_set.add(("session_state", self.curent_resource.get('???', None)))
         current_set.add(("tablefamilyid", self.curent_resource.get('TABLE_FAMILY_ID', None)))
         current_set.add(("drain_timeout", self.curent_resource.get('DRAIN_TIMEOUT', None)))
-        current_set.add(("stopoption", self.curent_resource.get('STOP_OPTION', None).upper())) # CRS stores is as lowercase
+        current_set.add(("stopoption", self.curent_resource.get('STOP_OPTION', '').upper())) # CRS stores is as lowercase
 
         apply = False
         changes = wanted_set.difference(current_set)
@@ -318,7 +318,7 @@ class oracle_crs_service:
 
         for change in changes:
             (param, value) = change
-            srvctl.extend(['-' + param, value])
+            srvctl.extend(['-' + param, str(value)])
             apply = True
 
         if changes or apply:
