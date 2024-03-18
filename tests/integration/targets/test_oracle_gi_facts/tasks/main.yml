@@ -1,0 +1,10 @@
+---
+
+- name: Call oracle_gi_facts
+  oracle_gi_facts:
+  register: _
+
+- name: Display oracle_gi_facts
+  debug: var=_
+
+...

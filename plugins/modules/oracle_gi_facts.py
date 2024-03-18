@@ -6,30 +6,31 @@ DOCUMENTATION = '''
 module: oracle_gi_facts
 short_description: Returns some facts about Grid Infrastructure environment
 description:
-    - Returns some facts about Grid Infrastructure environment
-    - Must be run on a remote host
+  - Returns some facts about Grid Infrastructure environment
+  - Must be run on a remote host
 version_added: "2.4"
 options:
-    oracle_home:
-        description:
-            - Grid Infrastructure home, can be absent if ORACLE_HOME environment variable is set
-        required: false
+  oracle_home:
+    description:
+      - Grid Infrastructure home, can be absent if ORACLE_HOME environment variable is set
+    required: false
 notes:
-    - Oracle Grid Infrastructure 12cR1 or later required
-    - Must be run as (become) GI owner
-author: Ilmar Kerm, ilmar.kerm@gmail.com, @ilmarkerm
+  - Oracle Grid Infrastructure 12cR1 or later required
+  - Must be run as (become) GI owner
+author:
+  - Ilmar Kerm, ilmar.kerm@gmail.com, @ilmarkerm
+  - Ivan Brezina
 '''
 
 EXAMPLES = '''
 ---
-- hosts: localhost
-  vars:
-    oracle_env:
-      ORACLE_HOME: /u01/app/grid/product/12.1.0.2/grid
-  tasks:
-    - name: Return GI facts
-      oracle_gi_facts:
-      environment: "{{ oracle_env }}"
+- name: Return GI facts
+  oracle_gi_facts:
+    environment: "{{ oracle_env }}"
+  register: _oracle_gi_facts
+
+- name: GI facts
+  debug: var=_oracle_gi_facts
 '''
 
 import os, re
@@ -47,8 +48,7 @@ except ImportError:  # pragma: no cover
 
     def check_output(*popenargs, **kwargs):
         if 'stdout' in kwargs:  # pragma: no cover
-            raise ValueError('stdout argument not allowed, '
-                             'it will be overridden.')
+            raise ValueError('stdout argument not allowed, it will be overridden.')
         process = subprocess.Popen(stdout=subprocess.PIPE, *popenargs, **kwargs)
         output, _ = process.communicate()
         retcode = process.poll()
@@ -234,12 +234,22 @@ def main():
     facts = {}
     if module.params["oracle_home"]:
         os.environ['ORACLE_HOME'] = module.params["oracle_home"]
-    srvctl = os.path.join(os.environ['ORACLE_HOME'], 'bin', 'srvctl')
-    crsctl = os.path.join(os.environ['ORACLE_HOME'], 'bin', 'crsctl')
-    cemutlo = os.path.join(os.environ['ORACLE_HOME'], 'bin', 'cemutlo')
-    if not is_executable(srvctl) or not is_executable(crsctl):
-        module.fail_json(changed=False, msg="Are you sure ORACLE_HOME=%s points to GI home? I can't find executables srvctl or crsctl under bin/." % os.environ['ORACLE_HOME'])
+    else:
+        ohomes = oracle_homes()
+        ohomes.list_crs_instances()
+        ohomes.list_processes()
+        ohomes.parse_oratab()
+        
+        if ohomes.crs_home:
+            os.environ['ORACLE_HOME'] = ohomes.crs_home
 
+    if 'ORACLE_HOME' in os.environ:
+        srvctl = os.path.join(os.environ['ORACLE_HOME'], 'bin', 'srvctl')
+        crsctl = os.path.join(os.environ['ORACLE_HOME'], 'bin', 'crsctl')
+        cemutlo = os.path.join(os.environ['ORACLE_HOME'], 'bin', 'cemutlo')
+    else:
+        module.fail_json(changed=False, msg="Could not find GI home. I can't find executables srvctl or crsctl")
+            
     olsnodes = os.path.join(os.environ['ORACLE_HOME'], 'bin', 'olsnodes')
     # Lets assume that empty output form olsnodes means we're on Oracle Restart
     iscrs = bool(exec_program_lines([olsnodes]))
@@ -277,10 +287,27 @@ def main():
     facts.update({'scan_listener': list(scan_listener().values()) if iscrs else []})
     # Databases
     facts.update({'database_list': exec_program_lines([srvctl, 'config', 'database'])})
+    # ORACLE_CRS_HOME
+    facts.update({'oracle_crs_home': os.environ['ORACLE_HOME']})
     # Output
     module.exit_json(msg=", ".join(msg), changed=False, ansible_facts={"oracle_gi_facts": facts})
 
 
 from ansible.module_utils.basic import *
+
+# In these we do import from local project sub-directory <project-dir>/module_utils
+# While this file is placed in <project-dir>/library
+# No collections are used
+# try:
+#    from ansible.module_utils.oracle_homes import oracle_homes
+# except:
+#    pass
+
+# In these we do import from collections
+try:
+    from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_homes import *
+except:
+    pass
+
 if __name__ == '__main__':
     main()
