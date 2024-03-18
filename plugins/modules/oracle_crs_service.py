@@ -1,6 +1,10 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
+# TODO:
+#  Handle boolean paramters
+#  Unit tests
+
 DOCUMENTATION = '''
 ---
 module: oracle_crs_service
@@ -138,14 +142,9 @@ author: Ivan Brezina
 '''
 
 EXAMPLES = '''
-- name: Register Database
+- name: Create service
   oracle_crs_service:
-    name: TMP12102 
-
-- name: Restart Database
-  oracle_crs_service:
-    name: TMP12102
-    state: restarted
+    name: PRIMARY_SERVICE
 '''
 
 import os
@@ -174,7 +173,7 @@ class oracle_crs_service:
         self.commands = []
         self.changed = False
         self.curent_resource = None
-        self.get_crs_config('db')
+        self.get_crs_config('service')
         self.srvctl = os.path.join(self.ohomes.crs_home, "bin", "srvctl")
 
     def run_change_command(self, command):
@@ -227,49 +226,84 @@ class oracle_crs_service:
                 if value:
                     resource.update({key: value})
                 if key == 'NAME':
-                    if value.startswith('ora.'):
+                    if value.endswith('.svc'):
+                        db = value[len('ora.'):].split('.')[0].lower()
+                        sc = value[len('ora.'):].split('.')[1].lower()
+                        name = '{}.{}'.format(db, sc)
+                    elif value.startswith('ora.'):
                         name = value[len('ora.'):].split('.')[0].lower()
                     else:
                         name = value.split('.')[0].lower()
             except ValueError as e:
                 retval[name] = resource
                 resource = dict()
-        self.curent_resource = retval.get(self.resource_name.lower(), dict())
+        if resource_type == 'service':
+            db = self.module.params['db'].lower()
+            sc = self.resource_name.lower()
+            self.curent_resource = retval.get('{}.{}'.format(db, sc), dict())
+        else:
+            self.curent_resource = retval.get(self.resource_name.lower(), dict())
 
     def configure_db(self):
         state = self.module.params["state"]
         resource_name = self.module.params['name'].upper()
+        database_name = self.module.params['db']
 
         wanted_set = set()
-        for pname in ['oraclehome', 'domain', 'spfile', 'pwfile', 'role', 'startoption', 'stopoption'
-            , 'dbname', 'instance', 'policy', 'diskgroup']:
+        for pname in [ # "db"
+            "role", "policy"
+            , "failovertype", "failovermethod", "failoverdelay", "failoverretry", "failover_restore"
+            , "edition", "pdb", "maxlag"
+            , "clbgoal", "rlbgoal"
+            , "notification", "global"
+            , "sql_translation_profile"
+            , "commit_outcome"
+            , "retention"
+            , "replay_init_time"
+            , "session_state"
+            , "tablefamilyid"
+            , "drain_timeout"
+            , "stopoption"]:
             param = self.module.params[pname]
             if param:
                 wanted_set.add((pname, param))
 
         current_set = set()
-        current_set.add(('oraclehome', self.curent_resource.get('ORACLE_HOME', None)))
-        current_set.add(('domain', self.curent_resource.get('USR_ORA_DOMAIN', None)))
-        current_set.add(('spfile', self.curent_resource.get('SPFILE', None)))
-        current_set.add(('pwfile', self.curent_resource.get('PWFILE', None)))
-        current_set.add(('role', self.curent_resource.get('ROLE', None)))
-        current_set.add(('startoption', self.curent_resource.get('USR_ORA_OPEN_MODE', None)))
-        current_set.add(('stopoption', self.curent_resource.get('USR_ORA_STOP_MODE', None)))
-        current_set.add(('dbname', self.curent_resource.get('USR_ORA_DB_NAME', None)))
-        # current_set.add(('instance', self.curent_resource.get('ENDPOINTS', None)))
-        current_set.add(('policy', self.curent_resource.get('MANAGEMENT_POLICY', None)))
-        # current_set.add(('diskgroup', self.curent_resource.get('ENDPOINTS', None)))
+        # current_set.add(("db", self.curent_resource.get('???', None)))
+        # current_set.add(("service", self.curent_resource.get('???', None)))
+        current_set.add(("role", self.curent_resource.get('ROLE', None)))
+        current_set.add(("policy", self.curent_resource.get('MANAGEMENT_POLICY', None)))
+        current_set.add(("failovertype", self.curent_resource.get('FAILOVER_TYPE', None)))
+        current_set.add(("failovermethod", self.curent_resource.get('FAILOVER_METHOD', None)))
+        current_set.add(("failoverdelay", self.curent_resource.get('FAILOVER_DELAY', None)))
+        current_set.add(("failoverretry", self.curent_resource.get('FAILOVER_RETRIES', None)))
+        # current_set.add(("failover_restore", self.curent_resource.get('???', None)))
+        current_set.add(("edition", self.curent_resource.get('EDITION', None)))
+        current_set.add(("pdb", self.curent_resource.get('PLUGGABLE_DATABASE', None)))
+        current_set.add(("maxlag", self.curent_resource.get('MAX_LAG_TIME', None)))
+        current_set.add(("clbgoal", self.curent_resource.get('CLB_GOAL', None)))
+        current_set.add(("rlbgoal", self.curent_resource.get('RLB_GOAL', None)))
+        # current_set.add(("notification", self.curent_resource.get('???', None)))
+        current_set.add(("global", self.curent_resource.get('GLOBAL', None)))
+        current_set.add(("sql_translation_profile", self.curent_resource.get('SQL_TRANSLATION_PROFILE', None)))
+        current_set.add(("commit_outcome", self.curent_resource.get('COMMIT_OUTCOME', None)))
+        current_set.add(("retention", self.curent_resource.get('RETENTION', None)))
+        current_set.add(("replay_init_time", self.curent_resource.get('REPLAY_INITIATION_TIME', None)))
+        # current_set.add(("session_state", self.curent_resource.get('???', None)))
+        current_set.add(("tablefamilyid", self.curent_resource.get('TABLE_FAMILY_ID', None)))
+        current_set.add(("drain_timeout", self.curent_resource.get('DRAIN_TIMEOUT', None)))
+        current_set.add(("stopoption", self.curent_resource.get('STOP_OPTION', None)))
 
         apply = False
         changes = wanted_set.difference(current_set)
         srvctl = [self.srvctl]
         if (not self.curent_resource) and state in ['present', 'started', 'stopped', 'restarted']:
-            srvctl.extend(['add', 'database', '-d', resource_name])
+            srvctl.extend(['add', 'service', '-s', resource_name, '-d', database_name])
             apply = True
         elif self.curent_resource and state in ['present', 'started', 'stopped', 'restarted']:
-            srvctl.extend(['modify', 'database', '-d', resource_name])
+            srvctl.extend(['modify', 'service', '-s', resource_name, '-d', database_name])
         elif self.curent_resource and state == 'absent':
-            srvctl.extend(['remove', 'database', '-d', resource_name, '-noprompt'])
+            srvctl.extend(['remove', 'service', '-s', resource_name, '-d', database_name])
             if self.module.params['force']:
                 srvctl.append('-force')
             apply = True
@@ -292,18 +326,20 @@ class oracle_crs_service:
         if self.module.params['state'] == 'absent':
             return
 
+        database_name = self.module.params['db']
+
         enabled = self.curent_resource.get('ENABLED', '1')  # 0/1 or '0'/'1'
         enabled = bool(int(enabled))
         enable = self.module.params['enabled']
         if enable and not enabled:
-            srvctl = [self.srvctl, 'enable', 'database', '-d', self.resource_name]
+            srvctl = [self.srvctl, 'enable', 'service', '-s', self.resource_name, '-d', database_name]
             (rc, stdout, stderr) = self.run_change_command(srvctl)
 
         if not enable and enabled:
-            srvctl = [self.srvctl, 'disable', 'database', '-d', self.resource_name]
+            srvctl = [self.srvctl, 'disable', 'service', '-s', self.resource_name, '-d', database_name]
             (rc, stdout, stderr) = self.run_change_command(srvctl)
 
-        srvctl = [self.srvctl, 'status', 'database', '-d', self.resource_name]
+        srvctl = [self.srvctl, 'status', 'service', '-s', self.resource_name, '-d', database_name]
         (rc, stdout, stderr) = self.module.run_command(srvctl)
         running = None
         for line in stdout.splitlines():
@@ -319,18 +355,18 @@ class oracle_crs_service:
 
         state = self.module.params['state']
         if state == 'stopped' and running:
-            srvctl = [self.srvctl, 'stop', 'database', '-d', self.resource_name]
+            srvctl = [self.srvctl, 'stop', 'service', '-s', self.resource_name, '-d', database_name]
             (rc, stdout, stderr) = self.run_change_command(srvctl)
 
         if state == 'started' and not running:
-            srvctl = [self.srvctl, 'start', 'database', '-d', self.resource_name]
+            srvctl = [self.srvctl, 'start', 'service', '-s', self.resource_name, '-d', database_name]
             (rc, stdout, stderr) = self.run_change_command(srvctl)
 
         if state == 'restarted':
             if running:
-                srvctl = [self.srvctl, 'stop', 'database', '-d', self.resource_name]
+                srvctl = [self.srvctl, 'stop', 'service', '-s', self.resource_name, '-d', database_name]
                 (rc, stdout, stderr) = self.run_change_command(srvctl)
-            srvctl = [self.srvctl, 'start', 'database', '-d', self.resource_name]
+            srvctl = [self.srvctl, 'start', 'service', '-s', self.resource_name, '-d', database_name]
             (rc, stdout, stderr) = self.run_change_command(srvctl)
 
 
