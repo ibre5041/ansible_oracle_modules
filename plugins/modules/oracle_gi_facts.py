@@ -32,200 +32,192 @@ EXAMPLES = '''
   debug: var=_oracle_gi_facts
 '''
 
-import os, re
-from socket import gethostname, getfqdn
-
-# The following is to make the module usable in python 2.6 (RHEL6/OEL6)
-# Source: http://pydoc.net/pep8radius/0.9.0/pep8radius.shell/
-try:
-    from subprocess import check_output, CalledProcessError
-except ImportError:  # pragma: no cover
-    # python 2.6 doesn't include check_output
-    # monkey patch it in!
-    import subprocess
-    STDOUT = subprocess.STDOUT
-
-    def check_output(*popenargs, **kwargs):
-        if 'stdout' in kwargs:  # pragma: no cover
-            raise ValueError('stdout argument not allowed, it will be overridden.')
-        process = subprocess.Popen(stdout=subprocess.PIPE, *popenargs, **kwargs)
-        output, _ = process.communicate()
-        retcode = process.poll()
-        if retcode:
-            cmd = kwargs.get("args")
-            if cmd is None:
-                cmd = popenargs[0]
-            raise subprocess.CalledProcessError(retcode, cmd, output=output)
-        return output
-    subprocess.check_output = check_output
-
-    # overwrite CalledProcessError due to `output`
-    # keyword not being available (in 2.6)
-    class CalledProcessError(Exception):
-
-        def __init__(self, returncode, cmd, output=None):
-            self.returncode = returncode
-            self.cmd = cmd
-            self.output = output
-
-        def __str__(self):
-            return "Command '%s' returned non-zero exit status %d" % (
-                self.cmd, self.returncode)
-    subprocess.CalledProcessError = CalledProcessError
-
-
-def is_executable(fpath):
-    return os.path.isfile(fpath) and os.access(fpath, os.X_OK)
+import socket
+from subprocess import check_output, CalledProcessError, TimeoutExpired
 
 
 def exec_program_lines(arguments):
     try:
-        output = check_output(arguments)
+        output = check_output(arguments, timeout=30)
         return [line.strip().decode() for line in output.splitlines()]
     except CalledProcessError:
         # Just ignore the error
         return ['']
+    except TimeoutExpired:
+        return ['']
+
 
 def exec_program(arguments):
     return exec_program_lines(arguments)[0]
 
+
 def hostname_to_fqdn(hostname):
     if "." not in hostname:
-        return getfqdn(hostname)
+        return socket.getfqdn(hostname)
     else:
         return hostname
 
-def local_listener():
-    global srvctl, shorthostname, iscrs, vips
-    args = [srvctl, 'status', 'listener']
-    if iscrs:
-        args += ['-n', shorthostname]
-    listeners_out = exec_program_lines(args)
-    re_listener_name = re.compile('Listener (.+) is enabled')
-    listeners = []
-    out = []
-    for line in listeners_out:
-        if "is enabled" in line:
-            m = re_listener_name.search(line)
-            listeners.append(m.group(1))
-    for l in listeners:
-        config = {}
-        output = exec_program_lines([srvctl, 'config', 'listener', '-l', l])
-        for line in output:
-            if line.startswith('Name:'):
-                config['name'] = line[6:]
-            elif line.startswith('Type:'):
-                config['type'] = line[6:]
-            elif line.startswith('Network:'):
-                config['network'] = line[9:line.find(',')]
-            elif line.startswith('End points:'):
-                config['endpoints'] = line[12:]
-                for proto in config['endpoints'].split('/'):
-                    p = proto.split(':')
-                    config[p[0].lower()] = p[1]
-        if "network" in config.keys():
-            config['address'] = vips[config['network']]['fqdn']
-            config['ipv4'] = vips[config['network']]['ipv4']
-            config['ipv6'] = vips[config['network']]['ipv6']
-        out.append(config)
-    return out
 
+class OracleGiFacts:
+    def __init__(self, module, ohomes):
+        self.module = module
+        self.ohomes = ohomes
+        self.networks = dict()
+        self.vips = dict()
+        self.srvctl = os.path.join(ohomes.crs_home, 'bin', 'srvctl')
+        self.cemutlo = os.path.join(ohomes.crs_home, 'bin', 'cemutlo')
+        self.shorthostname = socket.gethostname().split('.', 1)[0]
 
-def scan_listener():
-    global srvctl, shorthostname, iscrs, networks, scans
-    out = {}
-    for n in networks.keys():
-        output = exec_program_lines([srvctl, 'config', 'scan_listener', '-k', n])
-        for line in output:
-            endpoints = None
-            # 19c
-            m = re.search('Endpoints: (.+)', line)
-            if m is not None:
-                endpoints = m.group(1)
-            else:
-                # 18c, 12c
-                m = re.search('SCAN Listener (.+) exists. Port: (.+)', line)
+    def local_listener(self):
+        args = [self.srvctl, 'status', 'listener']
+        if self.ohomes.oracle_crs:
+            args += ['-n', self.shorthostname]
+        listeners_out = exec_program_lines(args)
+        re_listener_name = re.compile('Listener (.+) is enabled')
+        listeners = []
+        out = []
+        for line in listeners_out:
+            if "is enabled" in line:
+                m = re_listener_name.search(line)
+                listeners.append(m.group(1))
+        for l in listeners:
+            config = {}
+            output = exec_program_lines([self.srvctl, 'config', 'listener', '-l', l])
+            for line in output:
+                if line.startswith('Name:'):
+                    config['name'] = line[6:]
+                elif line.startswith('Type:'):
+                    config['type'] = line[6:]
+                elif line.startswith('Network:'):
+                    config['network'] = line[9:line.find(',')]
+                elif line.startswith('End points:'):
+                    config['endpoints'] = line[12:]
+                    for proto in config['endpoints'].split('/'):
+                        p = proto.split(':')
+                        config[p[0].lower()] = p[1]
+            if "network" in config.keys():
+                config['address'] = self.vips[config['network']]['fqdn']
+                config['ipv4'] = self.vips[config['network']]['ipv4']
+                config['ipv6'] = self.vips[config['network']]['ipv6']
+            out.append(config)
+        return out
+
+    def scan_listener(self):
+        out = dict()
+        for n in self.networks.keys():
+            output = exec_program_lines([self.srvctl, 'config', 'scan_listener', '-k', n])
+            for line in output:
+                endpoints = None
+                # 19c
+                m = re.search('Endpoints: (.+)', line)
                 if m is not None:
-                    endpoints = m.group(2)
-            if endpoints:
-                out[n] = {'network': n, 'scan_address': scans[n]['fqdn'], 'endpoints': endpoints, 'ipv4': scans[n]['ipv4'], 'ipv6': scans[n]['ipv6']}
-                for proto in endpoints.split('/'):
-                    p = proto.split(':')
-                    out[n][p[0].lower()] = p[1]
-                break
-    return out
+                    endpoints = m.group(1)
+                else:
+                    # 18c, 12c
+                    m = re.search('SCAN Listener (.+) exists. Port: (.+)', line)
+                    if m is not None:
+                        endpoints = m.group(2)
+                if endpoints:
+                    out[n] = dict(network=n
+                                  , scan_address=self.scans[n]['fqdn']
+                                  , endpoints=endpoints
+                                  , ipv4=self.scans[n]['ipv4']
+                                  , ipv6=self.scans[n]['ipv6'])
+                    for proto in endpoints.split('/'):
+                        p = proto.split(':')
+                        out[n][p[0].lower()] = p[1]
+                    break
+        return out
 
-def get_networks():
-    global srvctl, shorthostname, iscrs
-    out = {}
-    item = {}
-    output = exec_program_lines([srvctl, 'config', 'network'])
-    for line in output:
-        m = re.search('Network ([0-9]+) exists', line)
-        if m is not None:
-            if "network" in item.keys():
-                out[item['network']] = item
-            item = {'network': m.group(1)}
-        elif line.startswith('Subnet IPv4:'):
-            item['ipv4'] = line[13:]
-        elif line.startswith('Subnet IPv6:'):
-            item['ipv6'] = line[13:]
-    if "network" in item.keys():
-        out[item['network']] = item
-    return out
-
-def get_vips():
-    global srvctl, shorthostname, iscrs
-    output = exec_program_lines([srvctl, 'config', 'vip', '-n', shorthostname])
-    vip = {}
-    out = {}
-    for line in output:
-        if line.startswith('VIP exists:'):
-            if "network" in vip.keys():
-                out[vip['network']] = vip
-            vip = {}
-            m = re.search('network number ([0-9]+),', line)
-            vip['network'] = m.group(1)
-        elif line.startswith('VIP Name:'):
-            vip['name'] = line[10:]
-            vip['fqdn'] = hostname_to_fqdn(vip['name'])
-        elif line.startswith('VIP IPv4 Address:'):
-            vip['ipv4'] = line[18:]
-        elif line.startswith('VIP IPv6 Address:'):
-            vip['ipv6'] = line[18:]
-    if "network" in vip.keys():
-        out[vip['network']] = vip
-    return out
-
-
-def get_scans():
-    global srvctl, shorthostname, iscrs
-    out = {}
-    item = {}
-    output = exec_program_lines([srvctl, 'config', 'scan', '-all'])
-    for line in output:
-        if line.startswith('SCAN name:'):
-            if "network" in item.keys():
-                out[item['network']] = item
-            m = re.search('SCAN name: (.+), Network: ([0-9]+)', line)
-            item = {'network': m.group(2), 'name': m.group(1), 'ipv4': [], 'ipv6': []}
-            item['fqdn'] = hostname_to_fqdn(item['name'])
-        else:
-            m = re.search('SCAN [0-9]+ (IPv[46]) VIP: (.+)', line)
+    def get_networks(self):
+        out = dict()
+        item = dict()
+        output = exec_program_lines([self.srvctl, 'config', 'network'])
+        for line in output:
+            m = re.search('Network ([0-9]+) exists', line)
             if m is not None:
-                item[m.group(1).lower()] += [m.group(2)]
-    if "network" in item.keys():
-        out[item['network']] = item
-    return out
+                if "network" in item.keys():
+                    out[item['network']] = item
+                item = {'network': m.group(1)}
+            elif line.startswith('Subnet IPv4:'):
+                item['ipv4'] = line[13:]
+            elif line.startswith('Subnet IPv6:'):
+                item['ipv6'] = line[13:]
+        if "network" in item.keys():
+            out[item['network']] = item
+        return out
+
+    def get_asm(self):
+        output = exec_program_lines([self.srvctl, 'config', 'asm'])
+        out = dict()
+        for line in output:
+            try:
+                value = line.split(': ')[1]
+            except IndexError:
+                value = ''
+            if line.startswith('ASM home'):
+                out.update({'asm_home': value})
+            elif line.startswith('Password file'):
+                out.update({'pwfile': value})
+            elif line.startswith('ASM listener'):
+                out.update({'listener': value})
+            elif line.startswith('Spfile'):
+                out.update({'spfile': value})
+            elif line.startswith('ASM diskgroup discovery string'):
+                out.update({'diskgroup': value})
+        return out
+
+    def get_vips(self):
+        output = exec_program_lines([self.srvctl, 'config', 'vip', '-n', self.shorthostname])
+        vip = dict()
+        out = dict()
+        for line in output:
+            try:
+                value = line.split(': ')[1]
+            except IndexError:
+                value = ''
+            if line.startswith('VIP exists:'):
+                if "network" in vip.keys():
+                    out[vip['network']] = vip
+                vip = {}
+                m = re.search('network number ([0-9]+),', line)
+                vip['network'] = m.group(1)
+            elif line.startswith('VIP Name:'):
+                vip['name'] = value
+                vip['fqdn'] = hostname_to_fqdn(vip['name'])
+            elif line.startswith('VIP IPv4 Address:'):
+                vip['ipv4'] = value
+            elif line.startswith('VIP IPv6 Address:'):
+                vip['ipv6'] = value
+        if "network" in vip.keys():
+            out[vip['network']] = vip
+        return out
+
+    def get_scans(self):
+        out = dict()
+        item = dict()
+        output = exec_program_lines([self.srvctl, 'config', 'scan', '-all'])
+        for line in output:
+            if line.startswith('SCAN name:'):
+                if "network" in item.keys():
+                    out[item['network']] = item
+                m = re.search('SCAN name: (.+), Network: ([0-9]+)', line)
+                item = {'network': m.group(2), 'name': m.group(1), 'ipv4': [], 'ipv6': []}
+                item['fqdn'] = hostname_to_fqdn(item['name'])
+            else:
+                m = re.search('SCAN [0-9]+ (IPv[46]) VIP: (.+)', line)
+                if m is not None:
+                    item[m.group(1).lower()] += [m.group(2)]
+        if "network" in item.keys():
+            out[item['network']] = item
+        return out
 
 
 # Ansible code
 def main():
-    global module, shorthostname, hostname, srvctl, crsctl, cemutlo, iscrs, vips, networks, scans
-    msg = ['']
     module = AnsibleModule(
         argument_spec=dict(
-            oracle_home=dict(required=False, aliases = ['oh'])
+            oracle_home=dict(required=False, aliases=['oh'])
         ),
         supports_check_mode=True
     )
@@ -233,63 +225,57 @@ def main():
     facts = {}
     if module.params["oracle_home"]:
         os.environ['ORACLE_HOME'] = module.params["oracle_home"]
-    else:
-        ohomes = oracle_homes()
-        ohomes.list_crs_instances()
+
+    ohomes = oracle_homes()
+    ohomes.list_crs_instances()
+    if not ohomes.crsctl:
         ohomes.list_processes()
+    if not ohomes.crsctl:
         ohomes.parse_oratab()
-        
-        if ohomes.crs_home:
-            os.environ['ORACLE_HOME'] = ohomes.crs_home
-
-    if 'ORACLE_HOME' in os.environ:
-        srvctl = os.path.join(os.environ['ORACLE_HOME'], 'bin', 'srvctl')
-        crsctl = os.path.join(os.environ['ORACLE_HOME'], 'bin', 'crsctl')
-        cemutlo = os.path.join(os.environ['ORACLE_HOME'], 'bin', 'cemutlo')
-    else:
+    if not ohomes.crs_home:
         module.fail_json(changed=False, msg="Could not find GI home. I can't find executables srvctl or crsctl")
-            
-    olsnodes = os.path.join(os.environ['ORACLE_HOME'], 'bin', 'olsnodes')
-    # Lets assume that empty output form olsnodes means we're on Oracle Restart
-    iscrs = bool(exec_program_lines([olsnodes]))
 
-    hostname = gethostname()
-    shorthostname = hostname.split('.')[0]
+    os.environ['ORACLE_HOME'] = ohomes.crs_home
+    oracle_gi_facts = OracleGiFacts(module, ohomes)
 
     # Cluster name
-    facts.update({'clustername': exec_program([cemutlo, '-n'])})
+    facts.update({'clustername': exec_program([oracle_gi_facts.cemutlo, '-n'])})
 
     # Cluster version
-    if iscrs:
-        version = exec_program([crsctl, 'query', 'crs', 'activeversion'])
+    if ohomes.oracle_crs:
+        version = exec_program([ohomes.crsctl, 'query', 'crs', 'activeversion'])
+        facts.update({'activeversion': version})
     else:
         for i in ['releaseversion', 'releasepatch', 'softwareversion', 'softwarepatch']:
-            version = exec_program([crsctl, 'query', 'has', i])
+            version = exec_program([ohomes.crsctl, 'query', 'has', i])
             m = re.search('\[([0-9\.]+)\]$', version)
             if m:
                 facts.update({i: m.group(1)})
-                facts.update({"version": m.group(1)}) # for backward compatibility
+                facts.update({"version": m.group(1)})  # for backward compatibility
             else:
                 facts.update({i: version})
 
+    # ASM
+    asm = oracle_gi_facts.get_asm()
+    facts.update({'asm': asm})
     # VIPS
-    vips = get_vips()
+    vips = oracle_gi_facts.get_vips()
     facts.update({'vip': list(vips.values())})
     # Networks
-    networks = get_networks()
+    networks = oracle_gi_facts.get_networks()
     facts.update({'network': list(networks.values())})
     # SCANs
-    scans = get_scans()
+    scans = oracle_gi_facts.get_scans()
     facts.update({'scan': list(scans.values())})
     # Listener
-    facts.update({'local_listener': local_listener()})
-    facts.update({'scan_listener': list(scan_listener().values()) if iscrs else []})
+    facts.update({'local_listener': oracle_gi_facts.local_listener()})
+    facts.update({'scan_listener': list(oracle_gi_facts.scan_listener().values()) if ohomes.oracle_crs else []})
     # Databases
-    facts.update({'database_list': exec_program_lines([srvctl, 'config', 'database'])})
+    facts.update({'database_list': exec_program_lines([oracle_gi_facts.srvctl, 'config', 'database'])})
     # ORACLE_CRS_HOME
     facts.update({'oracle_crs_home': os.environ['ORACLE_HOME']})
     # Output
-    module.exit_json(msg=", ".join(msg), changed=False, ansible_facts={"oracle_gi_facts": facts})
+    module.exit_json(msg=" ", changed=False, ansible_facts={"oracle_gi_facts": facts})
 
 
 from ansible.module_utils.basic import *
