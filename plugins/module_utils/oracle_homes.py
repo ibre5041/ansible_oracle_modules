@@ -286,7 +286,7 @@ class oracle_homes():
 
     def add_home(self, ORACLE_HOME):
         if not os.path.isdir(ORACLE_HOME):
-            self.module_warn('ORACLE_HOME: {} does not have valid directory')
+            self.module_warn('ORACLE_HOME: {} does not have valid directory'.format(ORACLE_HOME))
             return
         if ORACLE_HOME and ORACLE_HOME not in self.homes:
             ORACLE_BASE = self.base_from_home(ORACLE_HOME)
@@ -320,7 +320,7 @@ class oracle_homes():
 
     def add_sid(self, ORACLE_SID, ORACLE_HOME=None, DB_UNIQUE_NAME=None, crsname=None, running=None):
         if not os.path.isdir(ORACLE_HOME):
-            self.module_warn('ORACLE_HOME: {} does not have valid directory')
+            self.module_warn('ORACLE_HOME: {} does not have valid directory'.format(ORACLE_HOME))
             return
         if ORACLE_SID in self.facts_item:
             sid = self.facts_item[ORACLE_SID]
