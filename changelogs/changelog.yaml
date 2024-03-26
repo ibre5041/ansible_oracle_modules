@@ -1,10 +1,12 @@
 ancestor: null
 releases:
   3.1.10:
-    release_date: '2024-02-06'
     changes:
       minor_changes:
       - added support for names ORACLE_HOMEs (oracle_home_name)
+    release_date: '2024-02-06'
+  3.1.8:
+    release_date: '2023-12-19'
   3.1.9:
     changes:
       breaking_changes:
@@ -14,5 +16,11 @@ releases:
       - more tests
       - suppot for RAC on RHEL 9
     release_date: '2024-01-05'
-  3.1.8:
-    release_date: '2023-12-19'
+  3.2.0:
+    release_date: '2024-03-18'
+    changes:
+      minor_changes:
+      - oracle_gi_facts detects ORACLE_HOME
+      release_summary:
+      - new modules oracle_crs_asm oracle_crs_db oracle_crs_listener oracle_crs_service
+

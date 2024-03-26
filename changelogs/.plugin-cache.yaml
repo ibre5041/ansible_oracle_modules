@@ -31,6 +31,26 @@ plugins:
       name: oracle_awr
       namespace: ''
       version_added: 2.2.1
+    oracle_crs_asm:
+      description: Manage CRS/HAS resource type asm
+      name: oracle_crs_asm
+      namespace: ''
+      version_added: 3.1.7.0
+    oracle_crs_db:
+      description: Manage CRS/HAS resources type database
+      name: oracle_crs_db
+      namespace: ''
+      version_added: 3.1.7.0
+    oracle_crs_listener:
+      description: Manage CRS/HAS resources type listener
+      name: oracle_crs_listener
+      namespace: ''
+      version_added: 3.1.7.0
+    oracle_crs_service:
+      description: Manage CRS/HAS resources type service
+      name: oracle_crs_service
+      namespace: ''
+      version_added: 3.1.7.0
     oracle_datapatch:
       description: Manage datapatch functionality
       name: oracle_datapatch
@@ -177,4 +197,4 @@ plugins:
   strategy: {}
   test: {}
   vars: {}
-version: 3.1.10
+version: 3.2.0

@@ -27,6 +27,8 @@
   [ $(stat -fc %T /sys/fs/cgroup/) = "cgroup2fs" ] && echo "unified" || ( [ -e /sys/fs/cgroup/unified/ ] && echo "hybrid" || echo "legacy")
   grubby --update-kernel=/boot/vmlinuz-$(uname -r) --args="systemd.unified_cgroup_hierarchy=0 systemd.legacy_systemd_cgroup_controller"
 
+- See ~/.local/lib/python3.9/site-packages/ansible/plugins/connection/ssh.py, extends_documentation_fragment:
+  
 - File Permission Changed After applying a Patch on Oracle Home (Doc ID 1495123.1)
   use umask before running installer/opatch
   
