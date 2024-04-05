@@ -344,7 +344,7 @@ def main():
 
     instance = query_instance(module, conn)
     if module.params["instance"]:
-        db.update({'database': instance})
+        db.update({'instance': instance})
 
     database = query_database(module, conn)
     if module.params["database"]:
