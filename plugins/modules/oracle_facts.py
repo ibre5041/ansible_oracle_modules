@@ -106,6 +106,7 @@ def detect_paths(module, conn):
         srvctl = os.path.join(h.crs_home, 'bin', 'srvctl')
         proc = subprocess.Popen([srvctl, 'config', 'database', '-d', oracle_sid], stdout=subprocess.PIPE)
 
+        ORACLE_HOME = SPFILE = PASSWORD = None
         for line in iter(proc.stdout.readline, ''):
             if line.decode('utf-8').startswith('Oracle home:'):
                 ORACLE_HOME = line.decode('utf-8').split(': ')[1].strip()
