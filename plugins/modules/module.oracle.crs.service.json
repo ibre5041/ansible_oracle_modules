@@ -2,6 +2,8 @@
     "ANSIBLE_MODULE_ARGS": {
         "name": "TMP12102_PRIMARY",
         "db": "TMP12102",
-        "enabled": true
+        "enabled": true,
+        "failovertype": "TRANSACTION",
+        "commit_outcome": true
     }
 }

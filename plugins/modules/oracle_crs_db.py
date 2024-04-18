@@ -61,6 +61,7 @@ options:
   dbname:
     description:
       - "<db_name> Database name (DB_NAME), if different from the unique name given by the -db option"
+      - Please do provide dbname as parameter too especially in RAC or DG
     required: false
   instance:
     description:
@@ -233,6 +234,16 @@ class oracle_crs_db:
         if changes or apply:
             (rc, stdout, stderr) = self.run_change_command(srvctl)
 
+        # We're on RAC, newly added Database needs to add instances too
+        if (not self.curent_resource) and state in ['present', 'started', 'stopped', 'restarted'] and self.ohomes.oracle_crs:
+            (rc, stdout, stderr) = self.module.run_command(os.path.join(self.ohomes.crs_home, "bin", "olsnodes"))
+            if rc or stderr:
+                self.module.fail_json("Failed to execute olsnodes({}): {}".format(rc, stderr))
+            nodes = sorted(stdout.splitlines())
+            for (i, node) in enumerate(nodes):
+                instance = self.module.params['dbname'] + str(i+1)
+                srvctl = [self.srvctl, 'add', 'instance', '-d', resource_name, '-i', instance, '-n', node]
+                self.run_change_command(srvctl)
 
     def ensure_db_state(self):
         if self.module.params['state'] == 'absent':
