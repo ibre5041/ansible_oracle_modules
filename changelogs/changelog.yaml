@@ -17,10 +17,14 @@ releases:
       - suppot for RAC on RHEL 9
     release_date: '2024-01-05'
   3.2.0:
-    release_date: '2024-03-18'
     changes:
       minor_changes:
       - oracle_gi_facts detects ORACLE_HOME
-      release_summary:
-      - new modules oracle_crs_asm oracle_crs_db oracle_crs_listener oracle_crs_service
-
+    release_date: '2024-03-18'
+  3.2.1:
+    release_date: '2024-04-18'
+    changes:
+      minor_changes:
+      - oracle_gi_facts fixes
+      - oracle_oratab fixes
+      - oracle_crs_db fixes
