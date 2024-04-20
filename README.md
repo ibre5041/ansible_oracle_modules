@@ -42,7 +42,7 @@ The default behaviour for the modules using `cx_Oracle` is this:
 | [oracle_crs_asm](../content/module/oracle_crs_asm/)       | Manage CRS/HAS resource ASM instance |
 | [oracle_crs_db](../content/module/oracle_crs_db/)         | Manage CRS/HAS resource database |
 | [oracle_crs_listener](../content/module/oracle_crs_listener/) | Manage CRS/HAS resource listener |
-| [oracle_crs_service](../content/module/oracle_crs_service/) Manage CRS/HAS resource database service |
+| [oracle_crs_service](../content/module/oracle_crs_service/) | Manage CRS/HAS resource database service |
 | [oracle_directory](../content/module/oracle_directory/)   | Create/drop DIRECTORY in an Oracle database |
 | [oracle_facts](../content/module/oracle_facts/)	    | Returns some facts about Oracle DB |
 | [oracle_gi_facts](../content/module/oracle_gi_facts/)	    | Returns some facts about Grid Infrastructure environment |
