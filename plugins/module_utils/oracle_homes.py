@@ -4,7 +4,6 @@ __metaclass__ = type
 
 import fcntl
 import os
-from pathlib import Path
 import pwd
 import subprocess
 import re
@@ -351,8 +350,8 @@ class oracle_homes():
                 , 'running': running}
 
     def query_db_status(self, oracle_owner, oracle_home, oracle_sid):
-        sqlplus_path = Path(oracle_home, 'bin', 'sqlplus')
-        args = [str(sqlplus_path), '-S', '/', 'as', 'sysdba']
+        sqlplus_path = os.path.join(oracle_home, 'bin', 'sqlplus')
+        args = [sqlplus_path, '-S', '/', 'as', 'sysdba']
         pw_record = pwd.getpwnam(oracle_owner)
         user_name = pw_record.pw_name
         user_home_dir = pw_record.pw_dir
@@ -444,7 +443,7 @@ class oracle_homes():
 
 #     for sid in list(h.facts_item):
 #         try:
-#             sqlplus_path = Path(h.facts_item[sid]['ORACLE_HOME'], 'bin', 'oracle')
+#             sqlplus_path = os.path.join(h.facts_item[sid]['ORACLE_HOME'], 'bin', 'oracle')
 #             oracle_owner = getpwuid(os.stat(sqlplus_path).st_uid).pw_name
 #             h.facts_item[sid]['owner'] = oracle_owner
 #         except BaseException as e:
