@@ -4,6 +4,7 @@ __metaclass__ = type
 
 import fcntl
 import os
+import sys
 import pwd
 import subprocess
 import re
@@ -91,7 +92,7 @@ class oracle_homes():
         if self.module:
             self.module.fail_json(msg=msg, changed=changed)
         else:
-            os.exit(1)
+            sys.exit(1)
 
     def parse_oratab(self):
         try:
@@ -440,7 +441,7 @@ class oracle_homes():
 #     h.list_crs_instances()
 #     h.list_processes()
 #     h.parse_oratab()
-
+#
 #     for sid in list(h.facts_item):
 #         try:
 #             sqlplus_path = os.path.join(h.facts_item[sid]['ORACLE_HOME'], 'bin', 'oracle')
@@ -449,7 +450,7 @@ class oracle_homes():
 #         except BaseException as e:
 #             print(e)
 #             pass
-
+#
 #         if h.facts_item[sid]["running"]:
 #             status = h.query_db_status(oracle_owner=h.facts_item[sid]['owner']
 #                                        , oracle_home=h.facts_item[sid]['ORACLE_HOME']
@@ -457,9 +458,9 @@ class oracle_homes():
 #             h.facts_item[sid]['status'] = status
 #         else:
 #             h.facts_item[sid]['status'] = ['DOWN']
-
+#
 #     print(json.dumps(h.facts_item, sort_keys=True, indent=2))
-
-
+#
+#
 # if __name__ == '__main__':
 #     main()
