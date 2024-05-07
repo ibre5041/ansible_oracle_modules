@@ -5,6 +5,24 @@ Ibre5041.Ansible_Oracle_Modules Release Notes
 .. contents:: Topics
 
 
+v3.2.1
+======
+
+Minor Changes
+-------------
+
+- oracle_crs_db fixes
+- oracle_gi_facts fixes
+- oracle_oratab fixes
+
+v3.2.0
+======
+
+Minor Changes
+-------------
+
+- oracle_gi_facts detects ORACLE_HOME
+
 v3.1.10
 =======
 
