@@ -76,6 +76,7 @@ tasks:
 
 import fcntl
 import os
+import sys
 import pwd
 import subprocess
 import re
@@ -97,7 +98,10 @@ from ansible.module_utils.basic import AnsibleModule
 
 # In these we do import from collections
 try:
-    from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_homes import oracle_homes
+    if sys.version_info.major == 2:
+        from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_homes_py2 import oracle_homes
+    else:
+        from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_homes import oracle_homes
 except:
     pass
 
