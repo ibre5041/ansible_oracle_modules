@@ -5,6 +5,17 @@ Ibre5041.Ansible_Oracle_Modules Release Notes
 .. contents:: Topics
 
 
+v3.2.2
+======
+
+New Plugins
+-----------
+
+Filter
+~~~~~~
+
+- ibre5041.ansible_oracle_modules.pwhash12c - Compute hash of Oracle password
+
 v3.2.1
 ======
 
