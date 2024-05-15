@@ -9,29 +9,27 @@ name: pwhash12c
 short_description: Compute hash of Oracle password
 version_added: 3.2.2
 author:
-    - Ivan Brezina
+  - Ivan Brezina
 description:
-    - Uses PBKDF2 hash function to compute passord hash in latest format
+  - Uses PBKDF2 hash function to compute passord hash in latest format
 options:
-    _input:
-        description:
-            - Password in plaintext format 
-        type: string
-        required: true
-requirements:
-    - pbkdf2
+  _input:
+    description:
+      - Password in plaintext format 
+    type: string
+    required: true
 '''
 
 EXAMPLES = '''
-- name: Alter user password
+- name: reset users password
   ansible.builtin.debug:
     msg: "alter user scott identified by values '{{ 'tigger' | pwhash12c }}';"
 '''
 
 RETURN = '''
-_value:
+  _value:
     description:
-        - "Oracle 12c password hash starting with T:"
+      - "Oracle 12c password hash starting with T:"
     type: string
 '''
 
