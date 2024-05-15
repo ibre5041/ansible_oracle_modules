@@ -1,0 +1,19 @@
+---
+
+- name: Make sure the Python pbkdf2 library is installed
+  pip:
+    name: pbkdf2
+    state: present
+  delegate_to: 127.0.0.1
+  
+- name: Print password reset SQL
+  debug:
+    msg: "alter user scott identified by values '{{'tiger' | ibre5041.ansible_oracle_modules.pwhash12c }}';"
+  delegate_to: 127.0.0.1
+
+- name: Print test connect
+  debug:
+    msg: "connect scott/tiger"
+  delegate_to: 127.0.0.1
+  
+...
