@@ -22,9 +22,16 @@ releases:
       - oracle_gi_facts detects ORACLE_HOME
     release_date: '2024-03-18'
   3.2.1:
-    release_date: '2024-04-18'
     changes:
       minor_changes:
+      - oracle_crs_db fixes
       - oracle_gi_facts fixes
       - oracle_oratab fixes
-      - oracle_crs_db fixes
+    release_date: '2024-04-18'
+  3.2.2:
+    plugins:
+      filter:
+      - description: Compute hash of Oracle password
+        name: pwhash12c
+        namespace: ibre5041.ansible_oracle_modules
+    release_date: '2024-05-15'
