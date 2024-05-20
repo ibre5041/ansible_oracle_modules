@@ -26,7 +26,7 @@ oracle.install.crs.config.clusterNodes={{ crs_node_list | default([]) | join(','
 #   - 5 : ASM & PRIVATE
 #
 # For example: eth0:140.87.24.0:1,eth1:10.2.1.0:2,eth2:140.87.52.0:3
-{{ '' if oracle_install_type == 'rac' else '#' }}oracle.install.crs.config.networkInterfaceList={{ oracle_crs_priv_iface }}:{{ oracle_crs_priv_net }}:5,{{ oracle_crs_public_iface }}:{{ oracle_crs_public_net }}:1
+{{ '' if oracle_install_type == 'rac' else '#' }}oracle.install.crs.config.networkInterfaceList={{ oracle_crs_priv_iface | default() }}:{{ oracle_crs_priv_net | default() }}:5,{{ oracle_crs_public_iface | default() }}:{{ oracle_crs_public_net | default() }}:1
 
 oracle.install.crs.config.gpnp.gnsOption=CREATE_NEW_GNS
 oracle.install.crs.configureGIMR=false
