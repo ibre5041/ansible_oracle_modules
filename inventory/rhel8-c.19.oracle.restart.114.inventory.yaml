@@ -1,0 +1,48 @@
+all:
+  hosts:
+    rhel8c-19-restart:
+      address: 192.168.8.114
+      oracle_install_type: restart
+      oracle_release: 19c
+      oracle_password: X4ollkflkfjslkjfglksj
+  children:
+    oracle:
+      hosts:
+        rhel8c-19-restart:
+
+  vars:
+    oracle_url_base: http://kicklinux/oracle/19c/
+    scsi:
+    - adapter:
+        pciSlotNumber: 16
+    - adapter:
+        pciSlotNumber: 32
+    disks:
+    - disk: rootdg
+      size: 10g
+      bus: 0
+    - disk: appdg
+      size: 60g
+      bus: 0
+    network:
+    - adapter:
+      pciSlotNumber: 192
+      network: "Public Network"
+    - adapter:
+      pciSlotNumber: 224
+      network: "Barn Network"      
+    ram: 16G
+    cpu: 2
+
+    vmware:
+      vm_folder: VmFolder
+      datastore: Kingston890G
+
+    cluster:
+      oracle_cluster_name: rhel8c-19
+      disks:
+        - disk:
+            size: 8G
+            bus: 1
+            count: 4
+    template: "RHEL8 Template"
