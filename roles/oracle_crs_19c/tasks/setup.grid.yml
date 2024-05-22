@@ -27,7 +27,7 @@
         basedir: "{{ oracle_home }}/lib/"
         strip: 0
 
-    - name: install grid.rsp
+    - name: Install {{ oracle_gi_response_file }}
       template:
         src:  "{{ oracle_gi_response_file }}"
         dest: "{{ oracle_install_dir_temp }}/"
