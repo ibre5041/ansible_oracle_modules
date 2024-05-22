@@ -55,7 +55,7 @@ oracle.install.asm.SYSASMPassword={{ oracle_password }}
 oracle.install.asm.monitorPassword={{ oracle_password }}
 
 # Note: there is dependecy between this and grid.rsp
-# While patched Golden image does not support
-#  oracle.install.crs.configureGIMR=true
+# While patched Golden image does support
+#  oracle.install.crs.configureGIMR=false
 # Base install package does not support
 

@@ -12,23 +12,23 @@
 - debug: var=domain_name
 
 
-- name: Build crs node list
+- name: Build crs node list {{ crs_node_list }},  {{ ansible_play_batch | length }}, {{ crs_node_list | length }}
   set_fact:
-    crs_node_list : "{{ crs_node_list + [ item + '.' + domain_name + ':' + hostvars[item].oracle_crs_node_vip + '.' +  domain_name] | sort }}"
-  with_items: "{{ ansible_play_batch }}"
-- name: crs node list
+    crs_node_list: "{{ (crs_node_list | default([]) ) + [ item + '.' + domain_name + ':' + hostvars[item].oracle_crs_node_vip + '.' +  domain_name] }}"
+  with_items: "{{ ansible_play_batch | sort }}"
+
+- name: Debug crs_node_list, {{ crs_node_list }}, {{ crs_node_list | length }}
   debug:
     var: crs_node_list
 
-- name: CRS node list
+- name: CRS node list, {{ crs_node_list | length }}
   debug:
     msg: "{{ crs_node_list|join(',') }}"
 
-
-- name: Build db node list
+- name: Build db node list {{ ansible_play_batch | length }}
   set_fact:
-    db_node_list : "{{ db_node_list + [ item ] | sort }}"
-  with_items: "{{ ansible_play_batch }}"
+    db_node_list : "{{ ansible_play_batch | sort }}"
+
 - name: dbnode list
   debug:
     var: db_node_list
