@@ -88,8 +88,8 @@ This is how storage on mine VM looks like:
 
         VBoxManage storageattach rac1 --storagectl datacrtl --port 0 --type hdd --medium "%HOMEDRIVE%%HOMEPATH%\VirtualBox VMs\rac\rac1\rac1.vdi"
         VBoxManage storageattach rac2 --storagectl datacrtl --port 0 --type hdd --medium "%HOMEDRIVE%%HOMEPATH%\VirtualBox VMs\rac\rac2\rac2.vdi"
-        VBoxManage storageattach rac1 --storagectl datacrtl --port 1 --type dvddrive --medium emptydrive
-        VBoxManage storageattach rac2 --storagectl datacrtl --port 1 --type dvddrive --medium emptydrive
+        VBoxManage storageattach rac1 --storagectl sata --port 1 --type dvddrive --medium emptydrive
+        VBoxManage storageattach rac2 --storagectl sata --port 1 --type dvddrive --medium emptydrive
 
 - Install base minimal OS
 
