@@ -86,8 +86,8 @@ This is how storage on mine VM looks like:
         0%...10%...20%...30%...40%...50%...60%...70%...80%...90%...100%
         Medium created. UUID: d0fbfeaf-58f0-41d2-83f9-f2d492339fb0
 
-        VBoxManage storageattach rac1 --storagectl datacrtl --port 0 --type hdd --medium "%HOMEDRIVE%%HOMEPATH%\VirtualBox VMs\rac\rac1\rac1.vdi"
-        VBoxManage storageattach rac2 --storagectl datacrtl --port 0 --type hdd --medium "%HOMEDRIVE%%HOMEPATH%\VirtualBox VMs\rac\rac2\rac2.vdi"
+        VBoxManage storageattach rac1 --storagectl sata --port 0 --type hdd --medium "%HOMEDRIVE%%HOMEPATH%\VirtualBox VMs\rac\rac1\rac1.vdi"
+        VBoxManage storageattach rac2 --storagectl sata --port 0 --type hdd --medium "%HOMEDRIVE%%HOMEPATH%\VirtualBox VMs\rac\rac2\rac2.vdi"
         VBoxManage storageattach rac1 --storagectl sata --port 1 --type dvddrive --medium emptydrive
         VBoxManage storageattach rac2 --storagectl sata --port 1 --type dvddrive --medium emptydrive
 
