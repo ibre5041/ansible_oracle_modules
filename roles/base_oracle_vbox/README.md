@@ -50,7 +50,7 @@ This is how storage on mine VM looks like:
 
 - Create two VBox networks:
 
-        cd C:\Program Files\Oracle\VirtualBox
+        cd "C:\Program Files\Oracle\VirtualBox"
         VBoxManage natnetwork add --netname rac_public --enable --network 172.16.1.0/24
         VBoxManage natnetwork add --netname rac_private --enable --network 10.0.1.0/24
 
