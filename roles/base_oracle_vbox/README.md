@@ -136,10 +136,10 @@ This is how storage on mine VM looks like:
 
         VBoxManage modifymedium disk "%HOMEDRIVE%%HOMEPATH%\VirtualBox VMs\rac\rac_DATA1.vdi" --type shareable
         VBoxManage modifymedium disk "%HOMEDRIVE%%HOMEPATH%\VirtualBox VMs\rac\rac_DATA2.vdi" --type shareable
-        VboxManage storageattach rac1 --storagectl rac1 --port 2 --type hdd --medium "%HOMEDRIVE%%HOMEPATH%\VirtualBox VMs\rac\rac_DATA1.vdi"
-        VboxManage storageattach rac1 --storagectl rac1 --port 3 --type hdd --medium "%HOMEDRIVE%%HOMEPATH%\VirtualBox VMs\rac\rac_DATA2.vdi"
-        VboxManage storageattach rac2 --storagectl rac2 --port 2 --type hdd --medium "%HOMEDRIVE%%HOMEPATH%\VirtualBox VMs\rac\rac_DATA1.vdi"
-        VboxManage storageattach rac2 --storagectl rac2 --port 3 --type hdd --medium "%HOMEDRIVE%%HOMEPATH%\VirtualBox VMs\rac\rac_DATA2.vdi"
+        VboxManage storageattach rac1 --storagectl datacrtl --port 2 --type hdd --medium "%HOMEDRIVE%%HOMEPATH%\VirtualBox VMs\rac\rac_DATA1.vdi"
+        VboxManage storageattach rac1 --storagectl datacrtl --port 3 --type hdd --medium "%HOMEDRIVE%%HOMEPATH%\VirtualBox VMs\rac\rac_DATA2.vdi"
+        VboxManage storageattach rac2 --storagectl datacrtl --port 2 --type hdd --medium "%HOMEDRIVE%%HOMEPATH%\VirtualBox VMs\rac\rac_DATA1.vdi"
+        VboxManage storageattach rac2 --storagectl datacrtl --port 3 --type hdd --medium "%HOMEDRIVE%%HOMEPATH%\VirtualBox VMs\rac\rac_DATA2.vdi"
 
 - Attach Oracle binaries to VMs
 
