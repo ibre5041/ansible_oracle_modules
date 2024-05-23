@@ -106,6 +106,8 @@ This is how storage on mine VM looks like:
         # yum install epel-release
         # yum install dkms
 
+        # hostnamectl hostname rac1
+        # hostnamectl hostname rac2
         # mount /dev/cdrom /mnt/
         mount: /dev/sr0 is write-protected, mounting read-only
         # /mnt/VBoxLinuxAdditions.run --nox11
