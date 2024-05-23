@@ -69,7 +69,7 @@ This is how storage on mine VM looks like:
         Settings file: 'C:\Users\...\VirtualBox VMs\rac\rac2\rac2.vbox'
 
         VboxManage modifyvm rac1 --cpus 2 --memory 10240 --nic1 natnetwork --nat-network1 rac_public --nic2 natnetwork --nat-network2 rac_private
-        VboxManage modifyvm rac1 --cpus 2 --memory 10240 --nic1 natnetwork --nat-network1 rac_public --nic2 natnetwork --nat-network2 rac_private
+        VboxManage modifyvm rac2 --cpus 2 --memory 10240 --nic1 natnetwork --nat-network1 rac_public --nic2 natnetwork --nat-network2 rac_private
 
         VBoxManage storagectl rac1 --name sata --add sata
         VBoxManage storagectl rac2 --name sata --add sata    
