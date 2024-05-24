@@ -84,8 +84,8 @@ This is how storage on mine VM looks like:
 
         VBoxManage storagectl rac1 --name sata --add sata
         VBoxManage storagectl rac2 --name sata --add sata    
-        VBoxManage storagectl rac1 --name datacrtl --add pcie
-        VBoxManage storagectl rac2 --name datacrtl --add pcie
+        VBoxManage storagectl rac1 --name datacrtl --add virtio-scsi
+        VBoxManage storagectl rac2 --name datacrtl --add virtio-scsi
 
         VBoxManage createmedium --filename "%HOMEDRIVE%%HOMEPATH%\VirtualBox VMs\rac\rac1\rac1.vdi" --size 102400 --variant Standard
 
