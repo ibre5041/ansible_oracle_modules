@@ -48,6 +48,14 @@ This is how storage on mine VM looks like:
         10.0.1.101       rac1-priv.vbox rac1-priv  # private address of the first node(enp0s8)
         10.0.1.102       rac2-priv.vbox rac2-priv  # private address of the second node
 
+        192.168.8.40     rac19-a-node-1.prod.vmware.haf rac19-a-node-1 # public address of the first node(enp0s3)
+        192.168.8.41     rac19-a-node-2.prod.vmware.haf rac19-a-node-1 # public address of the second node
+        192.168.8.43     rac19-a-lis-1.prod.vmware.haf rac19-a-lis-1   # virtual address of the first node
+        192.168.8.44     rac19-a-lis-2.prod.vmware.haf rac19-a-lis-2   # virtual address of the 2ND node
+        192.168.8.47     rac19-a-scan.prod.vmware.haf rac19-a-scan     # SCAN address of the cluster
+        192.168.8.48     rac19-a-scan.prod.vmware.haf rac19-a-scan     # SCAN address of the cluster
+        192.168.8.49     rac19-a-scan.prod.vmware.haf rac19-a-scan     # SCAN address of the cluster
+	
 - Create two VBox networks:
 
         cd "C:\Program Files\Oracle\VirtualBox"
