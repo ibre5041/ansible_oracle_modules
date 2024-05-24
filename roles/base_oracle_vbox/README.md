@@ -68,8 +68,8 @@ This is how storage on mine VM looks like:
         UUID: b7a000cd-f92e-45aa-ae01-ceac567f2549
         Settings file: 'C:\Users\...\VirtualBox VMs\rac\rac2\rac2.vbox'
 
-        VboxManage modifyvm rac1 --nic1 natnetwork --nat-network1 rac_public --nic2 natnetwork --nat-network2 rac_private
-        VboxManage modifyvm rac2 --nic1 natnetwork --nat-network1 rac_public --nic2 natnetwork --nat-network2 rac_private
+        VboxManage modifyvm rac1 --nic1 bridged --nictype1 virtio --nic2 natnetwork --nat-network2 rac_private
+        VboxManage modifyvm rac2 --nic1 bridged --nictype1 virtio --nic2 natnetwork --nat-network2 rac_private
 
         VboxManage modifyvm rac1 --cpus 2 --memory 10240 --ostype RedHat9_64 --acpi
         VboxManage modifyvm rac2 --cpus 2 --memory 10240 --ostype RedHat9_64 --acpi
