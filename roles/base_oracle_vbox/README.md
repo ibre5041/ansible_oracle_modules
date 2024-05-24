@@ -28,6 +28,13 @@ This is how storage on mine VM looks like:
         [N:0:0:1]    disk    ORCL-VBOX-NVME-VER12__1                    /dev/nvme0n1
         [N:0:0:2]    disk    ORCL-VBOX-NVME-VER12__2                    /dev/nvme0n2
 
+        or (in case when SCSI is used)
+        [root@rac19-a-node-1 ~]# lsscsi
+        [0:0:0:0]    disk    ATA      VBOX HARDDISK    1.0   /dev/sda
+        [1:0:0:0]    cd/dvd  VBOX     CD-ROM           1.0   /dev/sr0
+        [30:0:2:0]   disk    VBOX     HARDDISK         1.0   /dev/sdb
+        [30:0:3:0]   disk    VBOX     HARDDISK         1.0   /dev/sdc
+
 - Install necessary packages
 
         yum install -y bind-utils net-tools dnsmasq
