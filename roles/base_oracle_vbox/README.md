@@ -71,8 +71,8 @@ This is how storage on mine VM looks like:
         VboxManage modifyvm rac1 --nic1 bridged --nictype1 virtio --nic2 natnetwork --nat-network2 rac_private
         VboxManage modifyvm rac2 --nic1 bridged --nictype1 virtio --nic2 natnetwork --nat-network2 rac_private
 
-        VboxManage modifyvm rac1 --cpus 2 --memory 10240 --ostype RedHat9_64 --acpi on
-        VboxManage modifyvm rac2 --cpus 2 --memory 10240 --ostype RedHat9_64 --acpi on
+        VboxManage modifyvm rac1 --cpus 2 --memory 10240 --ostype RedHat9_64 --acpi on --graphicscontroller vmsvga
+        VboxManage modifyvm rac2 --cpus 2 --memory 10240 --ostype RedHat9_64 --acpi on --graphicscontroller vmsvga
 
         VBoxManage storagectl rac1 --name sata --add sata
         VBoxManage storagectl rac2 --name sata --add sata    
