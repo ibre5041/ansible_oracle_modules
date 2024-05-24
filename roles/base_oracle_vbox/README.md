@@ -155,7 +155,7 @@ This is how storage on mine VM looks like:
         VBoxManage modifymedium disk "%HOMEDRIVE%%HOMEPATH%\VirtualBox VMs\rac\rac_DATA1.vdi" --type shareable
         VBoxManage modifymedium disk "%HOMEDRIVE%%HOMEPATH%\VirtualBox VMs\rac\rac_DATA2.vdi" --type shareable
 
-  	# Lower SCSI id's are reserved for OS
+        # Lower SCSI id's are reserved for OS
         VboxManage storageattach rac1 --storagectl datacrtl --port 4 --type hdd --medium "%HOMEDRIVE%%HOMEPATH%\VirtualBox VMs\rac\rac_DATA1.vdi"
         VboxManage storageattach rac1 --storagectl datacrtl --port 5 --type hdd --medium "%HOMEDRIVE%%HOMEPATH%\VirtualBox VMs\rac\rac_DATA2.vdi"
         VboxManage storageattach rac2 --storagectl datacrtl --port 4 --type hdd --medium "%HOMEDRIVE%%HOMEPATH%\VirtualBox VMs\rac\rac_DATA1.vdi"
