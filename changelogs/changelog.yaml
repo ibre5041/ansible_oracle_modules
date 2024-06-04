@@ -33,5 +33,10 @@ releases:
       filter:
       - description: Compute hash of Oracle password
         name: pwhash12c
-        namespace: ibre5041.ansible_oracle_modules
+        namespace: null
     release_date: '2024-05-15'
+  3.2.3:
+    release_date: '2024-06-04'
+    changes:
+      minor_changes:
+      - CRS build fixes
