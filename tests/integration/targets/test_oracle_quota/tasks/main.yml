@@ -1,0 +1,12 @@
+---
+- include_tasks: "set_up.yml"
+
+- include_tasks: "check_parameters.yml"
+- include_tasks: "ensure_present.yml"
+- include_tasks: "ensure_absent.yml"
+- include_tasks: "ensure_no_quota.yml"
+- include_tasks: "ensure_same.yml"
+- include_tasks: "check_unlimited.yml"
+
+- include_tasks: "tear_down.yml"
+...

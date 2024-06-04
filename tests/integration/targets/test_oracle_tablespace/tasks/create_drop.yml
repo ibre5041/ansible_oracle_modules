@@ -1,0 +1,56 @@
+---
+- name: "define connection parameters"
+  set_fact:
+    connection_parameters: &con_param
+      service_name: "{{ service_name }}"
+      username: "SYS"
+      password: "{{ sys_password }}"
+      mode: "sysdba"
+
+- name: create permanent tablespace
+  oracle_tablespace:
+    <<: *con_param
+    tablespace: "ts"
+    size: "1M"
+    datafiles: "/tmp/ts.dbf"
+    state: "present"
+    bigfile: no
+  register: _
+  failed_when: not _.changed
+
+- name: create undo tablespace
+  oracle_tablespace:
+    <<: *con_param
+    tablespace: "ts_undo"
+    size: "1M"
+    datafiles: "/tmp/ts_undo.dbf"
+    state: "online"
+    bigfile: no
+    content: "undo"
+  register: _
+  failed_when: not _.changed
+
+- name: create temp tablespace
+  oracle_tablespace:
+    <<: *con_param
+    tablespace: "ts_temp"
+    size: "2M"
+    datafiles: "/tmp/ts_temp.dbf"
+    state: "present"
+    bigfile: yes
+    content: "temp"
+  register: _
+  failed_when: not _.changed
+
+- name: drop tablespaces
+  oracle_tablespace:
+    <<: *con_param
+    tablespace: "{{ item }}"
+    state: "absent"
+  register: _
+  failed_when: not _.changed
+  loop:
+    - ts
+    - ts_undo
+    - ts_temp
+...

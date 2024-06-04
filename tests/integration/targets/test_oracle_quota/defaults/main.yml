@@ -1,0 +1,8 @@
+---
+service_name: "XEPDB1"
+sys_password: "password"
+user: "u_quota"
+ts_1: "ts_quota_1"
+ts_2: "ts_quota_2"
+ts_3: "ts_quota_3"
+...

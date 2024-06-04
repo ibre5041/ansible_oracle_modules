@@ -1,0 +1,64 @@
+---
+- name: "define connection parameters"
+  set_fact:
+    connection_parameters: &con_param
+      service_name: "{{ service_name }}"
+      username: "SYS"
+      password: "{{ sys_password }}"
+      mode: "sysdba"
+
+- name: "add two quota with 10M size"
+  oracle_quota:
+    <<: *con_param
+    schema_name: "{{ user }}"
+    tablespaces:
+      - "{{ ts_1 }}"
+      - "{{ ts_2 }}"
+    size: "10485760"
+    state: "present"
+  register: _
+
+- name: "two quotas with 10M size"
+  assert:
+    that:
+      - _.diff.after.quotas | length == 2
+      - _.diff.after.quotas[0].size == '10M'
+      - _.diff.after.quotas[1].size == '10M'
+
+- name: "add same quotas, same size"
+  oracle_quota:
+    <<: *con_param
+    schema_name: "{{ user }}"
+    tablespaces:
+      - "{{ ts_1 }}"
+      - "{{ ts_2 }}"
+    size: "10485760"
+    state: "present"
+  register: _
+
+- name: "no change"
+  assert:
+    that:
+      - not _.changed
+
+- name: "remove one quota, change one quota and add one quota"
+  oracle_quota:
+    <<: *con_param
+    schema_name: "{{ user }}"
+    tablespaces:
+      - "{{ ts_2 }}"
+      - "{{ ts_3 }}"
+    size: "1048576"
+    state: "present"
+  register: _
+
+- name: "two quotas with 1M size : ts_2 and ts_3"
+  assert:
+    that:
+      - _.diff.after.quotas | length == 2
+      - _.diff.after.quotas[0].size == '1M'
+      - _.diff.after.quotas[1].size == '1M'
+      - _.diff.after | community.general.json_query('quotas[?tablespace==`{{ ts_1 }}`].size') | length == 0
+      - _.diff.after | community.general.json_query('quotas[?tablespace==`{{ ts_2 }}`].size') | length == 1
+      - _.diff.after | community.general.json_query('quotas[?tablespace==`{{ ts_3 }}`].size') | length == 1
+...

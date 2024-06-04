@@ -1,0 +1,18 @@
+---
+- name: "define connection parameters"
+  set_fact:
+    connection_parameters: &con_param
+      service_name: "{{ service_name }}"
+      username: "SYS"
+      password: "{{ sys_password }}"
+      mode: "sysdba"
+
+- name: "remove user and tablespaces"
+  oracle_sql:
+    <<: *con_param
+    script: |
+      drop user {{ user }};
+      drop tablespace {{ ts_1 }} including contents and datafiles;
+      drop tablespace {{ ts_2 }} including contents and datafiles;
+      drop tablespace {{ ts_3 }} including contents and datafiles;
+...

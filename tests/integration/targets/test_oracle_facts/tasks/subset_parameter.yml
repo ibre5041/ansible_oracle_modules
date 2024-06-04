@@ -1,0 +1,119 @@
+---
+- name: "define connection parameters"
+  set_fact:
+    connection_parameters: &con_param
+      service_name: "{{ cdb_service_name }}"
+      username: "SYS"
+      password: "{{ sys_password }}"
+      mode: "sysdba"
+
+- name: get min facts
+  oracle_facts:
+    <<: *con_param
+    gather_subset: "min"
+  register: _
+  failed_when: _.failed or _.oracle_facts.version is not defined or _.oracle_facts.database is not defined
+
+- name: get database facts
+  oracle_facts:
+    <<: *con_param
+    gather_subset: "database"
+  register: _
+  failed_when: _.failed or _.oracle_facts.version is not defined or _.oracle_facts.database is not defined
+
+- name: get instance facts
+  oracle_facts:
+    <<: *con_param
+    gather_subset: "instance"
+  register: _
+  failed_when: _.failed or _.oracle_facts.database is not defined or _.oracle_facts.instance is not defined
+
+- name: get option facts
+  oracle_facts:
+    <<: *con_param
+    gather_subset: "option"
+  register: _
+  failed_when: _.failed or _.oracle_facts.database is not defined or _.oracle_facts.options is not defined
+
+- name: get parameters facts
+  oracle_facts:
+    <<: *con_param
+    gather_subset: "parameter"
+  register: _
+  failed_when: _.failed or _.oracle_facts.database is not defined or _.oracle_facts.parameters is not defined
+
+- name: get pdbs facts
+  oracle_facts:
+    <<: *con_param
+    gather_subset: "pdb"
+  register: _
+  failed_when: _.failed or _.oracle_facts.database is not defined or _.oracle_facts.pdbs is not defined
+
+- name: get rac facts
+  oracle_facts:
+    <<: *con_param
+    gather_subset: "rac"
+  register: _
+  failed_when: _.failed or _.oracle_facts.database is not defined or _.oracle_facts.racs is not defined
+
+- name: get redolog facts
+  oracle_facts:
+    <<: *con_param
+    gather_subset: "redolog"
+  register: _
+  failed_when: _.failed or _.oracle_facts.database is not defined or _.oracle_facts.redologs is not defined
+
+- name: get tablespace facts
+  oracle_facts:
+    <<: *con_param
+    gather_subset: "tablespace"
+  register: _
+  failed_when: |
+    _.failed or _.oracle_facts.database is not defined or
+    _.oracle_facts.tablespaces is not defined or _.oracle_facts.temp_tablespaces is not defined
+
+- name: get userenv facts
+  oracle_facts:
+    <<: *con_param
+    gather_subset: "userenv"
+  register: _
+  failed_when: _.failed or _.oracle_facts.database is not defined or _.oracle_facts.userenv is not defined
+
+- name: get users facts
+  oracle_facts:
+    <<: *con_param
+    gather_subset: "user"
+  register: _
+  failed_when: _.failed or _.oracle_facts.database is not defined or _.oracle_facts.users is not defined
+
+- name: get tablespace and users facts
+  oracle_facts:
+    <<: *con_param
+    gather_subset:
+      - "user"
+      - "tablespace"
+  register: _
+  failed_when: |
+    _.failed or _.oracle_facts.database is not defined or
+    _.oracle_facts.users is not defined or
+    _.oracle_facts.tablespaces is not defined or
+    _.oracle_facts.temp_tablespaces is not defined
+
+- name: get min facts and check nothing else is gathered
+  oracle_facts:
+    <<: *con_param
+    gather_subset: "min"
+  register: _
+  failed_when: |
+    _.failed or _.oracle_facts.database is not defined or
+    _.oracle_facts.instance is defined or
+    _.oracle_facts.options is defined or
+    _.oracle_facts.parameters is defined or
+    _.oracle_facts.pdbs is defined or
+    _.oracle_facts.racs is defined or
+    _.oracle_facts.redologs is defined or
+    _.oracle_facts.tablespaces is defined or
+    _.oracle_facts.temp_tablespaces is defined or
+    _.oracle_facts.userenv is defined or
+    _.oracle_facts.users is defined
+...

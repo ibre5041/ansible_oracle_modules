@@ -1,0 +1,52 @@
+---
+- name: "define connection parameters"
+  set_fact:
+    connection_parameters: &con_param
+      service_name: "{{ service_name }}"
+      username: "SYS"
+      password: "{{ sys_password }}"
+      mode: "sysdba"
+
+- name: "add quota"
+  oracle_quota:
+    <<: *con_param
+    schema_name: "{{ user }}"
+    tablespace: "{{ ts_1 }}"
+    size: "104857600"
+    state: "present"
+
+- name: "add another quota"
+  oracle_quota:
+    <<: *con_param
+    schema_name: "{{ user }}"
+    tablespace: "{{ ts_2 }}"
+    size: "104857600"
+    state: "present"
+
+- name: "remove one quota"
+  oracle_quota:
+    <<: *con_param
+    schema_name: "{{ user }}"
+    tablespace: "{{ ts_1 }}"
+    state: "absent"
+  register: _
+
+- name: "assert one quota was removed"
+  assert:
+    that:
+      - _.changed
+      - _.diff.before.quotas | length == 2
+      - _.diff.after.quotas | length == 1
+
+- name: "remove same quota (again)"
+  oracle_quota:
+    <<: *con_param
+    schema_name: "{{ user }}"
+    tablespace: "{{ ts_1 }}"
+    state: "absent"
+  register: _
+
+- name: "assert quota wasn't removed"
+  assert:
+    that: not _.changed
+...

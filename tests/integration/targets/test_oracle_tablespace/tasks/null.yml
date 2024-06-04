@@ -1,0 +1,20 @@
+---
+- name: define vars
+  set_fact:
+    connection_parameters: &con_param
+      service_name: "{{ service_name }}"
+      username: "SYS"
+      password: "{{ sys_password }}"
+      mode: "sysdba"
+    nul:
+
+- name: create tablespace
+  oracle_tablespace:
+    <<: *con_param
+    tablespace: "ts"
+    size: "1M"
+    datafiles: "/tmp/ts.dbf"
+    autoextend: yes
+    nextsize: "{{ nul }}"
+    maxsize: "{{ nul }}"
+...

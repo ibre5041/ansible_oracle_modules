@@ -1,0 +1,109 @@
+---
+- name: "define connection parameters"
+  set_fact:
+    connection_parameters: &con_param
+      service_name: "{{ cdb_service_name }}"
+      username: "SYS"
+      password: "{{ sys_password }}"
+      mode: "sysdba"
+
+- name: get min facts
+  oracle_facts:
+    <<: *con_param
+    gather_subset: "min"
+  register: _
+  failed_when: _.oracle_facts.database.con_id != 0
+
+- name: get instance facts
+  oracle_facts:
+    <<: *con_param
+    gather_subset: "instance"
+  register: _
+  failed_when: _.oracle_facts.instance.instance_name != 'XE'
+
+- name: get option facts
+  oracle_facts:
+    <<: *con_param
+    gather_subset: "option"
+  register: _
+  failed_when: _.oracle_facts.options['Advanced Compression'] != 'TRUE'
+
+- name: get parameters facts
+  oracle_facts:
+    <<: *con_param
+    gather_subset: "parameter"
+  register: _
+  failed_when: |
+    _.oracle_facts.parameters.enable_pluggable_database.value != 'TRUE' or
+    _.oracle_facts.parameters.enable_pluggable_database.isdefault != 'FALSE'
+
+- name: get pdb facts
+  oracle_facts:
+    <<: *con_param
+    gather_subset: "pdb"
+  register: _
+  failed_when: |
+    _.oracle_facts.pdbs | length == 0 or
+    _.oracle_facts.pdbs[0].name != 'PDB$SEED' or
+    _.oracle_facts.pdbs[1].name != 'XEPDB1'
+
+- name: get rac facts
+  oracle_facts:
+    <<: *con_param
+    gather_subset: "rac"
+  register: _
+  failed_when: |
+    _.oracle_facts.racs | length == 0 or
+    _.oracle_facts.racs[0].instance_name != 'XE'
+
+- name: get redolog facts
+  oracle_facts:
+    <<: *con_param
+    gather_subset: "redolog"
+  register: _
+  failed_when: |
+    _.oracle_facts.redologs | length == 0 or
+    _.oracle_facts.redologs[0].status not in ('CURRENT', 'INACTIVE')
+
+- name: get tablespace facts
+  oracle_facts:
+    <<: *con_param
+    gather_subset: "tablespace"
+  register: _
+  failed_when: |
+    _.oracle_facts.tablespaces | length == 0 or
+    _.oracle_facts.temp_tablespaces | length == 0 or
+    _.oracle_facts.tablespaces[0].name != 'SYSAUX' or
+    _.oracle_facts.temp_tablespaces[0].name != 'TEMP'
+
+- name: get userenv facts
+  oracle_facts:
+    <<: *con_param
+    gather_subset: "userenv"
+  register: _
+  failed_when: |
+    _.oracle_facts.userenv is not defined or
+    _.oracle_facts.userenv.current_user != 'SYS'
+
+- name: get user facts in CDB
+  oracle_facts:
+    <<: *con_param
+    gather_subset: "user"
+  register: _
+  failed_when: |
+    _.oracle_facts.users is not defined or
+    _.oracle_facts.users | length != 0
+
+- name: get user facts in PDB
+  oracle_facts:
+    service_name: "{{ pdb_service_name }}"
+    username: "SYS"
+    password: "{{ sys_password }}"
+    mode: "sysdba"
+    gather_subset: "user"
+  register: _
+  failed_when: |
+    _.oracle_facts.users is not defined or
+    _.oracle_facts.users | length == 0 or
+    _.oracle_facts.users[0].username != 'APP_USER'
+...

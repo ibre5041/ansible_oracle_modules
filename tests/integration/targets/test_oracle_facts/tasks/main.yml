@@ -1,0 +1,6 @@
+---
+- include_tasks: "compile.yml"
+- include_tasks: "subset_parameter.yml"
+- include_tasks: "subset_content.yml"
+- include_tasks: "no_sysdba.yml"
+...

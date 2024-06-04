@@ -1,0 +1,41 @@
+---
+- name: "define connection parameters"
+  set_fact:
+    connection_parameters: &con_param
+      service_name: "{{ service_name }}"
+      username: "SYS"
+      password: "{{ sys_password }}"
+      mode: "sysdba"
+
+- name: create permament tablespace
+  oracle_tablespace:
+    <<: *con_param
+    tablespace: "ts"
+    size: "1M"
+    datafiles:
+      - "/tmp/ts1.dbf"
+      - "/tmp/ts2.dbf"
+    state: "present"
+    bigfile: no
+
+- name: create temp tablespace
+  oracle_tablespace:
+    <<: *con_param
+    tablespace: "ts_temp"
+    size: "2M"
+    datafiles:
+      - "/tmp/ts_temp1.dbf"
+      - "/tmp/ts_temp2.dbf"
+    state: "present"
+    bigfile: no
+    content: "temp"
+
+- name: drop tablespaces
+  oracle_tablespace:
+    <<: *con_param
+    tablespace: "{{ item }}"
+    state: "absent"
+  loop:
+    - "ts"
+    - "ts_temp"
+...

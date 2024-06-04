@@ -1,0 +1,38 @@
+---
+- name: "define connection parameters"
+  set_fact:
+    connection_parameters: &con_param
+      service_name: "{{ service_name }}"
+      username: "SYS"
+      password: "{{ sys_password }}"
+      mode: "sysdba"
+
+- name: "module compile"
+  oracle_quota:
+    <<: *con_param
+    schema_name: "foo"
+    tablespace: "{{ ts_1 }}"
+    state: "present"
+  check_mode: yes
+
+- name: "check mutually exclusive tablespace and tablespaces parameters"
+  oracle_quota:
+    <<: *con_param
+    schema_name: "foo"
+    tablespace: "{{ ts_1 }}"
+    tablespaces:
+      - "{{ ts_1 }}"
+    state: "present"
+  check_mode: yes
+  register: _
+  failed_when: not _.failed or 'mutually exclusive' not in _.msg
+
+- name: "check mandatory tablespace|tablespaces when state == 'present'"
+  oracle_quota:
+    <<: *con_param
+    schema_name: "foo"
+    state: "present"
+  check_mode: yes
+  register: _
+  failed_when: not _.failed or 'mandatory' not in _.msg
+...

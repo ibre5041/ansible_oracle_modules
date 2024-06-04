@@ -1,0 +1,16 @@
+---
+- name: "define connection parameters"
+  set_fact:
+    connection_parameters: &con_param
+      service_name: "{{ pdb_service_name }}"
+      username: "{{ app_user }}"
+      password: "{{ app_password }}"
+      mode: "normal"
+
+- name: you can't get facts with non sysdba user
+  oracle_facts:
+    <<: *con_param
+    gather_subset: "min"
+  register: _
+  failed_when: not _.failed
+...

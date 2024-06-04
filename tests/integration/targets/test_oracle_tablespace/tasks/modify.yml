@@ -1,0 +1,50 @@
+---
+- name: "define connection parameters"
+  set_fact:
+    connection_parameters: &con_param
+      service_name: "{{ service_name }}"
+      username: "SYS"
+      password: "{{ sys_password }}"
+      mode: "sysdba"
+
+- name: create tablespace
+  oracle_tablespace:
+    <<: *con_param
+    tablespace: "ts"
+    size: "1M"
+    datafiles:
+      - "/tmp/ts1.dbf"
+    state: "present"
+    bigfile: no
+
+- name: add datafile
+  oracle_tablespace:
+    <<: *con_param
+    tablespace: "ts"
+    size: "1M"
+    datafiles:
+      - "/tmp/ts1.dbf"
+      - "/tmp/ts2.dbf"
+    state: "present"
+    bigfile: no
+
+- name: add datafile
+  oracle_tablespace:
+    <<: *con_param
+    tablespace: "ts"
+    size: "2M"
+    datafiles:
+      - "/tmp/ts1.dbf"
+      - "/tmp/ts3.dbf"
+    state: "present"
+    bigfile: no
+    autoextend: yes
+    nextsize: "1M"
+    maxsize: "10M"
+
+- name: drop tablespace
+  oracle_tablespace:
+    <<: *con_param
+    tablespace: "ts"
+    state: "absent"
+...

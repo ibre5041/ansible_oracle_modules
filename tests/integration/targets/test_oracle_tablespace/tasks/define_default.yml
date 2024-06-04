@@ -1,0 +1,90 @@
+---
+- name: "define connection parameters"
+  set_fact:
+    connection_parameters: &con_param
+      service_name: "{{ service_name }}"
+      username: "SYS"
+      password: "{{ sys_password }}"
+      mode: "sysdba"
+
+- name: "permanent tablespace"
+  oracle_tablespace:
+    <<: *con_param
+    tablespace: "ts"
+    datafiles: "/tmp/ts.dbf"
+    size: "1M"
+    autoextend: yes
+
+- name: "setting tablespace to default"
+  oracle_tablespace:
+    <<: *con_param
+    tablespace: "ts"
+    datafiles: "/tmp/ts.dbf"
+    size: "1M"
+    autoextend: yes
+    default: yes
+  register: _
+  failed_when: _.failed or not _.changed
+
+- name: "cannot drop default tablespace"
+  oracle_tablespace:
+    <<: *con_param
+    tablespace: "ts"
+    state: "absent"
+  register: _
+  failed_when: not _.failed or _.code != 12919
+
+- name: "setting users to default"
+  oracle_tablespace:
+    <<: *con_param
+    tablespace: "users"
+    datafiles: "/opt/oracle/oradata/XE/XEPDB1/users01.dbf"
+    size: "5M"
+    autoextend: yes
+    nextsize: "1280K"
+    maxsize: "unlimited"
+    default: yes
+
+- name: "drop ts tablespace"
+  oracle_tablespace:
+    <<: *con_param
+    tablespace: "ts"
+    state: "absent"
+
+- name: "create default temporary tablespace"
+  oracle_tablespace:
+    <<: *con_param
+    tablespace: "ts_temp"
+    datafiles: "/tmp/ts_temp.dbf"
+    content: "temp"
+    default: yes
+    size: "5M"
+
+- name: "cannot drop default tablespace"
+  oracle_tablespace:
+    <<: *con_param
+    tablespace: "ts_temp"
+    state: "absent"
+    content: "temp"
+  register: _
+  failed_when: not _.failed or _.code != 12906
+
+- name: "change back default to temp"
+  oracle_tablespace:
+    <<: *con_param
+    tablespace: "temp"
+    datafiles: "/opt/oracle/oradata/XE/XEPDB1/temp01.dbf"
+    content: "temp"
+    default: yes
+    size: "5M"
+    autoextend: true
+    nextsize: "640K"
+    maxsize: "unlimited"
+
+- name: "drop ts_temp tablespace"
+  oracle_tablespace:
+    <<: *con_param
+    tablespace: "ts_temp"
+    state: "absent"
+    content: "temp"
+...

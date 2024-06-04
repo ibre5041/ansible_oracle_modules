@@ -1,0 +1,7 @@
+---
+cdb_service_name: "XE"
+pdb_service_name: "XEPDB1"
+sys_password: "password"
+app_user: "app_user"
+app_password: "app_user_password"
+...

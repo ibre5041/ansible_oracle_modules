@@ -1,0 +1,11 @@
+---
+- include_tasks: "create_drop.yml"
+- include_tasks: "create_check_mode.yml"
+- include_tasks: "drop_check_mode.yml"
+- include_tasks: "create_several_datafiles.yml"
+- include_tasks: "modify.yml"
+- include_tasks: "error.yml"
+- include_tasks: "create_same.yml"
+- include_tasks: "null.yml"
+- include_tasks: "define_default.yml"
+...

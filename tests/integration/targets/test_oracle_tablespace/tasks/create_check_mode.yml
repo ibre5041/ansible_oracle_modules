@@ -1,0 +1,29 @@
+---
+- name: "define connection parameters"
+  set_fact:
+    connection_parameters: &con_param
+      service_name: "{{ service_name }}"
+      username: "SYS"
+      password: "{{ sys_password }}"
+      mode: "sysdba"
+
+- name: create tablespace in check mode
+  oracle_tablespace:
+    <<: *con_param
+    tablespace: "ts"
+    size: "1M"
+    datafiles: "/tmp/ts.dbf"
+    state: "present"
+    bigfile: no
+  register: _
+  failed_when: not _.changed
+  check_mode: yes
+
+- name: drop tablespaces don't do anything
+  oracle_tablespace:
+    <<: *con_param
+    tablespace: "ts"
+    state: "absent"
+  register: _
+  failed_when: _.changed
+...

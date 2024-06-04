@@ -1,0 +1,30 @@
+---
+- name: "define connection parameters"
+  set_fact:
+    connection_parameters: &con_param
+      service_name: "{{ service_name }}"
+      username: "SYS"
+      password: "{{ sys_password }}"
+      mode: "sysdba"
+
+- name: "add unlimited quota"
+  oracle_quota:
+    <<: *con_param
+    schema_name: "{{ user }}"
+    tablespace: "{{ ts_1 }}"
+    size: "unlimited"
+    state: "present"
+
+- name: "define same quota"
+  oracle_quota:
+    <<: *con_param
+    schema_name: "{{ user }}"
+    tablespace: "{{ ts_1 }}"
+    size: "unlimited"
+    state: "present"
+  register: _
+
+- assert:
+    that:
+      - not _.changed
+...

@@ -1,0 +1,49 @@
+---
+- name: "define connection parameters"
+  set_fact:
+    connection_parameters: &con_param
+      service_name: "{{ service_name }}"
+      username: "SYS"
+      password: "{{ sys_password }}"
+      mode: "sysdba"
+
+- name: "add quota"
+  oracle_quota:
+    <<: *con_param
+    schema_name: "{{ user }}"
+    tablespace: "{{ ts_1 }}"
+    size: "104857600"
+    state: "present"
+
+- name: "check quota already changed"
+  oracle_quota:
+    <<: *con_param
+    schema_name: "{{ user }}"
+    tablespace: "{{ ts_1 }}"
+    size: "104857600"
+    state: "present"
+  register: _
+  failed_when: _.failed or _.changed
+
+- name: "change quota to 1M"
+  oracle_quota:
+    <<: *con_param
+    schema_name: "{{ user }}"
+    tablespace: "{{ ts_1 }}"
+    size: "1048576"
+    state: "present"
+
+- name: "change quota to 2M and check diff"
+  oracle_quota:
+    <<: *con_param
+    schema_name: "{{ user }}"
+    tablespace: "{{ ts_1 }}"
+    size: "2097152"
+    state: "present"
+  register: _
+
+- assert:
+    that:
+      - _.diff.before | community.general.json_query('quotas[?tablespace==`{{ ts_1 }}`].size') | first == '1M'
+      - _.diff.after | community.general.json_query('quotas[?tablespace==`{{ ts_1 }}`].size') | first == '2M'
+...
