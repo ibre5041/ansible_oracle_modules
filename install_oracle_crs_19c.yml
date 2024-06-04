@@ -1,0 +1,70 @@
+---
+
+# TODO: setcap cap_net_raw+ep  /usr/bin/ping (on Centos8)
+
+- hosts: all
+  collections:
+    - ibre5041.ansible_oracle_modules    
+  become: yes
+  become_user: root
+  become_method: sudo
+  vars:
+    oracle_db_ver_path: 19.21.0.0
+  any_errors_fatal: true
+  roles:    
+  - role: default_vars_only
+    tags: [always,default_vars_only]
+
+  - role: base_oracle_vmware
+    tags: [ base, baseoracle ]
+    when: is_vmware_environment
+    
+  - role: base_oracle_vbox
+    tags: [ base, baseoracle ]
+    when: is_vbox_environment
+    
+  - role: oracle_crs_19c
+    oracle_gi_media: grid_home_19_21.zip
+    tags: [ oracle, oraclecrs ]
+
+  - role: oracle_db_home
+    oracle_db_media: db_home_19_21.zip
+    tags: [ oracle, oracledbhome ]
+
+  - role: oracle_post_install
+    tags: [ oraclepost ]
+
+  tasks:      
+    - name: create database
+      oracle_db:
+        oracle_home: "{{ oracle_install_dir_prod }}/{{ oracle_db_ver_path }}"
+        db_name: 'TEST19C'
+        sid: 'TEST19C'
+        db_unique_name: 'TEST19C_1'
+        sys_password: X43ofljfksjfkhfr3fkh
+        #system_password:
+        #dbsnmp_password:
+        #template:
+        db_options:
+          JSERVER: false
+          ORACLE_TEXT: false
+          IMEDIA: false
+          CWMLITE: false
+          SPATIAL: false
+          OMS: false
+          APEX: false
+          DV: false
+        initparams:
+          memory_target: 0
+          memory_max_target: 0
+          sga_target: 1500MB
+          sga_max_size: 1500MB
+        storage_type: ASM
+        datafile_dest: +XDATA
+        recoveryfile_dest: +XDATA
+        #state: absent
+        state: present
+      tags: [oracledb]
+      become_user: "{{ oracle_os_user }}"
+      become: yes
+      when: ansible_hostname == first_rac_node
