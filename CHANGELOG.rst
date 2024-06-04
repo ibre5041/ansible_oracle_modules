@@ -5,6 +5,14 @@ Ibre5041.Ansible_Oracle_Modules Release Notes
 .. contents:: Topics
 
 
+v3.2.3
+======
+
+Minor Changes
+-------------
+
+- CRS build fixes
+
 v3.2.2
 ======
 
