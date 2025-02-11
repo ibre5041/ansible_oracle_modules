@@ -18,14 +18,14 @@ To use this collection place this in requirements.yml
 
 And then execute: `ansible-galaxy collection install -r collections/requirements.yml`
 
-Most (if not all) modules require `cx_Oracle` either on your  managed node or on "control machine".
-To install `cx_Oracle` you can use: `pip3 install --user cx_Oracle` (`/usr/libexec/platform-python -m pip install --user cx_Oracle` on RHEL8)
+Most (if not all) modules require `oracledb` either on your  managed node or on "control machine".
+To install `oracledb` you can use: `pip3 install --user oracledb` (`/usr/libexec/platform-python -m pip install --user oracledb` on RHEL8)
 
-The default behaviour for the modules using `cx_Oracle` is this:
+The default behaviour for the modules using `oracledb` is this:
 
 - If mode=='sysdba' connect internal `/ as sysdba` is used
 - If neither username and password is passed as input to the module(s), the use of an Oracle wallet is assumed.
-- In that case, the `cx_Oracle.makedsn` step is skipped, and the connection will use the `'/@<service_name>'` format instead.
+- In that case, the `oracledb.makedsn` step is skipped, and the connection will use the `'/@<service_name>'` format instead.
 - You then need to make sure that you're using the correct tns-entry (service_name) to match the credential stored in the wallet.
 
 # Modules:

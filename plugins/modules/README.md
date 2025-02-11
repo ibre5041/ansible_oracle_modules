@@ -18,21 +18,21 @@ To use this collection place this in requirements.yml
 
 And then execute: `ansible-galaxy collection install -r requirements.yml`
 
-Most (if not all) requires `cx_Oracle` either on your on the managed node "control machine".
-To install `cx_Oracle` you can use: `pip3 install --user cx_Oracle`.
+Most (if not all) requires `oracledb` either on your on the managed node "control machine".
+To install `oracledb` you can use: `pip3 install --user oracledb`.
 
-The default behaviour for the modules using `cx_Oracle` is this:
+The default behaviour for the modules using `oracledb` is this:
 
 - If mode=='sysdba' connect internal `/ as sysdba` is used
 - If neither username or password is passed as input to the module(s), the use of an Oracle wallet is assumed.
-- In that case, the `cx_Oracle.makedsn` step is skipped, and the connection will use the `'/@<service_name>'` format instead.
+- In that case, the `oracledb.makedsn` step is skipped, and the connection will use the `'/@<service_name>'` format instead.
 - You then need to make sure that you're using the correct tns-entry (service_name) to match the credential stored in the wallet.
 
 # These are the different modules:
 
 ## **oracle_db**
 
-*pre-req: cx_Oracle*
+*pre-req: oracledb*
 
 - Create/remove databases (cdb/non-cdb)
 - Can be created by passing in a responsefile or just by using parameters
@@ -97,7 +97,7 @@ The default behaviour for the modules using `cx_Oracle` is this:
 
 ## **oracle_facts**
 
-*pre-req: cx_Oracle*
+*pre-req: oracledb*
 
 - Gathers facts about Oracle database
 
@@ -151,7 +151,7 @@ This results into situation when all white-noise characters are omited and resul
 
 ## **oracle_profile**
 
-*pre-req cx_Oracle*
+*pre-req oracledb*
 
 - Create/alter/drop database profile
   
@@ -165,7 +165,7 @@ This results into situation when all white-noise characters are omited and resul
 
 ## **oracle_user**
 
-*pre-req: cx_Oracle*
+*pre-req: oracledb*
 
  - Creates & drops a user
  - Does not suppot privileges (use oracle_grants for that)
@@ -183,7 +183,7 @@ This results into situation when all white-noise characters are omited and resul
 
 ## **oracle_tablespace**
 
-*pre-req: cx_Oracle*
+*pre-req: oracledb*
 
  - Manages normal(permanent), temp & undo tablespaces (create, drop, make read only/read write, offline/online)
  - Tablespaces can be created as bigfile, autoextend, ...
@@ -200,7 +200,7 @@ This results into situation when all white-noise characters are omited and resul
 
 ## **oracle_redo**
 
-*pre-req: cx_Oracle*
+*pre-req: oracledb*
 
 - Manage redo-groups and their size in RAC or single instance environments
 - NOTE: For RAC environments, the database needs to be in ARCHIVELOG mode. This is not required for SI environments.
@@ -222,7 +222,7 @@ This results into situation when all white-noise characters are omited and resul
 
 ## **oracle_grants**
 
-*pre-req: cx_Oracle*
+*pre-req: oracledb*
 
  - Manages privileges for a user
  - Grants/revokes privileges
@@ -240,7 +240,7 @@ This results into situation when all white-noise characters are omited and resul
 
 ## **oracle_sql**
 
-*pre-req: cx_Oracle*
+*pre-req: oracledb*
 
 - 2 modes: sql or script
 - Executes arbitrary sql or runs a script
@@ -267,13 +267,13 @@ This results into situation when all white-noise characters are omited and resul
 
 ## **oracle_role**
 
-*pre-req: cx_Oracle*
+*pre-req: oracledb*
 
 - Manages roles in the database
 
 **oracle_parameter**
 
-pre-req: cx_Oracle
+pre-req: oracledb
 
  - Manages init parameters in the database (i.e alter system set parameter...)
  - Also handles underscore parameters. That will require using mode=sysdba, to be able to read the X$ tables needed to verify the existence of the parameter.
@@ -288,7 +288,7 @@ pre-req: cx_Oracle
 
 **oracle_services**
 
-pre-req: cx_Oracle (if GI is not running)
+pre-req: oracledb (if GI is not running)
 
   - Manages services in an Oracle database (RAC/Single instance)
 
@@ -298,7 +298,7 @@ At the moment, Idempotence only applies to the state (present,absent,started, st
 
 **oracle_pdb**
 
-pre-req: cx_Oracle
+pre-req: oracledb
 
  - Manages pluggable databases in an Oracle container database
  - Creates/deletes/opens/closes the pdb
@@ -308,7 +308,7 @@ pre-req: cx_Oracle
 
 **oracle_asmdg**
 
-pre-req: cx_Oracle
+pre-req: oracledb
 
 - Manages ASM diskgroup state. (absent/present)
 - Takes a list of disks and makes sure those disks are part of the DG.
@@ -325,50 +325,50 @@ If the disk is removed from the disk it will be removed from the DG.
 
 **oracle_ldapuser**
 
-pre-req: cx_Oracle, ldap, re
+pre-req: oracledb, ldap, re
 
 - Syncronises users/role grants from LDAP/Active Directory to the database
 
 **oracle_privs**
 
-pre-req: cx_Oracle, re
+pre-req: oracledb, re
 
 - Manages system and object level grants
 - Object level grant support wildcards, so now it is possible to grant access to all tables in a schema and maintain it automatically!
 
 **oracle_jobclass**
 
-pre-req: cx_Oracle
+pre-req: oracledb
 
 - Manages DBMS_SCHEDULER job classes
 
 **oracle_jobschedule**
 
-pre-req: cx_Oracle, re
+pre-req: oracledb, re
 
 - Manages DBMS_SCHEDULER job schedules
 
 **oracle_jobwindow**
 
-pre-req: cx_Oracle, datetime
+pre-req: oracledb, datetime
 
 - Manages DBMS_SCHEDULER windows
 
 **oracle_job**
 
-pre-req: cx_Oracle, re
+pre-req: oracledb, re
 
 - Manages DBMS_SCHEDULER jobs
 
 **oracle_rsrc_consgroup**
 
-pre-req: cx_Oracle, re
+pre-req: oracledb, re
 
 - Manages resource manager consumer groups including its mappings and grants
 
 **oracle_awr**
 
-pre-req: cx_Oracle, datetime
+pre-req: oracledb, datetime
 
 - Manages AWR snapshot settings
 
@@ -378,6 +378,6 @@ pre-req: cx_Oracle, datetime
 
 **oracle_stats_prefs**
 
-pre-req: cx_Oracle
+pre-req: oracledb
 
 - Managing DBMS_STATS global preferences
