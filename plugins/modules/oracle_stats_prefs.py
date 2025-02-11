@@ -89,9 +89,9 @@ EXAMPLES = '''
 try:
     import cx_Oracle
 except ImportError:
-    cx_oracle_exists = False
+    oracledb_exists = False
 else:
-    cx_oracle_exists = True
+    oracledb_exists = True
 
 # Ansible code
 def main():
@@ -112,7 +112,7 @@ def main():
         supports_check_mode=True
     )
     # Check for required modules
-    if not cx_oracle_exists:
+    if not oracledb_exists:
         module.fail_json(msg="The cx_Oracle module is required. 'pip install cx_Oracle' should do the trick. If cx_Oracle is installed, make sure ORACLE_HOME & LD_LIBRARY_PATH is set")
     # Connect to database
     conn = oracle_connect(module)

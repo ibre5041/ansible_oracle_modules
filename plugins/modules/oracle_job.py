@@ -203,9 +203,9 @@ import re
 try:
     import cx_Oracle
 except ImportError:
-    cx_oracle_exists = False
+    oracledb_exists = False
 else:
-    cx_oracle_exists = True
+    oracledb_exists = True
 
 def query_existing(job_owner, job_name):
     c = conn.cursor()
@@ -391,7 +391,7 @@ def main():
         mutually_exclusive=[['schedule_name','repeat_interval'],['program_name','job_action']]
     )
     # Check for required modules
-    if not cx_oracle_exists:
+    if not oracledb_exists:
         module.fail_json(msg="The cx_Oracle module is required. 'pip install cx_Oracle' should do the trick. If cx_Oracle is installed, make sure ORACLE_HOME & LD_LIBRARY_PATH is set")
     # Check input parameters
     re_name = re.compile("^[A-Za-z0-9_\$#]+\.[A-Za-z0-9_\$#]+$")

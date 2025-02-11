@@ -139,9 +139,9 @@ EXAMPLES = '''
 try:
     import cx_Oracle
 except ImportError:
-    cx_oracle_exists = False
+    oracledb_exists = False
 else:
-    cx_oracle_exists = True
+    oracledb_exists = True
 
 
 # Check if the tablespace exists
@@ -769,7 +769,7 @@ def main():
     nextsize = module.params["nextsize"]
     maxsize = module.params["maxsize"]
 
-    if not cx_oracle_exists:
+    if not oracledb_exists:
         module.fail_json(msg="The cx_Oracle module is required. 'pip install cx_Oracle' should do the trick. If cx_Oracle is installed, make sure ORACLE_HOME is set")
 
     conn = oracle_connect(module)

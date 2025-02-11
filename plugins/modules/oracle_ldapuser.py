@@ -161,9 +161,9 @@ import re
 try:
     import cx_Oracle
 except ImportError:
-    cx_oracle_exists = False
+    oracledb_exists = False
 else:
-    cx_oracle_exists = True
+    oracledb_exists = True
 
 try:
     import ldap
@@ -247,7 +247,7 @@ def main():
     if module.params['user_default_tablespace'].upper() in ['SYSTEM','SYSAUX']:
         module.fail_json(msg='no No NO! Choose a proper non-system tablespace for users.')
     # Check for required modules
-    if not cx_oracle_exists:
+    if not oracledb_exists:
         module.fail_json(msg="The cx_Oracle module is required. 'pip install cx_Oracle' should do the trick. If cx_Oracle is installed, make sure ORACLE_HOME & LD_LIBRARY_PATH is set")
     if not ldap_module_exists:
         module.fail_json(msg="The ldap module is required. 'pip install ldap' should do the trick.")

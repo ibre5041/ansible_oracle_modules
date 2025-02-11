@@ -66,9 +66,9 @@ import os
 try:
     import cx_Oracle
 except ImportError:
-    cx_oracle_exists = False
+    oracledb_exists = False
 else:
-    cx_oracle_exists = True
+    oracledb_exists = True
 
 
 
@@ -219,7 +219,7 @@ def main():
     # elif 'ORACLE_SID' in os.environ:
     #     oracle_sid = os.environ['ORACLE_SID']
 
-    if not cx_oracle_exists:
+    if not oracledb_exists:
         msg = "The cx_Oracle module is required. 'pip install cx_Oracle' should do the trick. If cx_Oracle is installed, make sure ORACLE_HOME is set"
         module.fail_json(msg=msg)
 

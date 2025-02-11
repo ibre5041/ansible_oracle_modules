@@ -8,9 +8,9 @@ from ansible.module_utils.basic import *
 try:
     import cx_Oracle
 except ImportError:
-    cx_oracle_exists = False
+    oracledb_exists = False
 else:
-    cx_oracle_exists = True
+    oracledb_exists = True
 
 from ansible.module_utils.basic import *
 
@@ -24,11 +24,11 @@ def oracle_connect(module):
     try:
         import cx_Oracle
     except ImportError:
-        cx_oracle_exists = False
+        oracledb_exists = False
     else:
-        cx_oracle_exists = True
+        oracledb_exists = True
 
-    if not cx_oracle_exists:
+    if not oracledb_exists:
         module.fail_json(msg="The cx_Oracle module is required. 'pip install cx_Oracle' should do the trick. If cx_Oracle is installed, make sure ORACLE_HOME is set")
         
     if "oracle_home" in module.params:
@@ -90,7 +90,7 @@ class oracleConnection:
         self.module = module
         self.chaged = False
 
-        if not cx_oracle_exists:
+        if not oracledb_exists:
             module.fail_json(msg="The cx_Oracle module is required. 'pip install cx_Oracle' should do the trick.")
 
         if "oracle_home" in module.params and module.params["oracle_home"]:
