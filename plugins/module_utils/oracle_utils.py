@@ -6,7 +6,7 @@ from ansible.module_utils.basic import os
 from ansible.module_utils.basic import *
 
 try:
-    import cx_Oracle
+    import oracledb
 except ImportError:
     oracledb_exists = False
 else:
@@ -22,14 +22,14 @@ def oracle_connect(module):
     """
 
     try:
-        import cx_Oracle
+        import oracledb
     except ImportError:
         oracledb_exists = False
     else:
         oracledb_exists = True
 
     if not oracledb_exists:
-        module.fail_json(msg="The cx_Oracle module is required. 'pip install cx_Oracle' should do the trick. If cx_Oracle is installed, make sure ORACLE_HOME is set")
+        module.fail_json(msg="The oracledb module is required. 'pip install oracledb' should do the trick. If oracledb is installed, make sure ORACLE_HOME is set")
         
     if "oracle_home" in module.params:
         oracle_home = module.params["oracle_home"]
@@ -54,25 +54,25 @@ def oracle_connect(module):
         if (not user and not password ): # If neither user or password is supplied, the use of an oracle wallet is assumed
             if mode == 'sysdba':
                 connect = sysdba_connect
-                conn = cx_Oracle.connect(sysdba_connect, mode=cx_Oracle.SYSDBA)
+                conn = oracledb.connect(sysdba_connect, mode=oracledb.SYSDBA)
             else:
                 connect = wallet_connect
-                conn = cx_Oracle.connect(wallet_connect)
+                conn = oracledb.connect(wallet_connect)
 
         elif (user and password ):
             if mode == 'sysdba':
-                dsn = cx_Oracle.makedsn(host=hostname, port=port, service_name=service_name)
+                dsn = oracledb.makedsn(host=hostname, port=port, service_name=service_name)
                 connect = dsn
-                conn = cx_Oracle.connect(user, password, dsn, mode=cx_Oracle.SYSDBA)
+                conn = oracledb.connect(user, password, dsn, mode=oracledb.SYSDBA)
             else:
-                dsn = cx_Oracle.makedsn(host=hostname, port=port, service_name=service_name)
+                dsn = oracledb.makedsn(host=hostname, port=port, service_name=service_name)
                 connect = dsn
-                conn = cx_Oracle.connect(user, password, dsn)
+                conn = oracledb.connect(user, password, dsn)
 
         elif (not(user) or not(password)):
-            module.fail_json(msg='Missing username or password for cx_Oracle')
+            module.fail_json(msg='Missing username or password for oracledb')
             
-    except cx_Oracle.DatabaseError as exc:
+    except oracledb.DatabaseError as exc:
         error, = exc.args
         msg = 'Could not connect to database - %s, connect descriptor: %s' % (error.message, connect)
         module.fail_json(msg=msg, changed=False)
@@ -91,7 +91,7 @@ class oracleConnection:
         self.chaged = False
 
         if not oracledb_exists:
-            module.fail_json(msg="The cx_Oracle module is required. 'pip install cx_Oracle' should do the trick.")
+            module.fail_json(msg="The oracledb module is required. 'pip install oracledb' should do the trick.")
 
         if "oracle_home" in module.params and module.params["oracle_home"]:
             self.oracle_home = module.params["oracle_home"]
@@ -115,22 +115,22 @@ class oracleConnection:
             if not user and not password: # If neither user or password is supplied, the use of an oracle connect internal or wallet is assumed
                 if mode == 'sysdba':
                     connect = sysdba_connect
-                    conn = cx_Oracle.connect(sysdba_connect, mode=cx_Oracle.SYSDBA)
+                    conn = oracledb.connect(sysdba_connect, mode=oracledb.SYSDBA)
                 else:
                     connect = wallet_connect
-                    conn = cx_Oracle.connect(wallet_connect)
+                    conn = oracledb.connect(wallet_connect)
             elif user and password: # Assume supplied user has SYSDBA role granted
                 if mode == 'sysdba':
-                    dsn = cx_Oracle.makedsn(host=hostname, port=port, service_name=service_name)
+                    dsn = oracledb.makedsn(host=hostname, port=port, service_name=service_name)
                     connect = dsn
-                    conn = cx_Oracle.connect(user, password, dsn, mode=cx_Oracle.SYSDBA)
+                    conn = oracledb.connect(user, password, dsn, mode=oracledb.SYSDBA)
                 else:
-                    dsn = cx_Oracle.makedsn(host=hostname, port=port, service_name=service_name)
+                    dsn = oracledb.makedsn(host=hostname, port=port, service_name=service_name)
                     connect = dsn
-                    conn = cx_Oracle.connect(user, password, dsn)
+                    conn = oracledb.connect(user, password, dsn)
             elif not user or not password:
-                module.fail_json(msg='Missing username or password for cx_Oracle')
-        except cx_Oracle.DatabaseError as exc:
+                module.fail_json(msg='Missing username or password for oracledb')
+        except oracledb.DatabaseError as exc:
             error, = exc.args
             msg = 'Could not connect to database - %s, connect descriptor: %s' % (error.message, connect)
             module.fail_json(msg=msg, changed=False)
@@ -154,7 +154,7 @@ class oracleConnection:
             with self.conn.cursor() as cursor:
                 cursor.execute(sql, params)
                 return cursor.fetchone() if fetchone else cursor.fetchall()
-        except cx_Oracle.DatabaseError as e:
+        except oracledb.DatabaseError as e:
             error = e.args[0]
             self.module.fail_json(msg=error.message, code=error.code, request=sql, params=params, ddls=self.ddls, changed=self.changed)
 
@@ -179,7 +179,7 @@ class oracleConnection:
                         return dict()
                 else:
                     return [dict(zip(column_names, row)) for row in cursor]
-        except cx_Oracle.DatabaseError as e:
+        except oracledb.DatabaseError as e:
             error = e.args[0]
             self.module.fail_json(msg=error.message, code=error.code, request=sql, params=params, ddls=self.ddls, changed=self.changed)
 
@@ -200,7 +200,7 @@ class oracleConnection:
                 self.ddls.append('--' + request)
             if not no_change: # In case of alter session, do not set changed to True
                 self.changed = True
-        except cx_Oracle.DatabaseError as e:
+        except oracledb.DatabaseError as e:
             error = e.args[0]
             if error.code not in ignore_errors:
                 self.module.fail_json(msg=error.message, code=error.code, request=request, ddls=self.ddls, changed=self.changed)
@@ -244,7 +244,7 @@ class oracleConnection:
             else:
                 self.ddls.append('--' + statement)
             return output_lines
-        except cx_Oracle.DatabaseError as e:
+        except oracledb.DatabaseError as e:
             error = e.args[0]
             self.module.fail_json(msg=error.message, code=error.code, request=statement)
 
@@ -260,7 +260,7 @@ class dictcur(object):
         self._original_cursor.rowfactory = lambda *a: dict(
             zip([d[0] for d in self._original_cursor.description], a)
         )
-        # cx_Oracle's cursor's execute method returns a cursor object
+        # oracledb's cursor's execute method returns a cursor object
         # -> return the correct cursor in the monkeypatched version as well!
         return self._original_cursor
 

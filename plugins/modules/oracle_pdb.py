@@ -72,8 +72,8 @@ options:
     default: normal
     choices: ['normal','sysdba']
 notes:
-    - cx_Oracle needs to be installed
-requirements: [ "cx_Oracle" ]
+    - oracledb needs to be installed
+requirements: [ "oracledb" ]
 author: 
     - Mikael Sandström, oravirt@gmail.com, @oravirt
     - Ivan Brezina

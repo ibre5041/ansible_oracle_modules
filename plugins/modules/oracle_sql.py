@@ -21,13 +21,13 @@ options:
     description: The script you want to execute. Doesn't handle selects
     required: False
 notes:
-  - cx_Oracle needs to be installed
+  - oracledb needs to be installed
   - Oracle client libraries need to be installed along with ORACLE_HOME settings.
   - Oracle basic tools.
   - Check mode is supported.
   - In check mode, the select query are executed.
   - Diff mode is not supported.
-requirements: [ "cx_Oracle" ]
+requirements: [ "oracledb" ]
 author: 
   - Mikael Sandström, oravirt@gmail.com, @oravirt
   - Ari Stark (@ari-stark)

@@ -27,8 +27,8 @@ options:
     default: "redo"
     choices: ['redo','standby']
 notes:
-    - cx_Oracle needs to be installed
-requirements: [ "cx_Oracle" ]
+    - oracledb needs to be installed
+requirements: [ "oracledb" ]
 author: 
     - Mikael Sandström, oravirt@gmail.com, @oravirt
     - Ivan Brezina
@@ -76,7 +76,7 @@ EXAMPLES = '''
 '''
 
 
-import cx_Oracle
+import oracledb
 
 
 # Ansible code
@@ -398,10 +398,10 @@ END;
     cur = conn.cursor()
 
     try:
-        v_size_changed = cur.var(cx_Oracle.NUMBER)
-        v_group_changed = cur.var(cx_Oracle.NUMBER)
-        v_size_msg = cur.var(cx_Oracle.STRING)
-        v_group_msg = cur.var(cx_Oracle.STRING)
+        v_size_changed = cur.var(oracledb.NUMBER)
+        v_group_changed = cur.var(oracledb.NUMBER)
+        v_size_msg = cur.var(oracledb.STRING)
+        v_group_msg = cur.var(oracledb.STRING)
         if log_type == 'redo':
             cur.execute(redosql, {
                 'redosize': size,
@@ -420,7 +420,7 @@ END;
                 'o_size_msg': v_size_msg,
                 'o_group_msg': v_group_msg}
             )            
-    except cx_Oracle.DatabaseError as exc:
+    except oracledb.DatabaseError as exc:
         error, = exc.args
         msg = '%s' % (error.message)
         module.fail_json(msg=msg, changed=False)

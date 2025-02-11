@@ -24,8 +24,8 @@ options:
     default: present
     choices: ['present','absent','reset']  
 notes:
-  - cx_Oracle needs to be installed
-requirements: [ "cx_Oracle","re" ]
+  - oracledb needs to be installed
+requirements: [ "oracledb","re" ]
 author: 
   - Mikael Sandström, oravirt@gmail.com, @oravirt
   - Ivan Brezina

@@ -37,7 +37,7 @@ options:
 notes:
     - Returns information from v$instance
     - All other modules use the same parameters to connect to the database
-requirements: ["cx_Oracle"]
+requirements: ["oracledb"]
 author: 
     - Mikael Sandström, oravirt@gmail.com, @oravirt
     - Ivan Brezina

@@ -151,9 +151,9 @@ options:
         default: True
         type: bool
 notes:
-    - cx_Oracle needs to be installed
+    - oracledb needs to be installed
     - Oracle RDBMS 10gR2 or later required
-requirements: [ "cx_Oracle", "re" ]
+requirements: [ "oracledb", "re" ]
 author: Ilmar Kerm, ilmar.kerm@gmail.com, @ilmarkerm
 '''
 
@@ -201,7 +201,7 @@ EXAMPLES = '''
 import re
 
 try:
-    import cx_Oracle
+    import oracledb
 except ImportError:
     oracledb_exists = False
 else:
@@ -248,7 +248,7 @@ def query_existing(job_owner, job_name):
 
 def create_job():
     c = conn.cursor()
-    var_args = c.arrayvar(cx_Oracle.STRING, [] if module.params['job_arguments'] is None else module.params['job_arguments'])
+    var_args = c.arrayvar(oracledb.STRING, [] if module.params['job_arguments'] is None else module.params['job_arguments'])
     # Bild the right CREATE_JOB command
     job_sql = "job_name=>v_name,comments=>v_comments,auto_drop=>v_auto_drop"
     if module.params['job_class']:
@@ -392,7 +392,7 @@ def main():
     )
     # Check for required modules
     if not oracledb_exists:
-        module.fail_json(msg="The cx_Oracle module is required. 'pip install cx_Oracle' should do the trick. If cx_Oracle is installed, make sure ORACLE_HOME & LD_LIBRARY_PATH is set")
+        module.fail_json(msg="The oracledb module is required. 'pip install oracledb' should do the trick. If oracledb is installed, make sure ORACLE_HOME & LD_LIBRARY_PATH is set")
     # Check input parameters
     re_name = re.compile("^[A-Za-z0-9_\$#]+\.[A-Za-z0-9_\$#]+$")
     if not re_name.match(module.params['job_name']):
@@ -424,25 +424,25 @@ def main():
         if (not user and not password ): # If neither user or password is supplied, the use of an oracle wallet is assumed
             if mode == 'sysdba':
                 connect = wallet_connect
-                conn = cx_Oracle.connect(wallet_connect, mode=cx_Oracle.SYSDBA)
+                conn = oracledb.connect(wallet_connect, mode=oracledb.SYSDBA)
             else:
                 connect = wallet_connect
-                conn = cx_Oracle.connect(wallet_connect)
+                conn = oracledb.connect(wallet_connect)
 
         elif (user and password ):
             if mode == 'sysdba':
-                dsn = cx_Oracle.makedsn(host=hostname, port=port, service_name=service_name)
+                dsn = oracledb.makedsn(host=hostname, port=port, service_name=service_name)
                 connect = dsn
-                conn = cx_Oracle.connect(user, password, dsn, mode=cx_Oracle.SYSDBA)
+                conn = oracledb.connect(user, password, dsn, mode=oracledb.SYSDBA)
             else:
-                dsn = cx_Oracle.makedsn(host=hostname, port=port, service_name=service_name)
+                dsn = oracledb.makedsn(host=hostname, port=port, service_name=service_name)
                 connect = dsn
-                conn = cx_Oracle.connect(user, password, dsn)
+                conn = oracledb.connect(user, password, dsn)
 
         elif (not(user) or not(password)):
-            module.fail_json(msg='Missing username or password for cx_Oracle')
+            module.fail_json(msg='Missing username or password for oracledb')
 
-    except cx_Oracle.DatabaseError as exc:
+    except oracledb.DatabaseError as exc:
         error, = exc.args
         msg[0] = 'Could not connect to database - %s, connect descriptor: %s' % (error.message, connect)
         module.fail_json(msg=msg[0], changed=False)

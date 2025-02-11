@@ -51,8 +51,8 @@ options:
     description: If autoextend, the maximum size of the datafile (1M, 50M, 1G etc). If empty, defaults to database limits
     aliases: ['max']
 notes:
-  - cx_Oracle needs to be installed
-requirements: [ "cx_Oracle" ]
+  - oracledb needs to be installed
+requirements: [ "oracledb" ]
 author:
   - Mikael Sandström, oravirt@gmail.com, @oravirt
   - Ivan Brezina
@@ -137,7 +137,7 @@ EXAMPLES = '''
 '''
 
 try:
-    import cx_Oracle
+    import oracledb
 except ImportError:
     oracledb_exists = False
 else:
@@ -157,7 +157,7 @@ def check_tablespace_exists(module, msg, cursor, tablespace):
         #result = cursor.fetchone()[0]
         result = cursor.fetchall()
         count = cursor.rowcount
-    except cx_Oracle.DatabaseError as exc:
+    except oracledb.DatabaseError as exc:
         error, = exc.args
         msg = error.message+ 'sql: ' + sql
         return False
@@ -611,13 +611,13 @@ def ensure_tablespace_attributes (module,msg,cursor,tablespace, autoextend, next
        END;
     """
     try:
-        v_autoextend_change = cursor.var(cx_Oracle.NUMBER)
-        v_nextsize_change = cursor.var(cx_Oracle.NUMBER)
-        v_maxsize_change = cursor.var(cx_Oracle.NUMBER)
+        v_autoextend_change = cursor.var(oracledb.NUMBER)
+        v_nextsize_change = cursor.var(oracledb.NUMBER)
+        v_maxsize_change = cursor.var(oracledb.NUMBER)
 
         cursor.execute(ensure_sql,
             {'tablespace': tablespace,'autoextend': str(autoextend), 'nextsize': nextsize, 'maxsize': maxsize, 'o_autoextend_changed': v_autoextend_change, 'o_nextsize_changed': v_nextsize_change,'o_maxsize_changed': v_maxsize_change})
-    except cx_Oracle.DatabaseError as exc:
+    except oracledb.DatabaseError as exc:
         error, = exc.args
         msg = '%s' % (error.message)
         module.fail_json(msg=msg, changed=False)
@@ -641,7 +641,7 @@ def get_tablespace_files(module, msg, cursor, tablespace):
     try:
             cursor.execute(sql)
             result = cursor.fetchall()
-    except cx_Oracle.DatabaseError as exc:
+    except oracledb.DatabaseError as exc:
             error, = exc.args
             msg = error.message+ ': sql: ' + sql
             module.fail_json(msg=msg)
@@ -670,7 +670,7 @@ def manage_tablespace(module, msg, cursor, tablespace, state):
 
     try:
         cursor.execute(sql)
-    except cx_Oracle.DatabaseError as exc:
+    except oracledb.DatabaseError as exc:
         error, = exc.args
         msg = error.message+ 'sql: ' + sql
         return False
@@ -690,7 +690,7 @@ def drop_tablespace(msg, cursor, tablespace):
 
     try:
         cursor.execute(sql)
-    except cx_Oracle.DatabaseError as exc:
+    except oracledb.DatabaseError as exc:
         error, = exc.args
         msg = 'Something went wrong while dropping the tablespace - %s sql: %s' % (error.message, sql)
         module.fail_json(msg=msg, changed=False)
@@ -702,7 +702,7 @@ def execute_sql_get(module, msg, cursor, sql):
     try:
         cursor.execute(sql)
         result = (cursor.fetchall())
-    except cx_Oracle.DatabaseError as exc:
+    except oracledb.DatabaseError as exc:
         error, = exc.args
         msg = 'Something went wrong while executing sql_get - %s sql: %s' % (error.message, sql)
         module.fail_json(msg=msg, changed=False)
@@ -712,7 +712,7 @@ def execute_sql_get(module, msg, cursor, sql):
 def execute_sql(module, msg, cursor, sql):
     try:
         cursor.execute(sql)
-    except cx_Oracle.DatabaseError as exc:
+    except oracledb.DatabaseError as exc:
         error, = exc.args
         msg = 'Something went wrong while executing - %s sql: %s' % (error.message, sql)
         module.fail_json(msg=msg, changed=False)
@@ -770,7 +770,7 @@ def main():
     maxsize = module.params["maxsize"]
 
     if not oracledb_exists:
-        module.fail_json(msg="The cx_Oracle module is required. 'pip install cx_Oracle' should do the trick. If cx_Oracle is installed, make sure ORACLE_HOME is set")
+        module.fail_json(msg="The oracledb module is required. 'pip install oracledb' should do the trick. If oracledb is installed, make sure ORACLE_HOME is set")
 
     conn = oracle_connect(module)
     cursor = conn.cursor()

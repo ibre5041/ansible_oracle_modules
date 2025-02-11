@@ -9,13 +9,13 @@ import time
 import json
 import sys
 import socket
-import cx_Oracle
+import oracledb
 
 class database():
     
     def __init__(self):
         try:
-            connection = cx_Oracle.connect(user='/', mode=cx_Oracle.SYSDBA)
+            connection = oracledb.connect(user='/', mode=oracledb.SYSDBA)
             self._cursor = connection.cursor()
             self.ora_banner = None
             self.ora_alert_log = None
@@ -43,7 +43,7 @@ class database():
             self._cursor.execute(sql)
             (retval,) = self._cursor.fetchone()
             return retval
-        except (cx_Oracle.OperationalError, cx_Oracle.DatabaseError, cx_Oracle.InterfaceError) as e:
+        except (oracledb.OperationalError, oracledb.DatabaseError, oracledb.InterfaceError) as e:
             #sys.stderr.write("{} failed with: {}".format(sql, str(e)))
             #raise BaseException("{} failed with: {}".format(sql, str(e)))
             return ""

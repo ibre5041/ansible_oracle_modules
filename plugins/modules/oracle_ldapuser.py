@@ -116,9 +116,9 @@ options:
         required: false
         type: list of dicts
 notes:
-    - cx_Oracle needs to be installed
+    - oracledb needs to be installed
     - ldap python module needs to be installed, but not from PIP! yum install python-ldap!
-requirements: [ "cx_Oracle", "ldap", "re" ]
+requirements: [ "oracledb", "ldap", "re" ]
 author: Ilmar Kerm, ilmar.kerm@gmail.com, @ilmarkerm
 '''
 
@@ -159,7 +159,7 @@ EXAMPLES = '''
 import re
 
 try:
-    import cx_Oracle
+    import oracledb
 except ImportError:
     oracledb_exists = False
 else:
@@ -248,7 +248,7 @@ def main():
         module.fail_json(msg='no No NO! Choose a proper non-system tablespace for users.')
     # Check for required modules
     if not oracledb_exists:
-        module.fail_json(msg="The cx_Oracle module is required. 'pip install cx_Oracle' should do the trick. If cx_Oracle is installed, make sure ORACLE_HOME & LD_LIBRARY_PATH is set")
+        module.fail_json(msg="The oracledb module is required. 'pip install oracledb' should do the trick. If oracledb is installed, make sure ORACLE_HOME & LD_LIBRARY_PATH is set")
     if not ldap_module_exists:
         module.fail_json(msg="The ldap module is required. 'pip install ldap' should do the trick.")
     # Connect to LDAP
@@ -276,25 +276,25 @@ def main():
         if (not user and not password ): # If neither user or password is supplied, the use of an oracle wallet is assumed
             if mode == 'sysdba':
                 connect = wallet_connect
-                conn = cx_Oracle.connect(wallet_connect, mode=cx_Oracle.SYSDBA)
+                conn = oracledb.connect(wallet_connect, mode=oracledb.SYSDBA)
             else:
                 connect = wallet_connect
-                conn = cx_Oracle.connect(wallet_connect)
+                conn = oracledb.connect(wallet_connect)
 
         elif (user and password ):
             if mode == 'sysdba':
-                dsn = cx_Oracle.makedsn(host=hostname, port=port, service_name=service_name)
+                dsn = oracledb.makedsn(host=hostname, port=port, service_name=service_name)
                 connect = dsn
-                conn = cx_Oracle.connect(user, password, dsn, mode=cx_Oracle.SYSDBA)
+                conn = oracledb.connect(user, password, dsn, mode=oracledb.SYSDBA)
             else:
-                dsn = cx_Oracle.makedsn(host=hostname, port=port, service_name=service_name)
+                dsn = oracledb.makedsn(host=hostname, port=port, service_name=service_name)
                 connect = dsn
-                conn = cx_Oracle.connect(user, password, dsn)
+                conn = oracledb.connect(user, password, dsn)
 
         elif (not(user) or not(password)):
-            module.fail_json(msg='Missing username or password for cx_Oracle')
+            module.fail_json(msg='Missing username or password for oracledb')
 
-    except cx_Oracle.DatabaseError as exc:
+    except oracledb.DatabaseError as exc:
         error, = exc.args
         msg[0] = 'Could not connect to database - %s, connect descriptor: %s' % (error.message, connect)
         module.fail_json(msg=msg[0], changed=False)
@@ -330,10 +330,10 @@ def main():
     #
     msg[0] = msgstr
     c = conn.cursor()
-    var_usernames = c.arrayvar(cx_Oracle.STRING, usernames)
-    var_grants = c.arrayvar(cx_Oracle.STRING, [x.upper() for x in module.params['user_grants']])
-    var_ldapgroups = c.arrayvar(cx_Oracle.STRING, ldapgroups)
-    var_changes = c.var(cx_Oracle.NUMBER)
+    var_usernames = c.arrayvar(oracledb.STRING, usernames)
+    var_grants = c.arrayvar(oracledb.STRING, [x.upper() for x in module.params['user_grants']])
+    var_ldapgroups = c.arrayvar(oracledb.STRING, ldapgroups)
+    var_changes = c.var(oracledb.NUMBER)
     c.execute("""
       DECLARE
           TYPE str_array IS TABLE OF VARCHAR2(50) INDEX BY BINARY_INTEGER;

@@ -55,9 +55,9 @@ options:
         default: present
         choices: ['present','absent']
 notes:
-    - cx_Oracle needs to be installed
+    - oracledb needs to be installed
     - Oracle RDBMS 10gR2 or later required
-requirements: [ "cx_Oracle" ]
+requirements: [ "oracledb" ]
 author: Ilmar Kerm, ilmar.kerm@gmail.com, @ilmarkerm
 '''
 
@@ -87,7 +87,7 @@ EXAMPLES = '''
 '''
 
 try:
-    import cx_Oracle
+    import oracledb
 except ImportError:
     oracledb_exists = False
 else:
@@ -113,7 +113,7 @@ def main():
     )
     # Check for required modules
     if not oracledb_exists:
-        module.fail_json(msg="The cx_Oracle module is required. 'pip install cx_Oracle' should do the trick. If cx_Oracle is installed, make sure ORACLE_HOME & LD_LIBRARY_PATH is set")
+        module.fail_json(msg="The oracledb module is required. 'pip install oracledb' should do the trick. If oracledb is installed, make sure ORACLE_HOME & LD_LIBRARY_PATH is set")
     # Connect to database
     conn = oracle_connect(module)
     
@@ -124,8 +124,8 @@ def main():
         module.exit_json(changed=False)
     #
     c = conn.cursor()
-    var_changed = c.var(cx_Oracle.NUMBER)
-    var_msg = c.var(cx_Oracle.STRING)
+    var_changed = c.var(oracledb.NUMBER)
+    var_msg = c.var(oracledb.STRING)
     c.execute("""
     DECLARE
         v_param_name VARCHAR2(100);

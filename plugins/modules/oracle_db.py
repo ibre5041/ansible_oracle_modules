@@ -193,10 +193,10 @@ options:
     default: present
     choices: ['present', 'absent', 'stopped', 'started', 'restarted']
 notes:
-    - cx_Oracle needs to be installed
+    - oracledb needs to be installed
     - 'Parameters initparams and db_options used to be of type list of strings ["JSERVER:true", "APEX:false"]'
     - 'Now they are a dictionary { "JSERVER": true, "APEX": false}'
-requirements: ["cx_Oracle"]
+requirements: ["oracledb"]
 author: 
     - Mikael Sandström, oravirt@gmail.com, @oravirt
     - Ivan Brezina

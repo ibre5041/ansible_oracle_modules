@@ -53,9 +53,9 @@ options:
         aliases:
             - retention
 notes:
-    - cx_Oracle needs to be installed
+    - oracledb needs to be installed
     - Oracle RDBMS 10gR2 or later required
-requirements: [ "cx_Oracle" ]
+requirements: [ "oracledb" ]
 author: Ilmar Kerm, ilmar.kerm@gmail.com, @ilmarkerm
 '''
 
@@ -87,7 +87,7 @@ EXAMPLES = '''
 from datetime import timedelta
 
 try:
-    import cx_Oracle
+    import oracledb
 except ImportError:
     oracledb_exists = False
 else:
@@ -121,7 +121,7 @@ def main():
     )
     # Check for required modules
     if not oracledb_exists:
-        module.fail_json(msg="The cx_Oracle module is required. 'pip install cx_Oracle' should do the trick. If cx_Oracle is installed, make sure ORACLE_HOME & LD_LIBRARY_PATH is set")
+        module.fail_json(msg="The oracledb module is required. 'pip install oracledb' should do the trick. If oracledb is installed, make sure ORACLE_HOME & LD_LIBRARY_PATH is set")
     # Check input parameters
     if module.params['snapshot_interval_min'] < 10 and module.params['snapshot_interval_min'] != 0:
         module.fail_json(msg="Snapshot interval must be >= 10 or 0", changed=False)

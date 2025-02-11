@@ -64,8 +64,8 @@ options:
     required: false
     default: 1521
 notes:
-  - cx_Oracle needs to be installed
-requirements: [ "cx_Oracle" ]
+  - oracledb needs to be installed
+requirements: [ "oracledb" ]
 author: Mikael Sandström, oravirt@gmail.com, @oravirt
 '''
 
@@ -74,7 +74,7 @@ EXAMPLES = '''
 import os
 
 try:
-    import cx_Oracle
+    import oracledb
 except ImportError:
     oracledb_exists = False
 else:
@@ -202,7 +202,7 @@ def execute_sql_get(module, msg, cursor, sql):
     try:
         cursor.execute(sql)
         result = (cursor.fetchall())
-    except cx_Oracle.DatabaseError as exc:
+    except oracledb.DatabaseError as exc:
         error, = exc.args
         msg = 'Something went wrong while executing sql_get - %s sql: %s' % (error.message, sql)
         module.fail_json(msg=msg, changed=False)
@@ -213,7 +213,7 @@ def execute_sql_get(module, msg, cursor, sql):
 #
 #     try:
 #         cursor.execute(sql)
-#     except cx_Oracle.DatabaseError as exc:
+#     except oracledb.DatabaseError as exc:
 #         error, = exc.args
 #         msg = 'Something went wrong while executing sql - %s sql: %s' % (error.message, sql)
 #         module.fail_json(msg=msg, changed=False)
@@ -285,7 +285,7 @@ def main():
         gimanaged = False
 
     if not oracledb_exists:
-        msg = "The cx_Oracle module is required. 'pip install cx_Oracle' should do the trick. If cx_Oracle is installed, make sure ORACLE_HOME & LD_LIBRARY_PATH is set"
+        msg = "The oracledb module is required. 'pip install oracledb' should do the trick. If oracledb is installed, make sure ORACLE_HOME & LD_LIBRARY_PATH is set"
         module.fail_json(msg=msg)
 
     # Connection details for database

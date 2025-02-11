@@ -76,9 +76,9 @@ options:
     choices: ['normal','sysdba']
 
 notes:
-    - cx_Oracle needs to be installed
+    - oracledb needs to be installed
     - Oracle RDBMS 11gR2 or later required
-requirements: [ "cx_Oracle", "re" ]
+requirements: [ "oracledb", "re" ]
 author: Ilmar Kerm, ilmar.kerm@gmail.com, @ilmarkerm
 '''
 
@@ -175,7 +175,7 @@ EXAMPLES = '''
 import re
 
 try:
-    import cx_Oracle
+    import oracledb
 except ImportError:
     oracledb_exists = False
 else:
@@ -205,7 +205,7 @@ def main():
     )
     # Check for required modules
     if not oracledb_exists:
-        module.fail_json(msg="The cx_Oracle module is required. 'pip install cx_Oracle' should do the trick. If cx_Oracle is installed, make sure ORACLE_HOME & LD_LIBRARY_PATH is set")
+        module.fail_json(msg="The oracledb module is required. 'pip install oracledb' should do the trick. If oracledb is installed, make sure ORACLE_HOME & LD_LIBRARY_PATH is set")
     # Check input parameters
     re_priv = re.compile('^[A-Za-z0-9_]+[A-Za-z0-9_ ]*[A-Za-z0-9_]+$')
     re_role = re.compile('^[A-Za-z0-9_\$#\- ]+$')
@@ -236,25 +236,25 @@ def main():
         if (not user and not password ): # If neither user or password is supplied, the use of an oracle wallet is assumed
             if mode == 'sysdba':
                 connect = wallet_connect
-                conn = cx_Oracle.connect(wallet_connect, mode=cx_Oracle.SYSDBA)
+                conn = oracledb.connect(wallet_connect, mode=oracledb.SYSDBA)
             else:
                 connect = wallet_connect
-                conn = cx_Oracle.connect(wallet_connect)
+                conn = oracledb.connect(wallet_connect)
 
         elif (user and password ):
             if mode == 'sysdba':
-                dsn = cx_Oracle.makedsn(host=hostname, port=port, service_name=service_name)
+                dsn = oracledb.makedsn(host=hostname, port=port, service_name=service_name)
                 connect = dsn
-                conn = cx_Oracle.connect(user, password, dsn, mode=cx_Oracle.SYSDBA)
+                conn = oracledb.connect(user, password, dsn, mode=oracledb.SYSDBA)
             else:
-                dsn = cx_Oracle.makedsn(host=hostname, port=port, service_name=service_name)
+                dsn = oracledb.makedsn(host=hostname, port=port, service_name=service_name)
                 connect = dsn
-                conn = cx_Oracle.connect(user, password, dsn)
+                conn = oracledb.connect(user, password, dsn)
 
         elif (not(user) or not(password)):
-            module.fail_json(msg='Missing username or password for cx_Oracle')
+            module.fail_json(msg='Missing username or password for oracledb')
 
-    except cx_Oracle.DatabaseError as exc:
+    except oracledb.DatabaseError as exc:
         error, = exc.args
         msg[0] = 'Could not connect to database - %s, connect descriptor: %s' % (error.message, connect)
         module.fail_json(msg=msg[0], changed=False)
@@ -265,13 +265,13 @@ def main():
         module.exit_json(changed=False)
     #
     c = conn.cursor()
-    var_changes = c.var(cx_Oracle.NUMBER)
-    var_error = c.var(cx_Oracle.NUMBER)
-    var_errstr = c.var(cx_Oracle.STRING)
-    var_privs = c.arrayvar(cx_Oracle.STRING, [p.upper() for p in module.params['privs']])
+    var_changes = c.var(oracledb.NUMBER)
+    var_error = c.var(oracledb.NUMBER)
+    var_errstr = c.var(oracledb.STRING)
+    var_privs = c.arrayvar(oracledb.STRING, [p.upper() for p in module.params['privs']])
     objectslist = [p.replace("_", "\_") for p in module.params['objs']] if module.params['objs'] is not None else []
-    var_objs = c.arrayvar(cx_Oracle.STRING, objectslist if not module.params['convert_to_upper'] else [p.upper() for p in objectslist], 100)
-    var_roles = c.arrayvar(cx_Oracle.STRING, module.params['roles'] if not module.params['convert_to_upper'] else [p.upper() for p in module.params['roles']], 50)
+    var_objs = c.arrayvar(oracledb.STRING, objectslist if not module.params['convert_to_upper'] else [p.upper() for p in objectslist], 100)
+    var_roles = c.arrayvar(oracledb.STRING, module.params['roles'] if not module.params['convert_to_upper'] else [p.upper() for p in module.params['roles']], 50)
     #
     rs_subquery = "SELECT username role FROM dba_users $IF DBMS_DB_VERSION.VERSION >= 12 $THEN WHERE oracle_maintained='N' $END UNION ALL SELECT role FROM dba_roles $IF DBMS_DB_VERSION.VERSION >= 12 $THEN WHERE oracle_maintained='N' $END INTERSECT SELECT column_value name FROM table(v_roles_sql)"
     objs_subquery = "SELECT DISTINCT o.owner, o.object_name FROM dba_objects o JOIN table(v_objs_sql) s ON o.owner||'.'||o.object_name LIKE s.column_value ESCAPE '\\' AND v_objtype LIKE '%,'||o.object_type||',%'"

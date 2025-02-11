@@ -59,9 +59,9 @@ options:
     default: None
     choices: [None, 'detail', 'summary']
 notes:
-  - cx_Oracle needs to be installed
+  - oracledb needs to be installed
   - Oracle RDBMS 10gR2 or later required
-requirements: ["cx_Oracle"]
+requirements: ["oracledb"]
 author:
   - Ilmar Kerm, ilmar.kerm@gmail.com, @ilmarkerm
   - Ivan Brezina

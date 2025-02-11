@@ -58,10 +58,10 @@ options:
     required: false
     type: bool  
 notes:
-  - cx_Oracle needs to be installed
+  - oracledb needs to be installed
   - optionaly depends on pbkdf2 to validate password hashes in PBKDF2 format
 requirements:
-  - "cx_Oracle"
+  - "oracledb"
   - pbkdf2
 author:
   - Mikael Sandström, oravirt@gmail.com, @oravirt
