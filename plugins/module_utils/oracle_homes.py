@@ -123,7 +123,13 @@ class oracle_homes():
 
         crsname = ORACLE_HOME = ORACLE_SID = DB_UNIQUE_NAME = None
         try:
-            crsname = attributes['NAME'].split('.')[1]
+            match = re.match(r'([\w.]+)(?:\(([\w.]+)\))?', attributes['NAME'])
+            resource_name = match.group(1)
+            resource_group = match.group(2) if match.group(2) else None
+            if resource_name.startswith('ora.'):
+                crsname = resource_name[len('ora.'):]
+            else:
+                crsname = resource_name
         except KeyError:
             pass
 
