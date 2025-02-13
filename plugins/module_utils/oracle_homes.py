@@ -17,7 +17,7 @@ from collections import namedtuple
 import json
 
 
-class oracle_homes():
+class OracleHomes():
 
     def __init__(self, module=None):
         self.facts_item = {}
@@ -443,7 +443,7 @@ class oracle_homes():
 
 
 # def main():
-#     h = oracle_homes(None)
+#     h = OracleHomes(None)
 #     h.list_crs_instances()
 #     h.list_processes()
 #     h.parse_oratab()

@@ -931,7 +931,7 @@ def main():
     # Unset ORACLE_SID, we will deduce it later, this should fix RAC deployments
     os.environ.pop('ORACLE_SID', None)
 
-    ohomes = oracle_homes()
+    ohomes = OracleHomes()
     ohomes.list_crs_instances()
     ohomes.list_processes()
     ohomes.parse_oratab()
@@ -1014,7 +1014,7 @@ from ansible.module_utils.basic import *
 # No collections are used
 #try:
 #    from ansible.module_utils.oracle_utils import oracleConnection
-#    from ansible.module_utils.oracle_homes import oracle_homes
+#    from ansible.module_utils.oracle_homes import OracleHomes
 #except:
 #    pass
 

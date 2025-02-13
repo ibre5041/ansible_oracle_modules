@@ -548,7 +548,7 @@ def main():
         msg = 'ORACLE_HOME variable not set. Please set it and re-run the command'
         module.fail_json(msg=msg, changed=False)
 
-    ohomes = oracle_homes()
+    ohomes = OracleHomes()
     ohomes.list_crs_instances()
     ohomes.list_processes()
     ohomes.parse_oratab()
@@ -637,7 +637,7 @@ from ansible.module_utils.basic import *
 # No collections are used
 #try:
 #    from ansible.module_utils.oracle_utils import oracleConnection
-#    from ansible.module_utils.oracle_homes import oracle_homes
+#    from ansible.module_utils.oracle_homes import OracleHomes
 #except:
 #    pass
 

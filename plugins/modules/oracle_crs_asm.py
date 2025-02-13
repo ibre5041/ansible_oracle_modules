@@ -64,7 +64,7 @@ from ansible.module_utils.basic import *
 # While this file is placed in <project-dir>/library
 # No collections are used
 # try:
-#    from ansible.module_utils.oracle_homes import oracle_homes
+#    from ansible.module_utils.oracle_homes import OracleHomes
 # except:
 #    pass
 
@@ -256,7 +256,7 @@ def main():
         supports_check_mode=True,
     )
 
-    ohomes = oracle_homes()
+    ohomes = OracleHomes()
     ohomes.list_crs_instances()
     ohomes.list_processes()
     ohomes.parse_oratab()

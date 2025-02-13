@@ -226,7 +226,7 @@ def main():
     if module.params["oracle_home"]:
         os.environ['ORACLE_HOME'] = module.params["oracle_home"]
 
-    ohomes = oracle_homes()
+    ohomes = OracleHomes()
     ohomes.list_crs_instances()
     if not ohomes.crsctl:
         ohomes.list_processes()
@@ -284,7 +284,7 @@ from ansible.module_utils.basic import *
 # While this file is placed in <project-dir>/library
 # No collections are used
 # try:
-#    from ansible.module_utils.oracle_homes import oracle_homes
+#    from ansible.module_utils.oracle_homes import OracleHomes
 # except:
 #    pass
 

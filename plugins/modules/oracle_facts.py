@@ -97,7 +97,7 @@ def detect_paths(module, conn):
     oracle_sid = os.environ['ORACLE_SID']
     oracle_home = os.environ['ORACLE_HOME']
 
-    h = oracle_homes(module)
+    h = OracleHomes(module)
     h.list_crs_instances()
     h.list_processes()
     h.parse_oratab()
@@ -400,13 +400,13 @@ from ansible.module_utils.basic import *
 # No collections are used                              
 #try:
 #    from ansible.module_utils.oracle_utils import oracleConnection
-#    from ansible.module_utils.oracle_homes import oracle_homes
+#    from ansible.module_utils.oracle_homes import OracleHomes
 #except:
 #    pass
 
 try:
     from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_utils import oracleConnection
-    from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_homes import oracle_homes
+    from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_homes import OracleHomes
 except:    
     pass
 

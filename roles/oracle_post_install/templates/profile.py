@@ -147,7 +147,7 @@ class database():
         return retval
 
 
-class oracle_homes():
+class OracleHomes():
 
     def __init__(self, module = None):
         self.facts_item = {}
@@ -521,7 +521,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     if args.homes:
-        h = oracle_homes()
+        h = OracleHomes()
         h.list_crs_instances()
         h.list_processes()
         h.parse_oratab()
