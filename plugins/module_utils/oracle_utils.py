@@ -49,12 +49,13 @@ def oracle_connect(module):
 
     wallet_connect = '/@%s' % service_name
 
-    sysdba_connect = '/'
     try:
         if (not user and not password ): # If neither user or password is supplied, the use of an oracle wallet is assumed
+            # oracledb module operates in Thin Mode by default
+            # Switch to Thick mode
+            oracledb.init_oracle_client()
             if mode == 'sysdba':
-                connect = sysdba_connect
-                conn = oracledb.connect(sysdba_connect, mode=oracledb.SYSDBA)
+                conn = oracledb.connect(mode=oracledb.SYSDBA)
             else:
                 connect = wallet_connect
                 conn = oracledb.connect(wallet_connect)
@@ -109,13 +110,14 @@ class oracleConnection:
         mode = module.params["mode"]
 
         wallet_connect = '/@%s' % service_name
-        sysdba_connect = '/'
 
         try:
             if not user and not password: # If neither user or password is supplied, the use of an oracle connect internal or wallet is assumed
+                # oracledb module operates in Thin Mode by default
+                # Switch to Thick mode
+                oracledb.init_oracle_client()
                 if mode == 'sysdba':
-                    connect = sysdba_connect
-                    conn = oracledb.connect(sysdba_connect, mode=oracledb.SYSDBA)
+                    conn = oracledb.connect(mode=oracledb.SYSDBA)
                 else:
                     connect = wallet_connect
                     conn = oracledb.connect(wallet_connect)
