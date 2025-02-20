@@ -55,6 +55,7 @@ def oracle_connect(module):
             # Switch to Thick mode
             oracledb.init_oracle_client()
             if mode == 'sysdba':
+                connect = '/'
                 conn = oracledb.connect(mode=oracledb.SYSDBA)
             else:
                 connect = wallet_connect
@@ -64,11 +65,11 @@ def oracle_connect(module):
             if mode == 'sysdba':
                 dsn = oracledb.makedsn(host=hostname, port=port, service_name=service_name)
                 connect = dsn
-                conn = oracledb.connect(user, password, dsn, mode=oracledb.SYSDBA)
+                conn = oracledb.connect(user=user, password=password, dsn=dsn, mode=oracledb.SYSDBA)
             else:
                 dsn = oracledb.makedsn(host=hostname, port=port, service_name=service_name)
                 connect = dsn
-                conn = oracledb.connect(user, password, dsn)
+                conn = oracledb.connect(user=user, password=password, dsn=dsn)
 
         elif (not(user) or not(password)):
             module.fail_json(msg='Missing username or password for oracledb')
@@ -110,13 +111,14 @@ class oracleConnection:
         mode = module.params["mode"]
 
         wallet_connect = '/@%s' % service_name
+        oracledb.init_oracle_client()
 
         try:
             if not user and not password: # If neither user or password is supplied, the use of an oracle connect internal or wallet is assumed
                 # oracledb module operates in Thin Mode by default
                 # Switch to Thick mode
-                oracledb.init_oracle_client()
                 if mode == 'sysdba':
+                    connect = '/'
                     conn = oracledb.connect(mode=oracledb.SYSDBA)
                 else:
                     connect = wallet_connect
@@ -125,11 +127,11 @@ class oracleConnection:
                 if mode == 'sysdba':
                     dsn = oracledb.makedsn(host=hostname, port=port, service_name=service_name)
                     connect = dsn
-                    conn = oracledb.connect(user, password, dsn, mode=oracledb.SYSDBA)
+                    conn = oracledb.connect(user=user, password=password, dsn=dsn, mode=oracledb.SYSDBA)
                 else:
                     dsn = oracledb.makedsn(host=hostname, port=port, service_name=service_name)
                     connect = dsn
-                    conn = oracledb.connect(user, password, dsn)
+                    conn = oracledb.connect(user=user, password=password, dsn=dsn)
             elif not user or not password:
                 module.fail_json(msg='Missing username or password for oracledb')
         except oracledb.DatabaseError as exc:
