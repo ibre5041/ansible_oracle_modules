@@ -42,7 +42,7 @@ options:
     default: None
   state:
     description: Whether the user should exist. Absent removes the user (cascade)
-    required: False
+    required: false
     default: present
     choices: ['present','absent']
   expired:
@@ -56,7 +56,13 @@ options:
       - Lock or unlock account.
       - If not specified for a new user, Oracle default will be used.
     required: false
-    type: bool  
+    type: bool
+  container:
+    description:
+      - To specify the CONTAINER clause, you must be connected to a multitenant container database
+    required: false
+    default: present
+    choices: ['all','current']
 notes:
   - oracledb needs to be installed
   - optionaly depends on pbkdf2 to validate password hashes in PBKDF2 format
@@ -442,7 +448,7 @@ def main():
             default_temp_tablespace = dict(default=None, aliases=['temporary_tablespace']),
             profile       = dict(default=None),
             authentication_type = dict(default=None, choices=['password', 'external', 'global', 'none']),
-            container     = dict(default=None),
+            container     = dict(default=None, choices=["all", "current"]),
             container_data = dict(default=None)
         ),
         required_together=[['username', 'password']],
