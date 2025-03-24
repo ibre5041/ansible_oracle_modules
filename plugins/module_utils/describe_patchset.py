@@ -52,25 +52,29 @@ ONE-OFF:/oracle/product/19.21.0.0/db1/inventory/oneoffs/35638318:JDK BUNDLE PATC
 import os
 import argparse
 import glob
+import zipfile
+import tempfile
 import xml.etree.ElementTree as ET
 
 
-def parse_patchset(path):
+def parse_patchset(path, archive=None):
     try:
         root = ET.parse(path).getroot()
         patch_number = root.findall("./patch/bug")[0].findall('number')[0].text
         description = root.findall("./patch/bug")[0].findall('abstract')[0].text
-
+        if archive:
+            print('PATCHSET:%s:%s' % (archive, description))
+            return
         d = os.path.dirname(path)
         d = os.path.join(d, patch_number)
         if os.path.isdir(d):
             print('PATCHSET:%s:%s' % (d, description))
-            return d
+            return
     except:
-        return None
+        pass
 
 
-def parse_bundle_patch(path):
+def parse_bundle_patch(path, archive=None):
     try:
         retval = []
         root = ET.parse(path).getroot()
@@ -83,18 +87,20 @@ def parse_bundle_patch(path):
             if os.path.isdir(d):
                 retval.append(d)
                 print('BUNDLEPART:%s:(%s)' % (d, ','.join(targets)))
-        return retval
     except:
-        return []
+        pass
 
 
-def parse_oneoff_patch(path):
+def parse_oneoff_patch(path, archive=None):
     try:
         root = ET.parse(path).getroot()
         description = root.findall("./patch_description")[0].text
-        base_dir = os.path.dirname(path)
-        base_dir = os.path.dirname(base_dir)
-        base_dir = os.path.dirname(base_dir)
+        if not archive:
+            base_dir = os.path.dirname(path)
+            base_dir = os.path.dirname(base_dir)
+            base_dir = os.path.dirname(base_dir)
+        else:
+            base_dir = archive
         targets = []
         for t in root.findall("./targets/target"):
             targets.append(t.attrib['type'])
@@ -102,6 +108,22 @@ def parse_oneoff_patch(path):
     except:
         pass
 
+
+def parse_zip(path):
+    with zipfile.ZipFile(path, "r") as z:
+        patchset  = [name for name in z.namelist() if name.endswith("PatchSearch.xml")]
+        bundle    = [name for name in z.namelist() if name.endswith("/bundle.xml")]
+        inventory = [name for name in z.namelist() if name.endswith("/etc/config/inventory.xml")]
+        with tempfile.TemporaryDirectory() as tempdir:
+            for f in patchset:
+                f = z.extract(f, tempdir)
+                parse_patchset(f, archive=path)
+            for b in bundle:
+                f = z.extract(b, tempdir)
+                parse_bundle_patch(f, archive=path)
+            for i in inventory:
+                f = z.extract(i, tempdir)
+                parse_oneoff_patch(f, archive=path)
 
 def main(path):
     for f in glob.glob('%s/**/PatchSearch.xml' % path, recursive=True):
@@ -113,6 +135,8 @@ def main(path):
     for f in glob.glob('%s/**/etc/config/inventory.xml' % path, recursive=True):
         parse_oneoff_patch(f)
 
+    for f in glob.glob('%s/*.zip' % path, recursive=False):
+        parse_zip(f)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
