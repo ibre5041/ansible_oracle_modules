@@ -2,17 +2,35 @@
 - name: "define connection parameters"
   set_fact:
     connection_parameters: &con_param
-      service_name: "{{ service_name }}"
-      username: "SYS"
-      password: "{{ sys_password }}"
+      hostname: "{{ oracle_hostname }}"
+      port: "{{ oracle_port }}"
+      service_name: "{{ oracle_service_name }}"
+      username: "{{ oracle_username }}"
+      password: "{{ oracle_password }}"
       mode: "sysdba"
+
+- name: 'Connection parameters - see or use integration_config.yml.template'
+  debug:
+    var: connection_parameters
+
+- name: "drop tablespaces (prepare tests)"
+  oracle_tablespace:
+    <<: *con_param
+    tablespace: "{{ item }}"
+    state: "absent"
+  register: _
+  failed_when: False
+  loop:
+    - ts
+    - ts_undo
+    - ts_temp
 
 - name: create permanent tablespace
   oracle_tablespace:
     <<: *con_param
     tablespace: "ts"
     size: "1M"
-    datafiles: "/tmp/ts.dbf"
+    datafiles: "/var/tmp/ts.dbf"   # /tnp might be tmpfs
     state: "present"
     bigfile: no
   register: _
@@ -23,7 +41,7 @@
     <<: *con_param
     tablespace: "ts_undo"
     size: "1M"
-    datafiles: "/tmp/ts_undo.dbf"
+    datafiles: "/var/tmp/ts_undo.dbf"
     state: "online"
     bigfile: no
     content: "undo"
@@ -35,7 +53,7 @@
     <<: *con_param
     tablespace: "ts_temp"
     size: "2M"
-    datafiles: "/tmp/ts_temp.dbf"
+    datafiles: "/var/tmp/ts_temp.dbf"
     state: "present"
     bigfile: yes
     content: "temp"

@@ -208,7 +208,7 @@ class oracleConnection:
                 pass
 
             
-    def execute_statement(self, statement):
+    def execute_statement(self, statement, params=None):
         """Execute a statement, can be a query or a procedure and return lines of dbms_output.put_line().
 
         statement -- SQL request or PL/SQL block
@@ -216,13 +216,15 @@ class oracleConnection:
         In check mode, statement is not executed.
         If PL/SQL block contains put_line, the output will be returned.
         """
+        if params is None:
+            params = {}
         output_lines = []
         try:
             if not self.module.check_mode:
                 if 'dbms_output.put_line' in statement.lower():
                     with self.conn.cursor() as cursor:
                         cursor.callproc('dbms_output.enable', [None])
-                        cursor.execute(statement)
+                        cursor.execute(statement, params)
 
                         chunk_size = 100  # Get lines by batch of 100
                         # create variables to hold the output
