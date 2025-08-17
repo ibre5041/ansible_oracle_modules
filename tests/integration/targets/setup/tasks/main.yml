@@ -1,8 +1,10 @@
 ---
-- name: "install cx_Oracle"
+- name: "install oracledb"
   pip:
-    name: "cx_Oracle"
+    name: "oracledb"
     state: "present"
+  when: false
+  failed_when: false
 
 - block:
     - name: "check InstantClient is installed"
@@ -33,9 +35,11 @@
     - name: "check InstantClient is installed"
       dnf:
         name: "oracle-instantclient-basic-21.9.0.0.0-1"
+      failed_when: false
+        
   rescue:
     - name: "install Instant Client dependencies"    
-      apt:
+      dnf:
         name:
           - "libaio1"
           - "alien"

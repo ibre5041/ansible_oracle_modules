@@ -9,12 +9,13 @@
       username: "{{ oracle_username }}"
       password: "{{ oracle_password }}"
       mode: "sysdba"
+    password: "PassW1234567890#_"
 
 - name: "user creation with check mode (change)"
   oracle_user:
     <<: *con_param
     schema_name: "foo"
-    schema_password: "pass"
+    schema_password: "{{ password }}"
     state: "present"
   check_mode: yes
   register: _
@@ -24,7 +25,7 @@
   oracle_user:
     <<: *con_param
     schema_name: "foo"
-    schema_password: "pass"
+    schema_password: "{{ password }}"
     state: "present"
   check_mode: no
   register: _
@@ -34,7 +35,7 @@
   oracle_user:
     <<: *con_param
     schema_name: "foo"
-    schema_password: "pass"
+    schema_password: "{{ password }}"
     state: "absent"
   check_mode: yes
   register: _
@@ -44,7 +45,7 @@
   oracle_user:
     <<: *con_param
     schema_name: "foo"
-    schema_password: "pass"
+    schema_password: "{{ password }}"
     state: "absent"
   check_mode: no
   register: _

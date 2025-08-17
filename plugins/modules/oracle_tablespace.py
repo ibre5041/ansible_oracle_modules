@@ -52,8 +52,8 @@ options:
     description: "If autoextend, the maximum size of the datafile (1M, 50M, 1G etc). If empty, defaults to database limits"
     aliases: ['max']
 notes:
-  - cx_Oracle needs to be installed
-requirements: [ "cx_Oracle" ]
+  - oracledb needs to be installed
+requirements: [ "oracledb" ]
 author:
   - Mikael Sandström, oravirt@gmail.com, @oravirt
   - Ivan Brezina
@@ -587,7 +587,7 @@ def manage_tablespace(module, msg, cursor, tablespace, state):
 
     try:
         cursor.execute(sql)
-    except cx_Oracle.DatabaseError as exc:
+    except oracledb.DatabaseError as exc:
         error, = exc.args
         msg = error.message+ 'sql: ' + sql
         return False

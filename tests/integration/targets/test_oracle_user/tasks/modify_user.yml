@@ -9,6 +9,7 @@
       username: "{{ oracle_username }}"
       password: "{{ oracle_password }}"
       mode: "sysdba"
+    password: "PassW1234567890#_"
 
 - name: "user creation"
   oracle_user:
@@ -26,7 +27,7 @@
   oracle_user:
     <<: *con_param
     schema_name: "foo"
-    schema_password: "pass"
+    schema_password: "{{ password }}"
     state: "present"
   register: _
   failed_when: _.failed or 'identified by'.upper() not in _.ddls[0].upper()
@@ -35,7 +36,7 @@
   oracle_user:
     <<: *con_param
     schema_name: "foo"
-    schema_password: "pass"
+    schema_password: "{{ password }}"
     state: "present"
   register: _
   failed_when: _.failed or _.changed
@@ -153,14 +154,14 @@
   oracle_user:
     <<: *con_param
     schema_name: "foo"
-    schema_password: "pass"
+    schema_password: "{{ password }}"
     state: "present"
 
 - name: "expiring account"
   oracle_user:
     <<: *con_param
     schema_name: "foo"
-    schema_password: "pass"
+    schema_password: "{{ password }}"
     expired: yes
     state: "present"
   register: _
@@ -170,7 +171,7 @@
   oracle_user:
     <<: *con_param
     schema_name: "foo"
-    schema_password: "pass"
+    schema_password: "{{ password }}"
     expired: yes
     state: "present"
   register: _
@@ -180,7 +181,7 @@
   oracle_user:
     <<: *con_param
     schema_name: "foo"
-    schema_password: "pass"
+    schema_password: "{{ password }}"
     expired: no
     state: "present"
   register: _

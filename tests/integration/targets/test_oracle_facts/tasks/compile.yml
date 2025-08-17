@@ -2,13 +2,26 @@
 - name: "define connection parameters"
   set_fact:
     connection_parameters: &con_param
-      service_name: "{{ cdb_service_name }}"
-      username: "SYS"
-      password: "{{ sys_password }}"
       mode: "sysdba"
 
-- name: get min facts
+- name: 'Connection paramters - see or use integration_config.yml.template'
+  debug:
+    var: connection_parameters
+      
+- name: get some facts
   oracle_facts:
     <<: *con_param
-    gather_subset: "min"
+    userenv: false
+    database: false
+    instance: false
+    password_file: true
+    redo: summary
+    standby: summary
+    parameter:
+      - audit_file_dest
+      - db_name
+      - db_unique_name
+      - instance_name
+      - service_names
+    
 ...

@@ -90,8 +90,9 @@ def main():
         supports_check_mode=True
     )
 
-    oracleConnection(module)
-    module.exit_json(msg="Connection successful", changed=False)
+    oc = oracleConnection(module)
+    r = check_connection(oc)
+    module.exit_json(msg="Connection successful: " + str(r), changed=oc.changed)
 
 
 from ansible.module_utils.basic import *

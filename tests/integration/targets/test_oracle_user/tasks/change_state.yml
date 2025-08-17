@@ -9,7 +9,8 @@
       username: "{{ oracle_username }}"
       password: "{{ oracle_password }}"
       mode: "sysdba"
-
+    password: "PassW1234567890#_"
+    
 - name: "init tests, test user absent"
   oracle_user:
     <<: *con_param
@@ -22,7 +23,7 @@
   oracle_user:
     <<: *con_param
     schema_name: "foo"
-    schema_password: "pass"
+    schema_password: "{{ password }}"
     state: "present"
   register: _
   failed_when: _.failed or not _.changed
@@ -31,7 +32,7 @@
   oracle_user:
     <<: *con_param
     schema_name: "foo"
-    schema_password: "pass"
+    schema_password: "{{ password }}"
     state: "present"
   register: _
   failed_when: _.failed or _.changed
@@ -40,7 +41,7 @@
   oracle_user:
     <<: *con_param
     schema_name: "foo"
-    schema_password: "pass"
+    schema_password: "{{ password }}"
     state: "absent"
   register: _
   failed_when: _.failed or not _.changed
@@ -49,7 +50,7 @@
   oracle_user:
     <<: *con_param
     schema_name: "foo"
-    schema_password: "pass"
+    schema_password: "{{ password }}"
     state: "absent"
   register: _
   failed_when: _.failed or _.changed

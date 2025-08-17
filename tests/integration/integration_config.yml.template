@@ -6,5 +6,16 @@ oracle_username: ..TODO.ADD.DB.USERNAME
 oracle_password: ..TODO.ADD.DB.PASSWORD
 
 oracle_home: ..ORACLE_HOME..for oracle_db module
---mode: "sysdba"
+mode: "sysdba"
+
+#
+running_on_server: false
+running_on_server_crs: false
+
+running_on_db_asm: false
+running_on_db_fs: false
+running_on_cdb: false
+running_on_pdb: false
+
+running_on_client: false
 

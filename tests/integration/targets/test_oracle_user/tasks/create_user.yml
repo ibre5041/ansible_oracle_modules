@@ -9,12 +9,13 @@
       username: "{{ oracle_username }}"
       password: "{{ oracle_password }}"
       mode: "sysdba"
+    password: "PassW1234567890#_"
 
 - name: "user creation with password"
   oracle_user:
     <<: *con_param
     schema_name: "foo"
-    schema_password: "pass"
+    schema_password: "{{ password }}"
     state: "present"
   register: _
   failed_when: _.failed or 'identified by' not in _.ddls[0]
@@ -135,7 +136,7 @@
   oracle_user:
     <<: *con_param
     schema_name: "foo"
-    schema_password: "pass"
+    schema_password: "{{ password }}"
     expired: yes
     state: "present"
   register: _
