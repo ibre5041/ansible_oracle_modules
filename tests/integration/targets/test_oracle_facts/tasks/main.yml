@@ -1,6 +1,12 @@
 ---
 - include_tasks: "compile.yml"
+  when: running_on_server
+  
 - include_tasks: "subset_parameter.yml"
+  when: running_on_server
+  
 - include_tasks: "subset_content.yml"
+  when: running_on_server
+  
 - include_tasks: "no_sysdba.yml"
 ...

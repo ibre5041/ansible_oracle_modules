@@ -3,8 +3,10 @@
 - name: Call oracle_gi_facts
   oracle_gi_facts:
   register: _
+  when: running_on_server_crs
 
 - name: Display oracle_gi_facts
   debug: var=_
+  when: running_on_server_crs
 
 ...

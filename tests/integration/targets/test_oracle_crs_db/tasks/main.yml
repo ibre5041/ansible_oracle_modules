@@ -1,5 +1,6 @@
 ---
 
 - include_tasks: simple.yml
+  when: running_on_server_crs
 
 ...
