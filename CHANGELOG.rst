@@ -1,9 +1,13 @@
-=============================================
-Ibre5041.Ansible_Oracle_Modules Release Notes
-=============================================
+===============================================
+Ibre5041.Ansible\_Oracle\_Modules Release Notes
+===============================================
 
 .. contents:: Topics
 
+v3.2.4
+======
+
+- oracle_tablespace rewritten
 
 v3.2.3
 ======
@@ -67,3 +71,4 @@ Breaking Changes / Porting Guide
 
 v3.1.8
 ======
+

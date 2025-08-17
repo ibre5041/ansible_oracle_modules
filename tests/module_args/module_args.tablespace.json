@@ -1,0 +1,16 @@
+{
+    "ANSIBLE_MODULE_ARGS": {
+        "mode": "sysdba",
+        "user": "sys",
+        "password": "AcrorA123456__",
+        "hostname": "ansible.private.frankfurt.oraclevcn.com",
+        "service_name": "PDB01.private.frankfurt.oraclevcn.com",
+        "tablespace": "TS",
+        "bigfile": false,
+        "datafiles": ["/var/tmp/ts1.dbf", "/var/tmp/ts2.dbf", "/var/tmp/ts2.dbf"],
+        "autoextend": true,
+        "nextsize": "1M",
+        "maxsize": "10M"
+    },
+    "_ansible_check_mode": true
+}
