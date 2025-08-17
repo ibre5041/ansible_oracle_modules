@@ -36,7 +36,12 @@ releases:
         namespace: null
     release_date: '2024-05-15'
   3.2.3:
-    release_date: '2024-06-04'
     changes:
       minor_changes:
       - CRS build fixes
+    release_date: '2024-06-04'
+  3.2.4:
+    release_date: '2025-08-13'
+    changes:
+      breaking_changes:
+      - oracle_tablespace rewritten, default values changed

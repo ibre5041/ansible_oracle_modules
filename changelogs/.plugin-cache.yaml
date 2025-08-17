@@ -6,11 +6,7 @@ plugins:
   callback: {}
   cliconf: {}
   connection: {}
-  filter:
-    pwhash12c:
-      description: Compute hash of Oracle password
-      name: pwhash12c
-      version_added: 3.2.2
+  filter: {}
   httpapi: {}
   inventory: {}
   lookup: {}
@@ -201,4 +197,4 @@ plugins:
   strategy: {}
   test: {}
   vars: {}
-version: 3.2.3
+version: 3.2.4
