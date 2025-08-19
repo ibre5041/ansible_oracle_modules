@@ -7,7 +7,7 @@
       password: "{{ app_password }}"
       mode: "normal"
 
-- name: you can't get facts with non sysdba user
+- name: "you can't get facts with non sysdba user"
   oracle_facts:
     <<: *con_param
     gather_subset: "min"

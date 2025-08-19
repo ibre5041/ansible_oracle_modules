@@ -5,14 +5,17 @@
     connection_parameters: &con_param
       hostname: "{{ oracle_hostname }}"      
       port: "{{ oracle_port }}"      
-      #service_name: "{{ oracle_service_name }}"
-      #username: "{{ oracle_username }}"
-      #password: "{{ oracle_password }}"
-      # Connect into PDB
-      service_name: "{{ oracle_service_name }}_PDB"
-      username: pdbadmin
-      password: pdbpass      
+      service_name: "{{ oracle_service_name }}"      
+      username: "{{ oracle_username }}"
+      password: "{{ oracle_password }}"
       mode: "sysdba"
+    cdb_name: "{{ oracle_service_name | split('.') | first  }}"
+    pdb_name: "PDB37"
+    domain_name: "{{ oracle_service_name.split('.', 1)[1] }}"
+
+- name: 'Connection paramters - see or use integration_config.yml.template'
+  debug:
+    var: connection_parameters
 
 - name: grant create session to inexistent user
   oracle_grant:

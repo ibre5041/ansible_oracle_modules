@@ -8,6 +8,10 @@
       mode: "sysdba"
       port: "{{ oracle_port }}"
       host: "{{ oracle_hostname }}"
+
+- name: 'PDB Connection paramters - see or use integration_config.yml.template'
+  debug:
+    var: connection_parameters
       
 - name: "define cdb connection parameters"
   set_fact:
@@ -18,6 +22,10 @@
       mode: "sysdba"
       port: "{{ oracle_port }}"
       host: "{{ oracle_hostname }}"
+
+- name: 'CDB Connection paramters - see or use integration_config.yml.template'
+  debug:
+    var: cdb_connection_parameters
       
 - name: "change open_cursors"
   oracle_parameter:
