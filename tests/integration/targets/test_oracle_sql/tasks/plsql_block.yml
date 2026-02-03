@@ -7,7 +7,9 @@
       service_name: "{{ oracle_service_name }}"
       username: "{{ oracle_username }}"
       password: "{{ oracle_password }}"
-      mode: "sysdba"
+      dsn: "{{ oracle_dsn }}"
+      oracle_home: "{{ oracle_home }}"
+      mode: "{{ mode }}"
 
 - name: execute two PL/SQL blocks
   oracle_sql:

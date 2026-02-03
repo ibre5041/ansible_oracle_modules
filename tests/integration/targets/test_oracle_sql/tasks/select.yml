@@ -8,7 +8,9 @@
       service_name: "{{ oracle_service_name }}"
       username: "{{ oracle_username }}"
       password: "{{ oracle_password }}"
-      mode: "sysdba"
+      dsn: "{{ oracle_dsn }}"
+      oracle_home: "{{ oracle_home }}"
+      mode: "{{ mode }}"
 
 - name: select from dual
   oracle_sql:
