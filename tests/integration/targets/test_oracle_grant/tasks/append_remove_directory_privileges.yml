@@ -41,6 +41,6 @@
 - name: reset user's privilege
   oracle_grant:
     <<: *con_param
-    grantee: "u_foo"
+    grantee: "r_foo"
     grant_mode: "exact"
 ...

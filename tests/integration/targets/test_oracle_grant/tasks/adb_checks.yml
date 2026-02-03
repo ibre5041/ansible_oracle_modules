@@ -1,0 +1,92 @@
+---
+
+- name: "define connection parameters"
+  set_fact:
+    connection_parameters: &con_param
+      hostname: "{{ oracle_hostname }}"
+      port: "{{ oracle_port }}"
+      service_name: "{{ oracle_service_name }}"
+      username: "{{ oracle_username }}"
+      password: "{{ oracle_password }}"
+      dsn: "{{ oracle_dsn }}"
+      mode: "{{ mode }}"
+      oracle_home: "{{ oracle_home }}"
+
+- name: "user u_foo tear down"
+  oracle_user:
+    <<: *con_param
+    schema_name: "u_foo"
+    state: "absent"
+  register: _
+  failed_when: _.failed
+      
+- name: "user u_foo creation with no password"
+  oracle_user:
+    <<: *con_param
+    schema_name: "u_foo"
+    authentication_type: "none"
+    state: "present"
+  register: _
+  failed_when: _.failed
+      
+- name: reset user's privilege
+  oracle_grant:
+    <<: *con_param
+    grantee: "u_foo"
+    grant_mode: "exact"    
+      
+- name: add object privilege to user
+  oracle_grant:
+    <<: *con_param
+    grantee: "u_foo"
+    objects_privileges:
+      - execute:dbms_random
+      # dbms_random:
+      #   - "execute"
+    state: "present"
+  register: _
+  failed_when: _.failed or not _.changed or 'dbms_random' not in _.ddls[0]
+    
+- name: add existing object privilege to user
+  oracle_grant:
+    <<: *con_param
+    grantee: "u_foo"
+    objects_privileges:
+      - execute:dbms_random
+      # dbms_random:
+      #   - "execute"
+    state: "present"
+  register: _
+  failed_when: _.failed or _.changed
+
+- name: add new object privileges to user
+  oracle_grant:
+    <<: *con_param
+    grantee: "u_foo"
+    objects_privileges:
+      - execute:dbms_random
+      - read,select:dba_users
+      # dbms_random:
+      #   - "execute"
+      # dba_users:
+      #   - "select"
+      #   - "read"
+    state: "present"
+  register: _
+  failed_when: _.failed or not _.changed or 'dbms_random' in _.ddls[0] or 'dbms_random' in _.ddls[0] or 'dba_users' not in _.ddls[0]
+
+- name: reset user's privilege
+  oracle_grant:
+    <<: *con_param
+    grantee: "u_foo"
+    grant_mode: "exact"
+
+- name: "user u_foo tear down"
+  oracle_user:
+    <<: *con_param
+    schema_name: "u_foo"
+    state: "absent"
+  register: _
+  failed_when: _.failed
+
+...

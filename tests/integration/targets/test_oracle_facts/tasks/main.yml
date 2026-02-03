@@ -9,4 +9,5 @@
   when: running_on_server
   
 - include_tasks: "no_sysdba.yml"
+
 ...

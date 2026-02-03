@@ -8,7 +8,9 @@
       service_name: "{{ oracle_service_name }}"
       username: "{{ oracle_username }}"
       password: "{{ oracle_password }}"
-      mode: "sysdba"
+      dsn: "{{ oracle_dsn }}"
+      mode: "{{ mode }}"
+      oracle_home: "{{ oracle_home }}"
 
 - name: 'Connection paramters - see or use integration_config.yml.template'
   debug:
@@ -48,7 +50,8 @@
     directory_path: '/tmp'
   register: _
   failed_when: _.changed == true
-
+  when: not running_on_adb
+  
 - name: 'would replace ?'
   oracle_directory:
     <<: *con_param
@@ -57,7 +60,8 @@
   check_mode: yes
   register: _
   failed_when: _.changed == false or 'replace'.upper() not in _.ddls[0].upper()
-
+  when: not running_on_adb
+  
 - name: 'replace'
   oracle_directory:
     <<: *con_param
@@ -65,7 +69,8 @@
     directory_path: '/tmptmp'
   register: _
   failed_when: _.changed == false or 'replace'.upper() not in _.ddls[0].upper()
-
+  when: not running_on_adb
+  
 - name: 'would drop ?'
   oracle_directory:
     <<: *con_param
@@ -90,4 +95,5 @@
     directory_name: 'FOO'
   register: _
   failed_when: _.changed == true
+
 ...

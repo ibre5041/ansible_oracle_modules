@@ -31,5 +31,11 @@
 
 - include_tasks: "tear_down.yml"
   when: running_on_cdb
+
+- include_tasks: adb_checks_object.yml
+  when: running_on_adb
+
+- include_tasks: adb_checks_directory.yml
+  when: running_on_adb
   
 ...
