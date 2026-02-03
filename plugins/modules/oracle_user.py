@@ -231,7 +231,7 @@ def create_user(conn, module):
 # Get the current password hash for the user
 def get_user_password_hash(conn, schema):
     sql = "select spare4 from sys.user$ where name = upper(:schema_name)"
-    r = conn.execute_select_to_dict(sql, {"schema_name": schema}, fetchone=True)
+    r = conn.execute_select_to_dict(sql, {"schema_name": schema}, fetchone=True, fail_on_error=False)
     return r['spare4'] if 'spare4' in r and r['spare4'] else ''
 
 
@@ -302,7 +302,11 @@ def modify_user(conn, module, user):
         authentication_type = 'PASSWORD'
 
     current_set = user
-    old_pw_hash = get_user_password_hash(conn, schema)
+    try:
+        old_pw_hash = get_user_password_hash(conn, schema)
+    except Exception:
+        module.warn("Failed to get password hash for schema %s" % schema)
+        old_pw_hash = ''
     wanted_set = set()
 
     if authentication_type == 'PASSWORD':
@@ -391,7 +395,7 @@ def modify_user(conn, module, user):
 
     profile = get_change(changes, 'profile')
     if profile:
-        sql += ' profile %s ' % profile
+        sql += ' profile "%s" ' % profile
 
     if changes:
         conn.execute_ddl(sql)
@@ -446,7 +450,7 @@ def main():
             container     = dict(default=None),
             container_data = dict(default=None)
         ),
-        required_together=[['username', 'password']],
+        required_together=[['user', 'password']],
         mutually_exclusive=[['schema_password', 'schema_password_hash']],
         supports_check_mode=True,
     )

@@ -162,7 +162,7 @@ class oracleConnection:
         self.changed = False
 
 
-    def execute_select(self, sql, params=None, fetchone=False):
+    def execute_select(self, sql, params=None, fetchone=False, fail_on_error=True):
         """Execute a select query and return fetched data.
 
         sql -- SQL query
@@ -177,10 +177,12 @@ class oracleConnection:
                 return cursor.fetchone() if fetchone else cursor.fetchall()
         except cx_Oracle.DatabaseError as e:
             error = e.args[0]
-            self.module.fail_json(msg=error.message, code=error.code, request=sql, params=params, ddls=self.ddls, changed=self.changed)
+            if fail_on_error:
+                self.module.fail_json(msg=error.message, code=error.code, request=sql, params=params, ddls=self.ddls, changed=self.changed)
+            else:
+                self.module.warn(error.message)
 
-
-    def execute_select_to_dict(self, sql, params=None, fetchone=False):
+    def execute_select_to_dict(self, sql, params=None, fetchone=False, fail_on_error=True):
         """Execute a select query and return a list of dictionaries : one dictionary for each row.
 
         sql -- SQL query
@@ -202,7 +204,10 @@ class oracleConnection:
                     return [dict(zip(column_names, row)) for row in cursor]
         except cx_Oracle.DatabaseError as e:
             error = e.args[0]
-            self.module.fail_json(msg=error.message, code=error.code, request=sql, params=params, ddls=self.ddls, changed=self.changed)
+            if fail_on_error:
+                self.module.fail_json(msg=error.message, code=error.code, request=sql, params=params, ddls=self.ddls, changed=self.changed)
+            else:
+                self.module.warn(error.message)
 
 
     def execute_ddl(self, request, no_change=False, ignore_errors = []):
