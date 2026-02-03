@@ -1,11 +1,13 @@
 ---
 oracle_hostname: ..TODO.ADD.HOSTNAME
-oracle_port: ..TODO.ADD.PORT  
+oracle_port: ..TODO.ADD.PORT
+oracle_dsn: ...TODO.ADD.PORT
 oracle_service_name: ..TODO.ADD.ORACLE.SERVICE.NAME
 oracle_username: ..TODO.ADD.DB.USERNAME
 oracle_password: ..TODO.ADD.DB.PASSWORD
 
 oracle_home: ..ORACLE_HOME..for oracle_db module
+
 mode: "sysdba"
 
 #
@@ -19,3 +21,6 @@ running_on_pdb: false
 
 running_on_client: false
 
+running_on_adb: false
+
+--mode: "sysdba"

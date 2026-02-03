@@ -103,12 +103,34 @@ class oracleConnection:
         else:
             self.oracle_home = None
 
+        if self.oracle_home:
+            try:
+                oracledb.init_oracle_client(lib_dir=self.oracle_home)
+            except oracledb.DatabaseError as exc:
+                error, = exc.args
+                module.warn(str(error))
+
+            try:
+                oracledb.init_oracle_client()
+            except oracledb.ProgrammingError as exc:
+                # Ignore: Oracle Client library has already been initialized
+                pass
+            except oracledb.DatabaseError as exc:
+                error, = exc.args
+                module.warn(str(error))
+
+
         hostname = module.params["hostname"]
         port = module.params["port"]
         service_name = module.params["service_name"]
         user = module.params["user"]
         password = module.params["password"]
         mode = module.params["mode"]
+
+        try:
+            dsn = module.params["dsn"]
+        except KeyError as exc:
+            dsn = None
 
         wallet_connect = '/@%s' % service_name
         oracledb.init_oracle_client()
@@ -124,14 +146,13 @@ class oracleConnection:
                     connect = wallet_connect
                     conn = oracledb.connect(wallet_connect)
             elif user and password: # Assume supplied user has SYSDBA role granted
+                if not dsn and hostname:
+                    dsn = oracledb.makedsn(host=hostname, port=port, service_name=service_name)
+                connect = dsn
                 if mode == 'sysdba':
-                    dsn = oracledb.makedsn(host=hostname, port=port, service_name=service_name)
-                    connect = dsn
-                    conn = oracledb.connect(user=user, password=password, dsn=dsn, mode=oracledb.SYSDBA)
+                    conn = oracledb.connect(user, password, dsn, mode=oracledb.SYSDBA)
                 else:
-                    dsn = oracledb.makedsn(host=hostname, port=port, service_name=service_name)
-                    connect = dsn
-                    conn = oracledb.connect(user=user, password=password, dsn=dsn)
+                    conn = oracledb.connect(user, password, dsn)
             elif not user or not password:
                 module.fail_json(msg='Missing username or password for oracledb')
         except oracledb.DatabaseError as exc:
@@ -145,7 +166,7 @@ class oracleConnection:
         self.changed = False
 
 
-    def execute_select(self, sql, params=None, fetchone=False):
+    def execute_select(self, sql, params=None, fetchone=False, fail_on_error=True):
         """Execute a select query and return fetched data.
 
         sql -- SQL query
@@ -160,10 +181,12 @@ class oracleConnection:
                 return cursor.fetchone() if fetchone else cursor.fetchall()
         except oracledb.DatabaseError as e:
             error = e.args[0]
-            self.module.fail_json(msg=error.message, code=error.code, request=sql, params=params, ddls=self.ddls, changed=self.changed)
+            if fail_on_error:
+                self.module.fail_json(msg=error.message, code=error.code, request=sql, params=params, ddls=self.ddls, changed=self.changed)
+            else:
+                self.module.warn(error.message)
 
-
-    def execute_select_to_dict(self, sql, params=None, fetchone=False):
+    def execute_select_to_dict(self, sql, params=None, fetchone=False, fail_on_error=True):
         """Execute a select query and return a list of dictionaries : one dictionary for each row.
 
         sql -- SQL query
@@ -185,7 +208,10 @@ class oracleConnection:
                     return [dict(zip(column_names, row)) for row in cursor]
         except oracledb.DatabaseError as e:
             error = e.args[0]
-            self.module.fail_json(msg=error.message, code=error.code, request=sql, params=params, ddls=self.ddls, changed=self.changed)
+            if fail_on_error:
+                self.module.fail_json(msg=error.message, code=error.code, request=sql, params=params, ddls=self.ddls, changed=self.changed)
+            else:
+                self.module.warn(error.message)
 
 
     def execute_ddl(self, request, no_change=False, ignore_errors = []):

@@ -8,8 +8,10 @@
       service_name: "{{ oracle_service_name }}"
       username: "{{ oracle_username }}"
       password: "{{ oracle_password }}"
-      mode: "sysdba"
-
+      dsn: "{{ oracle_dsn }}"
+      mode: "{{ mode }}"
+      oracle_home: "{{ oracle_home }}"
+      
 - name: 'Connection paramters - see or use integration_config.yml.template'
   debug:
     var: connection_parameters
@@ -28,7 +30,6 @@
     var: _oracle_instance
   when: running_on_server
 
-
 - name: "Connect remote"
   oracle_ping:
     <<: *con_param
@@ -40,3 +41,4 @@
     var: _oracle_instance
   when: running_on_client
 
+...

@@ -1,0 +1,13 @@
+{
+    "ANSIBLE_MODULE_ARGS": {
+        "mode": "normal",
+	"dsn": "(description= (retry_count=20)(retry_delay=3)(address=(protocol=tcps)(port=1522)(host=adb.eu-frankfurt-1.oraclecloud.com))(connect_data=(service_name=gc7d17cae05212a_rx3imkw1cjedzw68_high.adb.oraclecloud.com))(security=(ssl_server_dn_match=yes)))",
+        "user": "TEST",
+        "password": "Tst123456789",
+	"schema": "FOO",
+	"profile": "DEFAULT",
+	"default_tablespace": "users",
+	"temporary_tablespace": "temp",
+	"authentication_type": "none"
+    }
+}

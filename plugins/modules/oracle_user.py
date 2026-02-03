@@ -237,7 +237,7 @@ def create_user(conn, module):
 # Get the current password hash for the user
 def get_user_password_hash(conn, schema):
     sql = "select spare4 from sys.user$ where name = upper(:schema_name)"
-    r = conn.execute_select_to_dict(sql, {"schema_name": schema}, fetchone=True)
+    r = conn.execute_select_to_dict(sql, {"schema_name": schema}, fetchone=True, fail_on_error=False)
     return r['spare4'] if 'spare4' in r and r['spare4'] else ''
 
 
@@ -308,7 +308,11 @@ def modify_user(conn, module, user):
         authentication_type = 'PASSWORD'
 
     current_set = user
-    old_pw_hash = get_user_password_hash(conn, schema)
+    try:
+        old_pw_hash = get_user_password_hash(conn, schema)
+    except Exception:
+        module.warn("Failed to get password hash for schema %s" % schema)
+        old_pw_hash = ''
     wanted_set = set()
 
     if authentication_type == 'PASSWORD':
@@ -324,15 +328,17 @@ def modify_user(conn, module, user):
     elif authentication_type == 'none':
         wanted_set.add(('authentication_type', 'NONE'))
 
-    if module.params['locked']:
-        wanted_set.add(('account_status', 'LOCKED'))
-    else:
-        wanted_set.add(('account_status', 'OPEN'))
+    if module.params['locked'] is not None:
+        if module.params['locked']:
+            wanted_set.add(('account_status', 'LOCKED'))
+        else:
+            wanted_set.add(('account_status', 'OPEN'))
 
-    if module.params['expired']:
-        wanted_set.add(('password_status', 'EXPIRED'))
-    else:
-        wanted_set.add(('password_status', 'UNEXPIRED'))
+    if module.params['expired'] is not None:
+        if module.params['expired']:
+            wanted_set.add(('password_status', 'EXPIRED'))
+        else:
+            wanted_set.add(('password_status', 'UNEXPIRED'))
 
     if module.params['default_tablespace']:
         wanted_set.add(('default_tablespace', module.params['default_tablespace'].upper()))
@@ -397,7 +403,7 @@ def modify_user(conn, module, user):
 
     profile = get_change(changes, 'profile')
     if profile:
-        sql += ' profile %s ' % profile
+        sql += ' profile "%s" ' % profile
 
     if changes:
         conn.execute_ddl(sql)
@@ -427,7 +433,6 @@ def drop_user(conn, module, user):
 
 
 def main():
-    msg = ['']
     module = AnsibleModule(
         argument_spec=dict(
             user          = dict(required=False, aliases=['un', 'username']),
@@ -436,6 +441,7 @@ def main():
             hostname      = dict(required=False, default='localhost', aliases=['host']),
             port          = dict(required=False, default=1521, type='int'),
             service_name  = dict(required=False, aliases=['sn']),
+            dsn           = dict(required=False, aliases=['datasource_name']),
             oracle_home   = dict(required=False, aliases=['oh']),
 
             schema        = dict(required=True, type='str', aliases=['name', 'schema_name']),
@@ -451,7 +457,7 @@ def main():
             container     = dict(default=None, choices=["all", "current"]),
             container_data = dict(default=None)
         ),
-        required_together=[['username', 'password']],
+        required_together=[['user', 'password']],
         mutually_exclusive=[['schema_password', 'schema_password_hash']],
         supports_check_mode=True,
     )

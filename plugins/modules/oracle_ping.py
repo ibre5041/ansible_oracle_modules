@@ -21,6 +21,10 @@ options:
     description: The database service name to connect to
     required: False
     aliases: ['sn']
+  dsn:
+    description: "Oracle Data Source Name, i.e. Oracle connection string or TNS alias. This parameter has precedence over hostname, port and service_name"
+    required: False
+    aliases: ['datasource_name']
   user:
     description: The Oracle user name to connect to the database
     required: False    
@@ -84,6 +88,7 @@ def main():
             hostname      = dict(required=False, default='localhost', aliases=['host']),
             port          = dict(required=False, default=1521, type='int'),
             service_name  = dict(required=False, aliases=['sn']),
+            dsn           = dict(required=False, aliases=['datasource_name']),
             oracle_home   = dict(required=False, aliases=['oh'])
         ),
         required_together=[['user', 'password']],

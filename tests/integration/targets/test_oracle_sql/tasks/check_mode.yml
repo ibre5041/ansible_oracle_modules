@@ -7,13 +7,18 @@
       service_name: "{{ oracle_service_name }}"
       username: "{{ oracle_username }}"
       password: "{{ oracle_password }}"
-      mode: "sysdba"
+      dsn: "{{ oracle_dsn }}"
+      oracle_home: "{{ oracle_home }}"
+      mode: "{{ mode }}"
+      
     app_connection_parameters: &app_con_param
       hostname: "{{ oracle_hostname }}"      
       port: "{{ oracle_port }}"      
       service_name: "{{ oracle_service_name }}"      
       username: "foo"
       password: "Xlfsjflkdjgkrehjg1"
+      dsn: "{{ oracle_dsn }}"
+      oracle_home: "{{ oracle_home }}"
       mode: "normal"
 
 - name: prepare test

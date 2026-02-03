@@ -310,6 +310,7 @@ def main():
             hostname      = dict(required=False, default='localhost', aliases=['host']),
             port          = dict(required=False, default=1521, type='int'),
             service_name  = dict(required=False, aliases=['sn']),
+            dsn           = dict(required=False, aliases=['datasource_name']),
             oracle_home   = dict(required=False, aliases=['oh']),
             
             password_file=dict(default=False, type='bool', aliases=['paths'], no_log=False),

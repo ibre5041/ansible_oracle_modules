@@ -115,7 +115,7 @@ def create_profile(conn, module):
     else:
         wanted_set = list(zip(attribute_name, attribute_value))
 
-    sql = 'create profile %s limit ' % profile_name
+    sql = 'create profile "%s" limit ' % profile_name
     for limit in wanted_set:
         sql += ' %s %s' % (limit[0], limit[1])
 
@@ -128,7 +128,7 @@ def create_profile(conn, module):
 
 def remove_profile(conn, module):
     profile_name = module.params['profile']
-    dropsql = 'drop profile %s' % profile_name
+    dropsql = 'drop profile "%s"' % profile_name
     conn.execute_ddl(dropsql)
     msg = 'Profile %s successfully removed' % profile_name
     module.exit_json(msg=msg, changed=conn.changed, ddls=conn.ddls, profile=dict())
@@ -151,7 +151,7 @@ def ensure_profile_state(conn, module, current_set):
         attribute_value = [str(y).upper() for y in attribute_value]
         wanted_set = set(zip(attribute_name, attribute_value))
 
-    sql = "alter profile %s limit " % profile_name
+    sql = 'alter profile "%s" limit ' % profile_name
     changes = wanted_set.difference(current_set)
 
     if not changes:
@@ -177,6 +177,7 @@ def main():
             hostname      = dict(required=False, default='localhost', aliases=['host']),
             port          = dict(required=False, default=1521, type='int'),
             service_name  = dict(required=False, aliases=['sn']),
+            dsn           = dict(required=False, aliases=['datasource_name']),
             oracle_home   = dict(required=False, aliases=['oh']),
             
             profile             = dict(required=True, aliases=['name']),

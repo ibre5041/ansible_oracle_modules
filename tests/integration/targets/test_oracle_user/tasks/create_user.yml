@@ -8,14 +8,15 @@
       service_name: "{{ oracle_service_name }}"
       username: "{{ oracle_username }}"
       password: "{{ oracle_password }}"
-      mode: "sysdba"
-    password: "PassW1234567890#_"
-
+      dsn: "{{ oracle_dsn }}"
+      mode: "{{ mode }}"
+      oracle_home: "{{ oracle_home }}"
+      
 - name: "user creation with password"
   oracle_user:
     <<: *con_param
     schema_name: "foo"
-    schema_password: "{{ password }}"
+    schema_password: "{{ oracle_schema_password }}"
     state: "present"
   register: _
   failed_when: _.failed or 'identified by' not in _.ddls[0]
@@ -136,7 +137,7 @@
   oracle_user:
     <<: *con_param
     schema_name: "foo"
-    schema_password: "{{ password }}"
+    schema_password: "{{ oracle_schema_password }}"
     expired: yes
     state: "present"
   register: _
@@ -147,4 +148,5 @@
     <<: *con_param
     schema_name: "foo"
     state: "absent"
+
 ...
