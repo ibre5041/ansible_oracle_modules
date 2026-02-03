@@ -1,5 +1,4 @@
 ---
 
-#- include_tasks: "simple.yml"
+- include_tasks: "simple.yml"
 - include_tasks: "issue_4.yml"
-
