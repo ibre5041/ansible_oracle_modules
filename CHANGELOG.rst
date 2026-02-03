@@ -4,10 +4,19 @@ Ibre5041.Ansible\_Oracle\_Modules Release Notes
 
 .. contents:: Topics
 
+v3.2.5
+======
+
+- Fix for profile names having special characters in it
+- Fix for oracle_user paramters locked and expired
+
 v3.2.4
 ======
 
-- oracle_tablespace rewritten
+Breaking Changes / Porting Guide
+--------------------------------
+
+- oracle_tablespace rewritten, default values changed
 
 v3.2.3
 ======
