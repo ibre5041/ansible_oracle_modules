@@ -12,18 +12,18 @@
       mode: "{{ mode }}"
       oracle_home: "{{ oracle_home }}"
 
-- name: "user r_foo tear down"
+- name: "user u_foo tear down"
   oracle_user:
     <<: *con_param
-    schema_name: "r_foo"
+    schema_name: "u_foo"
     state: "absent"
   register: _
   failed_when: _.failed
       
-- name: "user r_foo creation with no password"
+- name: "user u_foo creation with no password"
   oracle_user:
     <<: *con_param
-    schema_name: "r_foo"
+    schema_name: "u_foo"
     authentication_type: "none"
     state: "present"
   register: _
@@ -38,7 +38,7 @@
 - name: grant read,write,execute on directory IMPEXP
   oracle_grant:
     <<: *con_param
-    grantee: "r_foo"
+    grantee: "u_foo"
     directory_privileges:
       - read,write,execute:impexp
     # objects_privileges:
@@ -56,13 +56,13 @@
 - name: reset user's privilege
   oracle_grant:
     <<: *con_param
-    grantee: "r_foo"
+    grantee: "u_foo"
     grant_mode: "exact"
 
-- name: "user r_foo tear down"
+- name: "user u_foo tear down"
   oracle_user:
     <<: *con_param
-    schema_name: "r_foo"
+    schema_name: "u_foo"
     state: "absent"
   register: _
   failed_when: _.failed

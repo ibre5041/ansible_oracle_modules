@@ -1,9 +1,23 @@
 ---
 - include_tasks: "create_delete.yml"
+  when: running_on_cdb
+  
 - include_tasks: "existence.yml"
+  when: running_on_cdb
+
 - include_tasks: "open_close.yml"
+  when: running_on_cdb
+
 - include_tasks: "clone.yml"
+  when: running_on_cdb
+  
 #- include_tasks: "unplug_plug.yml"  # TODO: Fix this test
+#  when: running_on_cdb
+
 - include_tasks: "exclusive_options.yml"
+  when: running_on_cdb
+    
 #- include_tasks: "check_mode.yml"
+#  when: running_on_cdb
+
 ...
