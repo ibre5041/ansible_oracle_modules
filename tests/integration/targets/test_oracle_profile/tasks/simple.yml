@@ -82,7 +82,7 @@
     profile: test_profile
     state: absent
   register: _
-  failed_when: _.failed or not _.changed or 'drop profile test_profile'.upper() not in _.ddls[0].upper()
+  failed_when: _.failed or not _.changed or 'drop profile "TEST_PROFILE"'.upper() not in _.ddls[0].upper()
 
 - name: 'drop profile (no change)'
   oracle_profile:

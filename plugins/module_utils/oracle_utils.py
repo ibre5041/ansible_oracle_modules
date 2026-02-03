@@ -133,7 +133,6 @@ class oracleConnection:
             dsn = None
 
         wallet_connect = '/@%s' % service_name
-        oracledb.init_oracle_client()
 
         try:
             if not user and not password: # If neither user or password is supplied, the use of an oracle connect internal or wallet is assumed
@@ -150,9 +149,9 @@ class oracleConnection:
                     dsn = oracledb.makedsn(host=hostname, port=port, service_name=service_name)
                 connect = dsn
                 if mode == 'sysdba':
-                    conn = oracledb.connect(user, password, dsn, mode=oracledb.SYSDBA)
+                    conn = oracledb.connect(user=user, password=password, dsn=dsn, mode=oracledb.SYSDBA)
                 else:
-                    conn = oracledb.connect(user, password, dsn)
+                    conn = oracledb.connect(user=user, password=password, dsn=dsn)
             elif not user or not password:
                 module.fail_json(msg='Missing username or password for oracledb')
         except oracledb.DatabaseError as exc:

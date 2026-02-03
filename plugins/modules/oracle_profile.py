@@ -11,7 +11,9 @@ description:
 version_added: "3.0.0"
 options:
   name:
-    description:  The name of the profile
+    description:  The name of the profile (should be in uppercase)
+    required: true
+    type: str 
     required: true
     default: None
     aliases: ['profile']
@@ -66,7 +68,9 @@ EXAMPLES = '''
       ORACLE_HOME: "{{ oracle_home }}"
       LD_LIBRARY_PATH: "{{ oracle_home }}/lib"
     profiles:
-      - name: profile1
+      - name: PROFILE1
+        mode: sysdba
+        profile: TEST_PROFILE
         attribute_name:
           - password_reuse_max
           - password_reuse_time
@@ -103,7 +107,7 @@ def check_profile_exists(conn, profile_name):
 
 
 def create_profile(conn, module):
-    profile_name = module.params['profile']
+    profile_name = module.params['profile'].upper()
     attribute_name = module.params['attribute_name']
     attribute_value = module.params['attribute_value']
     attributes = module.params['attributes']
@@ -127,7 +131,7 @@ def create_profile(conn, module):
 
 
 def remove_profile(conn, module):
-    profile_name = module.params['profile']
+    profile_name = module.params['profile'].upper()
     dropsql = 'drop profile "%s"' % profile_name
     conn.execute_ddl(dropsql)
     msg = 'Profile %s successfully removed' % profile_name
@@ -135,7 +139,7 @@ def remove_profile(conn, module):
 
 
 def ensure_profile_state(conn, module, current_set):
-    profile_name = module.params['profile']
+    profile_name = module.params['profile'].upper()
     attribute_name = module.params['attribute_name']
     attribute_value = module.params['attribute_value']
     attributes = module.params['attributes']
