@@ -5,4 +5,9 @@ oracle_service_name: "XEPDB1"
 oracle_username: "SYS"
 oracle_password: "password"
 #mode: "sysdba"
+
+oracle_schema_password: "Tst1234567890#"
+
+adb: False
+
 ...

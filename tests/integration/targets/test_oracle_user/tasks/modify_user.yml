@@ -8,14 +8,16 @@
       service_name: "{{ oracle_service_name }}"
       username: "{{ oracle_username }}"
       password: "{{ oracle_password }}"
-      mode: "sysdba"
+      dsn: "{{ oracle_dsn }}"
+      mode: "{{ mode }}"
+      oracle_home: "{{ oracle_home }}"
 
 - name: "user creation"
   oracle_user:
     <<: *con_param
     schema_name: "foo"
     authentication_type: "none"
-    default_tablespace: "users"
+    default_tablespace: "DATA"
     temporary_tablespace: "temp"
     profile: "default"
     locked: no
@@ -26,7 +28,7 @@
   oracle_user:
     <<: *con_param
     schema_name: "foo"
-    schema_password: "pass"
+    schema_password: "{{ oracle_schema_password }}"
     state: "present"
   register: _
   failed_when: _.failed or 'identified by'.upper() not in _.ddls[0].upper()
@@ -35,11 +37,12 @@
   oracle_user:
     <<: *con_param
     schema_name: "foo"
-    schema_password: "pass"
+    schema_password: "{{ oracle_schema_password }}"
     state: "present"
   register: _
   failed_when: _.failed or _.changed
-
+  when: not adb | bool
+  
 # Not activated on my db
 #    - name: "change to global authentication"
 #      oracle_user:
@@ -72,7 +75,7 @@
   oracle_user:
     <<: *con_param
     schema_name: "foo"
-    default_tablespace: "users"
+    default_tablespace: "DATA"  # DATA is the only tablespace allowed on ADB
     state: "present"
   register: _
   failed_when: _.failed or _.changed
@@ -103,7 +106,8 @@
     state: "present"
   register: _
   failed_when: not _.failed or _.code != 959  # ORA-00959: tablespace 'TEMP_1' does not exist
-
+  when: not adb | bool
+  
 - name: "no change of profile"
   oracle_user:
     <<: *con_param
@@ -113,7 +117,7 @@
   register: _
   failed_when: _.failed or _.changed
 
-- name: "error changing to inexistant profile"
+- name: "error changing to non-existent profile"
   oracle_user:
     <<: *con_param
     schema_name: "foo"
@@ -153,14 +157,14 @@
   oracle_user:
     <<: *con_param
     schema_name: "foo"
-    schema_password: "pass"
+    schema_password: "{{ oracle_schema_password }}"
     state: "present"
 
 - name: "expiring account"
   oracle_user:
     <<: *con_param
     schema_name: "foo"
-    schema_password: "pass"
+    # schema_password: "{{ oracle_schema_password }}" # does not work on ADB
     expired: yes
     state: "present"
   register: _
@@ -170,7 +174,7 @@
   oracle_user:
     <<: *con_param
     schema_name: "foo"
-    schema_password: "pass"
+    # schema_password: "{{ oracle_schema_password }}" # does not work on ADB
     expired: yes
     state: "present"
   register: _
@@ -180,7 +184,7 @@
   oracle_user:
     <<: *con_param
     schema_name: "foo"
-    schema_password: "pass"
+    schema_password: "{{ oracle_schema_password }}FO0"
     expired: no
     state: "present"
   register: _
@@ -190,7 +194,7 @@
   oracle_user:
     <<: *con_param
     schema_name: "foo"
-    schema_password: "bar"
+    schema_password: "{{ oracle_schema_password }}BAR"
     state: "present"
   register: _
   failed_when: _.failed or not _.changed or 'identified by'.upper() not in _.ddls[0].upper()
@@ -199,14 +203,16 @@
   oracle_user:
     <<: *con_param
     schema_name: "foo"
-    schema_password: "bar"
+    schema_password: "{{ oracle_schema_password }}BAR"
     state: "present"
   register: _
   failed_when: _.failed or _.changed
-
+  when: not adb | bool
+  
 - name: "delete user"
   oracle_user:
     <<: *con_param
     schema_name: "foo"
     state: "absent"
+
 ...

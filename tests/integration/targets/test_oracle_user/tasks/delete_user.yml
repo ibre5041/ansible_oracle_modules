@@ -8,7 +8,9 @@
       service_name: "{{ oracle_service_name }}"
       username: "{{ oracle_username }}"
       password: "{{ oracle_password }}"
-      mode: "sysdba"
+      dsn: "{{ oracle_dsn }}"
+      mode: "{{ mode }}"
+      oracle_home: "{{ oracle_home }}"
 
 - name: "delete a system user (not authorized)"
   oracle_user:
@@ -25,4 +27,5 @@
     state: "absent"
   register: _
   failed_when: _.failed or _.changed
+
 ...

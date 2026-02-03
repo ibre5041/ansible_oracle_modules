@@ -322,15 +322,17 @@ def modify_user(conn, module, user):
     elif authentication_type == 'none':
         wanted_set.add(('authentication_type', 'NONE'))
 
-    if module.params['locked']:
-        wanted_set.add(('account_status', 'LOCKED'))
-    else:
-        wanted_set.add(('account_status', 'OPEN'))
+    if module.params['locked'] is not None:
+        if module.params['locked']:
+            wanted_set.add(('account_status', 'LOCKED'))
+        else:
+            wanted_set.add(('account_status', 'OPEN'))
 
-    if module.params['expired']:
-        wanted_set.add(('password_status', 'EXPIRED'))
-    else:
-        wanted_set.add(('password_status', 'UNEXPIRED'))
+    if module.params['expired'] is not None:
+        if module.params['expired']:
+            wanted_set.add(('password_status', 'EXPIRED'))
+        else:
+            wanted_set.add(('password_status', 'UNEXPIRED'))
 
     if module.params['default_tablespace']:
         wanted_set.add(('default_tablespace', module.params['default_tablespace'].upper()))
@@ -425,7 +427,6 @@ def drop_user(conn, module, user):
 
 
 def main():
-    msg = ['']
     module = AnsibleModule(
         argument_spec=dict(
             user          = dict(required=False, aliases=['un', 'username']),

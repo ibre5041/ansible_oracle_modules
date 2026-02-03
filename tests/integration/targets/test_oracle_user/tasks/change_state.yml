@@ -8,7 +8,9 @@
       service_name: "{{ oracle_service_name }}"
       username: "{{ oracle_username }}"
       password: "{{ oracle_password }}"
-      mode: "sysdba"
+      dsn: "{{ oracle_dsn }}"
+      mode: "{{ mode }}"
+      oracle_home: "{{ oracle_home }}"
 
 - name: "init tests, test user absent"
   oracle_user:
@@ -22,7 +24,7 @@
   oracle_user:
     <<: *con_param
     schema_name: "foo"
-    schema_password: "pass"
+    schema_password: "{{ oracle_schema_password }}"
     state: "present"
   register: _
   failed_when: _.failed or not _.changed
@@ -31,16 +33,17 @@
   oracle_user:
     <<: *con_param
     schema_name: "foo"
-    schema_password: "pass"
+    schema_password: "{{ oracle_schema_password }}"
     state: "present"
   register: _
   failed_when: _.failed or _.changed
-
+  when: not adb | bool
+  
 - name: "user deletion (change)"
   oracle_user:
     <<: *con_param
     schema_name: "foo"
-    schema_password: "pass"
+    schema_password: "{{ oracle_schema_password }}"
     state: "absent"
   register: _
   failed_when: _.failed or not _.changed
@@ -49,8 +52,9 @@
   oracle_user:
     <<: *con_param
     schema_name: "foo"
-    schema_password: "pass"
+    schema_password: "{{ oracle_schema_password }}"
     state: "absent"
   register: _
   failed_when: _.failed or _.changed
+
 ...
