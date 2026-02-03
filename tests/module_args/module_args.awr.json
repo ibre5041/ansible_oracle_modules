@@ -1,0 +1,13 @@
+{
+    "ANSIBLE_MODULE_ARGS": {
+        "mode": "normal",
+        "hostname": "adb.eu-frankfurt-1.oraclecloud.com",
+        "port": "1522",
+        "service_name": "gc7d17cae05_high.adb.oraclecloud.com",
+	"dsn": "(description= (retry_count=20)(retry_delay=3)(address=(protocol=tcps)(port=1522)(host=adb.eu-frankfurt-1.oraclecloud.com))(connect_data=(service_name=gc7d17cae052_high.adb.oraclecloud.com))(security=(ssl_server_dn_match=yes)))",
+        "user": "TEST",
+        "password": "pass",
+	"snapshot_interval_min": "60",
+	"snapshot_retention_days": "10"
+    }
+}

@@ -1,0 +1,11 @@
+---
+oracle_hostname: "localhost"
+oracle_port: "1521"
+oracle_service_name: "XEPDB1"
+oracle_username: "SYS"
+oracle_password: "password"
+#mode: "sysdba"
+#oracle_home: "{{ oracle_home }}"
+#oracle_sid: "{{ oracle_sid }}"
+
+...

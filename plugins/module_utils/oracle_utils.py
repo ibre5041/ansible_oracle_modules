@@ -213,7 +213,7 @@ class oracleConnection:
                 self.module.warn(error.message)
 
 
-    def execute_ddl(self, request, no_change=False, ignore_errors = []):
+    def execute_ddl(self, request, params=None, no_change=False, ignore_errors = []):
         """Execute a DDL request and keep trace it in ddls attribute.
         request -- SQL query, no bind parameter allowed on DDL request.
         In check mode, query is not executed.
@@ -223,7 +223,7 @@ class oracleConnection:
                 self.module.warn("SQL: --{}".format(request))
             if not self.module.check_mode:
                 with self.conn.cursor() as cursor:
-                    cursor.execute(request)
+                    cursor.execute(request, params)
                     self.ddls.append(request)
             else:
                 self.ddls.append('--' + request)
