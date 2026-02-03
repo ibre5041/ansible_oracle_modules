@@ -1,11 +1,28 @@
 ---
+
 - include_tasks: "create_drop.yml"
+  when: not running_on_adb
+  
 - include_tasks: "create_check_mode.yml"
+  when: not running_on_adb
+
 - include_tasks: "drop_check_mode.yml"
+  when: not running_on_adb
+
 - include_tasks: "create_several_datafiles.yml"
+  when: not running_on_adb
+
 - include_tasks: "modify.yml"
+  when: not running_on_adb
+
 - include_tasks: "error.yml"
+  when: not running_on_adb
+
 - include_tasks: "create_same.yml"
+  when: not running_on_adb
+  
 - include_tasks: "null.yml"
+  when: not running_on_adb
+  
 #TODO: not implemented yet - include_tasks: "define_default.yml"
 ...
