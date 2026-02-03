@@ -101,12 +101,34 @@ class oracleConnection:
         else:
             self.oracle_home = None
 
+        if self.oracle_home:
+            try:
+                cx_Oracle.init_oracle_client(lib_dir=self.oracle_home)
+            except cx_Oracle.DatabaseError as exc:
+                error, = exc.args
+                module.warn(str(error))
+
+            try:
+                cx_Oracle.init_oracle_client()
+            except cx_Oracle.ProgrammingError as exc:
+                # Ignore: Oracle Client library has already been initialized
+                pass
+            except cx_Oracle.DatabaseError as exc:
+                error, = exc.args
+                module.warn(str(error))
+
+
         hostname = module.params["hostname"]
         port = module.params["port"]
         service_name = module.params["service_name"]
         user = module.params["user"]
         password = module.params["password"]
         mode = module.params["mode"]
+
+        try:
+            dsn = module.params["dsn"]
+        except KeyError as exc:
+            dsn = None
 
         wallet_connect = '/@%s' % service_name
         sysdba_connect = '/'
@@ -120,13 +142,12 @@ class oracleConnection:
                     connect = wallet_connect
                     conn = cx_Oracle.connect(wallet_connect)
             elif user and password: # Assume supplied user has SYSDBA role granted
-                if mode == 'sysdba':
+                if not dsn and hostname:
                     dsn = cx_Oracle.makedsn(host=hostname, port=port, service_name=service_name)
-                    connect = dsn
+                connect = dsn
+                if mode == 'sysdba':
                     conn = cx_Oracle.connect(user, password, dsn, mode=cx_Oracle.SYSDBA)
                 else:
-                    dsn = cx_Oracle.makedsn(host=hostname, port=port, service_name=service_name)
-                    connect = dsn
                     conn = cx_Oracle.connect(user, password, dsn)
             elif not user or not password:
                 module.fail_json(msg='Missing username or password for cx_Oracle')
