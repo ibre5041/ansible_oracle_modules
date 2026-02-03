@@ -661,16 +661,15 @@ from ansible.module_utils.basic import *
 # While this file is placed in <project-dir>/library
 # No collections are used
 #try:
-#    from ansible.module_utils.oracle_utils import oracle_connect
+#    from ansible.module_utils.oracle_utils import oracleConnection
 #except:
 #    pass
 
 # In these we do import from collections
-#try:
-from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_utils import oracleConnection
-#except:
-#    pass
-
+try:
+    from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_utils import oracleConnection
+except:
+    pass
 
 if __name__ == '__main__':
     main()
