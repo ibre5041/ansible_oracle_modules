@@ -8,9 +8,9 @@
       service_name: "{{ oracle_service_name }}"
       username: "{{ oracle_username }}"
       password: "{{ oracle_password }}"
-      dsn: "{{ oracle_dsn }}"
+      dsn: "{{ oracle_dsn | default() }}"
       mode: "{{ mode }}"
-      oracle_home: "{{ oracle_home }}"
+      oracle_home: "{{ oracle_home | default() }}"
       
 - name: 'Connection paramters - see or use integration_config.yml.template'
   debug:

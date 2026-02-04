@@ -1,6 +1,6 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
-from typer import params
+
 
 DOCUMENTATION = '''
 ---
