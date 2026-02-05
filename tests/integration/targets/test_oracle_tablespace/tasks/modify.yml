@@ -19,23 +19,25 @@
   oracle_tablespace:
     <<: *con_param
     tablespace: "ts"
-    size: "1M"
+    size: "13M"
     datafiles:
       - "/var/tmp/ts1.dbf"
     state: "present"
     bigfile: no
-
+  when: running_on_db_fs
+  
 - name: add datafile 2
   oracle_tablespace:
     <<: *con_param
     tablespace: "ts"
-    size: "1M"
+    size: "14M"
     datafiles:
       - "/var/tmp/ts1.dbf"
       - "/var/tmp/ts2.dbf"
     state: "present"
     bigfile: no
-
+  when: running_on_db_fs
+  
 - name: add datafile 3
   oracle_tablespace:
     <<: *con_param
@@ -49,7 +51,8 @@
     autoextend: yes
     nextsize: "1M"
     maxsize: "10M"
-
+  when: running_on_db_fs
+  
 - name: drop tablespace
   oracle_tablespace:
     <<: *con_param

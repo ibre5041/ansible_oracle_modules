@@ -35,7 +35,8 @@
       - "/var/tmp/ts2.dbf"
     state: "present"
     bigfile: no
-
+  when: running_on_db_fs
+  
 - name: create temp tablespace
   oracle_tablespace:
     <<: *con_param
@@ -47,7 +48,8 @@
     state: "present"
     bigfile: no
     content: "temp"
-
+  when: running_on_db_fs
+  
 - name: drop tablespaces
   oracle_tablespace:
     <<: *con_param
