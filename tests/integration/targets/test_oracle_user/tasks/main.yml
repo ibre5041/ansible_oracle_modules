@@ -1,10 +1,17 @@
 ---
 
-- include_tasks: "change_state.yml"
-- include_tasks: "check_mode.yml"
-- include_tasks: "create_user.yml"
-- include_tasks: "delete_user.yml"
-- include_tasks: "modify_user.yml"
-#- include_tasks: "empty_user.yml"
-#- include_tasks: "diff_mode.yml"
+- name: Role tasks with env
+  block:
+    - include_tasks: "change_state.yml"
+    - include_tasks: "check_mode.yml"
+    - include_tasks: "create_user.yml"
+    - include_tasks: "delete_user.yml"
+    - include_tasks: "modify_user.yml"
+    #- include_tasks: "empty_user.yml"
+    #- include_tasks: "diff_mode.yml"
+
+  environment:
+    ORACLE_SID: "{{ oracle_sid | default() }}"
+    ORACLE_HOME: "{{ oracle_home | default() }}"
+
 ...

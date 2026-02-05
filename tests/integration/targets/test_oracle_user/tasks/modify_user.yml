@@ -12,12 +12,22 @@
       mode: "{{ mode }}"
       oracle_home: "{{ oracle_home }}"
 
+- name: List tablespaces
+  oracle_sql:
+    <<: *con_param
+    sql: "select TABLESPACE_NAME, STATUS, CONTENTS from dba_tablespaces where status='ONLINE' and CONTENTS='PERMANENT' and TABLESPACE_NAME not in('SYSTEM','SYSAUX')"
+  register: tablespaces
+
+- name: "Tablespace: {{ tablespaces.data[0].tablespace_name }}"
+  set_fact:
+    users_tablespace: "{{ tablespaces.data[0].tablespace_name }}"
+
 - name: "user creation"
   oracle_user:
     <<: *con_param
     schema_name: "foo"
     authentication_type: "none"
-    default_tablespace: "DATA"
+    default_tablespace: "{{ users_tablespace }}"
     temporary_tablespace: "temp"
     profile: "default"
     locked: no
@@ -75,7 +85,7 @@
   oracle_user:
     <<: *con_param
     schema_name: "foo"
-    default_tablespace: "DATA"  # DATA is the only tablespace allowed on ADB
+    default_tablespace: "{{ users_tablespace }}"  # DATA is the only tablespace allowed on ADB
     state: "present"
   register: _
   failed_when: _.failed or _.changed
