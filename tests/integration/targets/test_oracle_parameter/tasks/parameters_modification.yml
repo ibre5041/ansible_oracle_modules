@@ -2,12 +2,14 @@
 - name: "define pdb connection parameters"
   set_fact:
     connection_parameters: &pdb_con_param
-      service_name: "{{ oracle_pdb_service_name }}"
-      username: "{{ oracle_pdb_username }}"
-      password: "{{ oracle_pdb_password }}"
-      mode: "sysdba"
-      port: "{{ oracle_port }}"
-      host: "{{ oracle_hostname }}"
+      hostname: "{{ oracle_hostname }}"
+      port: "{{ oracle_port }}"      
+      service_name: "{{ oracle_pdb_service_name | default(oracle_service_name) }}"
+      username: "{{ oracle_pdb_username | default(oracle_username) }}"
+      password: "{{ oracle_pdb_password | default(oracle_password) }}"
+      dsn: "{{ oracle_dsn }}"
+      mode: "{{ mode }}"
+      oracle_home: "{{ oracle_home }}"
 
 - name: 'PDB Connection paramters - see or use integration_config.yml.template'
   debug:
@@ -16,13 +18,15 @@
 - name: "define cdb connection parameters"
   set_fact:
     cdb_connection_parameters: &cdb_con_param
+      hostname: "{{ oracle_hostname }}"
+      port: "{{ oracle_port }}"
       service_name: "{{ oracle_cdb_service_name }}"
       username: "{{ oracle_cdb_username }}"
       password: "{{ oracle_cdb_password }}"
-      mode: "sysdba"
-      port: "{{ oracle_port }}"
-      host: "{{ oracle_hostname }}"
-
+      dsn: "{{ oracle_dsn }}"
+      mode: "{{ mode }}"
+      oracle_home: "{{ oracle_home }}"
+      
 - name: 'CDB Connection paramters - see or use integration_config.yml.template'
   debug:
     var: cdb_connection_parameters
@@ -135,7 +139,8 @@
     value: "+FRA"
     state: "present"
     scope: "spfile"
-
+  when: running_on_cdb
+  
 - name: "change _disable_directory_link_check (cdb only)"
   oracle_parameter:
     <<: *cdb_con_param
@@ -143,4 +148,6 @@
     value: "TRUE"
     state: "present"
     scope: "spfile"
+  when: running_on_cdb
+    
 ...

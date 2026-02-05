@@ -1,11 +1,18 @@
 ---
-- include_tasks: "parameters_modification.yml"
-  when: running_on_pdb
+
+- name: Role tasks with env
+  block:
+    - include_tasks: "parameters_modification.yml"
+      when: running_on_pdb
   
-- include_tasks: "parameters_reset.yml"
-  when: running_on_pdb
+    - include_tasks: "parameters_reset.yml"
+      when: running_on_pdb
   
-- include_tasks: "no_sysdba.yml"
-  when: running_on_pdb
-  
+    - include_tasks: "no_sysdba.yml"
+      when: running_on_pdb
+
+  environment:
+    ORACLE_SID: "{{ oracle_sid | default() }}"
+    ORACLE_HOME: "{{ oracle_home | default() }}"
+      
 ...
