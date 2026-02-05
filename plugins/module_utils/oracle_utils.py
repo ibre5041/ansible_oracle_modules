@@ -108,7 +108,7 @@ class oracleConnection:
                 oracledb.init_oracle_client(lib_dir=self.oracle_home)
             except oracledb.DatabaseError as exc:
                 error, = exc.args
-                module.warn(str(error))
+                #module.warn(str(error))
 
             try:
                 oracledb.init_oracle_client()
@@ -117,7 +117,7 @@ class oracleConnection:
                 pass
             except oracledb.DatabaseError as exc:
                 error, = exc.args
-                module.warn(str(error))
+                #module.warn(str(error))
 
 
         hostname = module.params["hostname"]

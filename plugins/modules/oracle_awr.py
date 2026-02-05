@@ -86,7 +86,8 @@ EXAMPLES = '''
 from datetime import timedelta
 
 def query_existing(conn):
-    sql = """
+    # PDB / ADB way
+    sql_adb = """
     SELECT
     c.snap_interval
     , c.retention
@@ -95,13 +96,21 @@ def query_existing(conn):
     , c.con_id as con_id
     FROM dba_hist_wr_control c
     JOIN v$pdbs p ON c.dbid = p.dbid and c.con_id = p.con_id
-    WHERE p.name = SYS_CONTEXT('USERENV', 'CON_NAME');
+    WHERE p.name = SYS_CONTEXT('USERENV', 'CON_NAME')
     """
-    r = conn.execute_select_to_dict(sql, fetchone=True, fail_on_error=False)
+    # Non CDB way
+    sql_19c = """
+        SELECT
+    c.snap_interval
+    , c.retention
+    FROM dba_hist_wr_control c
+    WHERE c.dbid in (select dbid from v$database)
+    """
+    r = conn.execute_select_to_dict(sql_adb, fetchone=True)
+    if not r:
+        r = conn.execute_select_to_dict(sql_19c, fetchone=True)        
     return r
-    #     return {"exists": True, "snap_interval": result[0], "retention": result[1]}
-    # else:
-    #     return {"exists": False}
+
 
 # Ansible code
 def main():
@@ -147,6 +156,8 @@ def main():
     snap_interval = timedelta(minutes=snapshot_interval_min) if snapshot_interval_min is not None else None
 
     result = query_existing(conn)
+    if not result:
+        module.fail_json(msg="Failed to query AWR settings", changed=False)
     params = dict()
     if snap_retention is not None and snap_retention != result['retention']:
         params['retention'] = snapshot_retention_days * 1440
