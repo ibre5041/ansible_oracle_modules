@@ -1,0 +1,14 @@
+{
+    "ANSIBLE_MODULE_ARGS": {
+	"dsn": null,
+        "hostname": "",
+        "mode": "sysdba",
+        "oracle_home": "/oracle/u01/product/19.21.0.0",
+        "password": null,
+        "port": 1521,
+        "service_name": null,
+        "username": null,
+	"snapshot_interval_min": "60",
+	"snapshot_retention_days": "10"
+    }
+}

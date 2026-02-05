@@ -1,4 +1,10 @@
 ---
 
-- include_tasks: "simple.yml"
-- include_tasks: "issue_4.yml"
+- name: Role tasks with env
+  block:
+    - include_tasks: "simple.yml"
+    - include_tasks: "issue_4.yml"
+
+  environment:
+    ORACLE_SID: "{{ oracle_sid | default() }}"
+    ORACLE_HOME: "{{ oracle_home | default() }}"

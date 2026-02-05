@@ -1,9 +1,15 @@
 ---
 
-- include_tasks: "create_delete.yml"
-- include_tasks: "parameter.yml"
-- include_tasks: "change_identified_method.yml"
-- include_tasks: "every_identified_method.yml"
-- include_tasks: "check_mode.yml"
+- name: Role tasks with env
+  block:
+    - include_tasks: "create_delete.yml"
+    - include_tasks: "parameter.yml"
+    - include_tasks: "change_identified_method.yml"
+    - include_tasks: "every_identified_method.yml"
+    - include_tasks: "check_mode.yml"
+
+  environment:
+    ORACLE_SID: "{{ oracle_sid | default() }}"
+    ORACLE_HOME: "{{ oracle_home | default() }}"
 
 ...

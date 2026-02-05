@@ -1,9 +1,17 @@
 ---
-- include_tasks: "select.yml"
-- include_tasks: "ddl.yml"
-- include_tasks: "plsql_block.yml"
-- include_tasks: "sql_file.yml"
-- include_tasks: "special_cases.yml"
-- include_tasks: "check_mode.yml"
-- include_tasks: "dbms_output.yml"
+
+- name: Role tasks with env
+  block:
+    - include_tasks: "select.yml"
+    - include_tasks: "ddl.yml"
+    - include_tasks: "plsql_block.yml"
+    - include_tasks: "sql_file.yml"
+    - include_tasks: "special_cases.yml"
+    - include_tasks: "check_mode.yml"
+    - include_tasks: "dbms_output.yml"
+
+  environment:
+    ORACLE_SID: "{{ oracle_sid | default() }}"
+    ORACLE_HOME: "{{ oracle_home | default() }}"
+
 ...

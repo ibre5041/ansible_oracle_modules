@@ -1,0 +1,38 @@
+---
+- name: "define connection parameters"
+  set_fact:
+    connection_parameters: &con_param
+      hostname: "{{ oracle_hostname }}"      
+      port: "{{ oracle_port }}"      
+      service_name: "{{ oracle_service_name }}"
+      username: "{{ oracle_username }}"
+      password: "{{ oracle_password }}"
+      dsn: "{{ oracle_dsn }}"
+      mode: "{{ mode }}"
+      oracle_home: "{{ oracle_home }}"
+
+- name: "drop user {{ user }}"
+  oracle_user:
+    <<: *con_param
+    schema_name: "{{ user }}"
+    state: "absent"
+
+- name: create tablespace
+  oracle_tablespace:
+    <<: *con_param
+    tablespace: "{{ item }}"
+    state: "absent"
+  loop:
+    - "{{ ts_1 }}"
+    - "{{ ts_2 }}"
+    - "{{ ts_3 }}"
+    
+- name: "add user and tablespaces"
+  oracle_sql:
+    <<: *con_param
+    script: |
+      create user {{ user }} no authentication;
+      create tablespace {{ ts_1 }} datafile '/tmp/{{ ts_1 }}.dbf' size 100M;
+      create tablespace {{ ts_2 }} datafile '/tmp/{{ ts_2 }}.dbf' size 100M;
+      create tablespace {{ ts_3 }} datafile '/tmp/{{ ts_3 }}.dbf' size 100M;
+...
