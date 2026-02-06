@@ -21,7 +21,7 @@ fi
 # [[ $DEVPATH =~ /target([1-9]):[0-9]:([0-9]) ]] && printf '%s => ASMNAME=asmshared%02d%02d%s\n' ${DEVPATH} "1"                 ${BASH_REMATCH[2]} "${PART}" >> /tmp/udevtest2.out
 # [[ $DEVPATH =~ /target([1-9]):[0-9]:([0-9]) ]] && printf       'ASMNAME=asmshared%02d%02d%s\n'            "1"                 ${BASH_REMATCH[2]} "${PART}"
 
-if [[ $DEVPATH =~ /target([1-9]):[0-9]:([0-9]+) ]]; then
+if [[ $DEVPATH =~ /target([1-9][0-9]?):[0-9]:([0-9]+) ]]; then
     # LUNs 0-3 are reserved for OS, 4-6,8-15 are DATA disks
     if [[ "${BASH_REMATCH[2]}" -ge 4 ]]; then
 	printf '%s => ASMNAME=asmshared%02d%02d%s\n' ${DEVPATH} "1"                 ${BASH_REMATCH[2]} "${PART}" >> /tmp/udevtest2.out

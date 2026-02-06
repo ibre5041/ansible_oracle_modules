@@ -1,0 +1,64 @@
+all:
+  hosts:
+    rac19-a-node-1:
+      address: 192.168.8.40
+      oracle_crs_node_vip: rac19-a-lis-1
+      listener: rac19-a-lis-1
+      oracle_release: 19c
+      oracle_install_type: rac
+    rac19-a-node-2:
+      address: 192.168.8.41
+      oracle_crs_node_vip: rac19-a-lis-2
+      listener: rac19-a-lis-2
+      oracle_release: 19c
+      oracle_install_type: rac
+  children:
+    oracle:
+      hosts:
+        rac19-a-node-1:
+        rac19-a-node-2:
+      vars:
+        oracle_release: 19c
+  vars:
+    scsi:
+    - adapter:
+        pciSlotNumber: 16
+    - adapter:
+        pciSlotNumber: 32
+    disks:
+    - disk: rootdg
+      size: 10g
+      bus: 0
+    - disk: appdg
+      size: 100g
+      bus: 0
+    network:
+    - adapter:
+      pciSlotNumber: 192
+      network: "Public Network"
+    - adapter:
+      pciSlotNumber: 224
+      network: "Barn Network"      
+    ram: 16G
+    cpu: 2
+
+    vmware:
+      vm_folder: VmFolder
+      datastore: WD1T
+
+    cluster:
+      oracle_cluster_name: rac19c-a
+      disks:
+        - disk:
+            size: 8g
+            bus: 1
+            count: 4
+      addresses:
+        rac19-a-lis-1: 192.168.8.43
+        rac19-a-lis-2: 192.168.8.44
+        rac19-a-scan: [192.168.8.47, 192.168.8.48, 192.168.8.49]
+    
+    oracle_crs_scan: rac19-a-scan
+    oracle_password: Xb6a5ed2ff29f98d
+    oracle_url_base: http://kicklinux/oracle/19c/
+    template: "RHEL9 Template"

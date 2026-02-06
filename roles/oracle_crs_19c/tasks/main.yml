@@ -13,15 +13,15 @@
 - debug: var=is_vbox_environment
 - debug: var=is_vmware_environment
 
-- include_role:
-    name: oracle_asm_disks_vbox
-    public: yes
-  when: crsbuild_present.stat.exists != True and is_vbox_environment
+# - include_role:
+#     name: oracle_asm_disks_vbox
+#     public: yes
+#   when: crsbuild_present.stat.exists != True and is_vbox_environment
 
 - include_role:
     name: oracle_asm_disks_vmware
     public: yes
-  when: crsbuild_present.stat.exists != True and is_vmware_environment
+#  when: crsbuild_present.stat.exists != True and is_vmware_environment
 
 - name: wait for oracle-ohasd.service
   systemd:

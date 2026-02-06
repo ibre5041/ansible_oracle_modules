@@ -24,9 +24,22 @@
   command: udevadm trigger
 
 - name: Wait for ASM DISK detection
-  wait_for:
-    # disk LUNs are assigned in order 15,14,...
-    path: /dev/asmshared0115
-    delay: 0
-    timeout: 30
-    state: present
+  shell: "(sleep 5s && ls -l /dev/asmshared*)"
+  register: _ls_res
+  retries: 5
+  until: _ls_res.stdout_lines | list | count != 0
+
+- debug:
+    msg: "{{ _ls_res }}"
+
+#   wait_for:
+#     # disk LUNs are assigned in order 15,14,...
+#     path: /dev/
+#     search_regex: "asmshared.*"
+#     delay: 0
+#     timeout: 30
+#     state: present
+#   register: _asm_disk
+
+# - debug:
+#     msg: "Completed {{ ~_asm_disk~['match_groupdict']['task'] }}"

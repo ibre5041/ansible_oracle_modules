@@ -19,9 +19,9 @@
     tags: [ base, baseoracle ]
     when: is_vmware_environment
     
-  - role: base_oracle_vbox
-    tags: [ base, baseoracle ]
-    when: is_vbox_environment
+  # - role: base_oracle_vbox
+  #   tags: [ base, baseoracle ]
+  #   when: is_vbox_environment
     
   - role: oracle_crs_19c
     oracle_gi_media: grid_home_19_21.zip
@@ -45,6 +45,7 @@
         #system_password:
         #dbsnmp_password:
         #template:
+        cdb: true
         db_options:
           JSERVER: false
           ORACLE_TEXT: false
