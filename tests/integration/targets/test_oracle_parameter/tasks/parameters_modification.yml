@@ -37,7 +37,8 @@
     name: "open_cursors"
     value: "351"
     state: "present"
-
+  when: not running_on_adb
+  
 - name: "change open_cursors +1"
   oracle_parameter:
     <<: *pdb_con_param
@@ -47,7 +48,8 @@
     scope: memory
   register: _    
   failed_when: not _.changed
-
+  when: not running_on_adb
+  
 - name: "change open_cursors +1(no change)"
   oracle_parameter:
     <<: *pdb_con_param
@@ -57,7 +59,8 @@
     scope: memory
   register: _    
   failed_when: _.changed
-
+  when: not running_on_adb
+  
 - name: "change open_cursors +2"
   oracle_parameter:
     <<: *pdb_con_param
@@ -67,7 +70,8 @@
     scope: spfile
   register: _    
   failed_when: not _.changed
-
+  when: not running_on_adb
+  
 - name: "change open_cursors +2 (no change)"
   oracle_parameter:
     <<: *pdb_con_param
@@ -77,7 +81,8 @@
     scope: spfile
   register: _    
   failed_when: _.changed
-
+  when: not running_on_adb
+  
 - name: "change pga_aggregate_target"
   oracle_parameter:
     <<: *pdb_con_param
@@ -85,7 +90,8 @@
     value: "500M"
     state: "present"
     scope: both
-
+  when: not running_on_adb
+  
 - name: "change pga_aggregate_target +1(change)"
   oracle_parameter:
     <<: *pdb_con_param
@@ -95,6 +101,7 @@
     scope: both
   register: _    
   failed_when: not _.changed
+  when: not running_on_adb
   
 - name: "change pga_aggregate_target +1(no change)"
   oracle_parameter:
@@ -105,7 +112,8 @@
     scope: both
   register: _    
   failed_when: _.changed
-
+  when: not running_on_adb
+  
 - name: "change pga_aggregate_target +2(change in memory)"
   oracle_parameter:
     <<: *pdb_con_param
@@ -115,7 +123,8 @@
     scope: memory
   register: _    
   failed_when: not _.changed
-  
+  when: not running_on_adb
+
 - name: "change blank_trimming"
   oracle_parameter:
     <<: *pdb_con_param
@@ -123,7 +132,8 @@
     value: "TRUE"
     state: "present"
     scope: "spfile"
-
+  when: not running_on_adb
+  
 - name: "change nls_language"
   oracle_parameter:
     <<: *pdb_con_param
@@ -131,7 +141,8 @@
     value: "GERMAN"
     state: "present"
     scope: "spfile"
-
+  when: not running_on_adb
+   
 - name: "change db_recovery_file_dest (cdb only)"
   oracle_parameter:
     <<: *cdb_con_param
