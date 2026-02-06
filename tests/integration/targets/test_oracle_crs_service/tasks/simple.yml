@@ -1,9 +1,29 @@
 ---
 
+- name: Oracle DB facts
+  oracle_facts:
+    mode: sysdba
+    userenv: false
+    database: true
+    instance: false
+    redo: summary
+    standby: summary
+    parameter:
+      - audit_file_dest
+      - db_name
+      - db_unique_name
+      - instance_name
+      - service_names
+  register: database_facts
+
+- name: database facts
+  set_fact:
+    db_name: "{{ database_facts.ansible_facts[oracle_sid].parameter['db_unique_name'].value }}"
+
 - name: First remove the service
   oracle_crs_service:
-    name: TMP12102_PRIMARY
-    db: TMP12102
+    name: "{{ db_name }}_PRIMARY"
+    db: "{{ db_name }}"
     state: absent
     force: true
   register: _
@@ -13,8 +33,8 @@
   
 - name: Register database service (check mode)
   oracle_crs_service:
-    name: TMP12102_PRIMARY
-    db: TMP12102_PRIMARY    
+    name: "{{ db_name }}_PRIMARY"
+    db: "{{ db_name }}"  
     state: present
   check_mode: yes    
   register: _
@@ -25,8 +45,8 @@
   
 - name: Register database service (apply mode)
   oracle_crs_service:
-    name: TMP12102_PRIMARY
-    db: TMP12102    
+    name: "{{ db_name }}_PRIMARY"
+    db: "{{ db_name }}"
     state: present
   check_mode: no
   register: _
@@ -37,8 +57,8 @@
 
 - name: Register database service (apply mode - no change)
   oracle_crs_service:
-    name: TMP12102_PRIMARY
-    db: TMP12102
+    name: "{{ db_name }}_PRIMARY"
+    db: "{{ db_name }}"
     state: present
   check_mode: yes    
   register: _
@@ -49,8 +69,8 @@
 
 - name: Alter database attributes (DG Standby)
   oracle_crs_service:
-    name: TMP12102_PRIMARY
-    db: TMP12102
+    name: "{{ db_name }}_PRIMARY"
+    db: "{{ db_name }}"
     state: present
     role: PHYSICAL_STANDBY
     # policy: MANUAL
@@ -69,8 +89,8 @@
 
 - name: Alter database attributes (DG Standby) (Again no change)
   oracle_crs_service:
-    name: TMP12102_PRIMARY
-    db: TMP12102
+    name: "{{ db_name }}_PRIMARY"
+    db: "{{ db_name }}"
     state: present
     role: PHYSICAL_STANDBY
     # policy: MANUAL
@@ -91,8 +111,8 @@
 # https://www.dbgenre.com/post/creating-readonly-service-in-oracle-adg-active-dataguard
 - name: Start database service (1st start usually fails in PHYSICAL_STANDBY)
   oracle_crs_service:
-    name: TMP12102_PRIMARY
-    db: TMP12102
+    name: "{{ db_name }}_PRIMARY"
+    db: "{{ db_name }}"
     state: started
   register: _
   failed_when: not _.changed
@@ -102,8 +122,8 @@
 
 - name: Restart database service
   oracle_crs_service:
-    name: TMP12102_PRIMARY
-    db: TMP12102
+    name: "{{ db_name }}_PRIMARY"
+    db: "{{ db_name }}"
     state: restarted
   register: _
   failed_when: not _.changed
@@ -113,8 +133,8 @@
 
 - name: Disable database
   oracle_crs_service:
-    name: TMP12102_PRIMARY
-    db: TMP12102
+    name: "{{ db_name }}_PRIMARY"
+    db: "{{ db_name }}"
     state: present
     enabled: false
   register: _
@@ -125,8 +145,8 @@
   
 - name: Enable database service
   oracle_crs_service:
-    name: TMP12102_PRIMARY
-    db: TMP12102
+    name: "{{ db_name }}_PRIMARY"
+    db: "{{ db_name }}"
     state: present
     enabled: true
   register: _
@@ -137,8 +157,8 @@
 
 - name: Stop database service
   oracle_crs_service:
-    name: TMP12102_PRIMARY
-    db: TMP12102
+    name: "{{ db_name }}_PRIMARY"
+    db: "{{ db_name }}"
     state: stopped
     enabled: false
   register: _
@@ -149,8 +169,8 @@
 
 - name: Start disabled database - should fail
   oracle_crs_service:
-    name: TMP12102_PRIMARY
-    db: TMP12102
+    name: "{{ db_name }}_PRIMARY"
+    db: "{{ db_name }}"
     state: started
     enabled: false 
   register: _
@@ -161,8 +181,8 @@
 
 - name: Restart database (and enable it) I
   oracle_crs_service:
-    name: TMP12102_PRIMARY
-    db: TMP12102
+    name: "{{ db_name }}_PRIMARY"
+    db: "{{ db_name }}"
     state: restarted
     enabled: true
   register: _
@@ -173,8 +193,8 @@
 
 - name: Restart database (and enable it) II
   oracle_crs_service:
-    name: TMP12102_PRIMARY
-    db: TMP12102    
+    name: "{{ db_name }}_PRIMARY"
+    db: "{{ db_name }}"    
     state: restarted
   register: _
   failed_when: not _.changed or _.failed
@@ -184,8 +204,8 @@
   
 - name: Stop database
   oracle_crs_service:
-    name: TMP12102_PRIMARY
-    db: TMP12102    
+    name: "{{ db_name }}_PRIMARY"
+    db: "{{ db_name }}"    
     state: stopped
     enabled: true
   register: _
@@ -196,8 +216,8 @@
   
 - name: Restart database III
   oracle_crs_service:
-    name: TMP12102_PRIMARY
-    db: TMP12102    
+    name: "{{ db_name }}_PRIMARY"
+    db: "{{ db_name }}"    
     state: restarted
   register: _
   failed_when: not (_.commands | length == 1) or not _.changed or _.failed

@@ -1,9 +1,15 @@
 ---
 
-- include_tasks: simple.yml
-  when: running_on_server_crs
+- name: Role tasks with env
+  block:
+    - include_tasks: simple.yml
+      when: running_on_server_crs
 
-- include_tasks: complex.yml  
-  when: running_on_server_crs
-  
+    - include_tasks: complex.yml  
+      when: running_on_server_crs
+
+  environment:
+    ORACLE_SID: "{{ oracle_sid | default() }}"
+    ORACLE_HOME: "{{ oracle_home | default() }}"
+      
 ...
