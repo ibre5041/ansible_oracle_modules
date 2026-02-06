@@ -44,7 +44,7 @@ all:
 
     vmware:
       vm_folder: VmFolder
-      datastore: WD1T
+      datastore: Kingston890G
 
     cluster:
       oracle_cluster_name: rac19c-a
