@@ -173,8 +173,9 @@ def get_obj_privs(conn, schema, wanted_privs_list, grant_mode):
     wanted_privs_d = dict(zip(w_object_name_l, w_object_priv_l))
 
     currsql_all = """
-    select listagg(p.privilege,',') within group (order by p.privilege)
-        , CASE WHEN p.owner = 'SYS' THEN '' ELSE p.OWNER||'.' END || p.table_name
+    select listagg(distinct p.privilege,',') within group (order by p.privilege)
+        --, CASE WHEN p.owner = 'SYS' THEN '' ELSE p.OWNER||'.' END || p.table_name
+        , p.OWNER ||'.'|| p.table_name
     from dba_tab_privs p, dba_objects o
     where p.grantee = upper(:schema)
     and p.table_name = o.object_name
@@ -223,14 +224,6 @@ def get_obj_privs(conn, schema, wanted_privs_list, grant_mode):
 def ensure_grant(module, conn, schema, wanted_grant_list, object_privs, directory_privs, grant_mode, container):
     add_sql = ''
     remove_sql = ''
-
-    # If no privs are added, we set the 'wanted' lists to be empty.
-    if wanted_grant_list is None or wanted_grant_list == ['']:
-        wanted_grant_list = []
-    if object_privs is None or object_privs == ['']:
-        object_privs = []
-    if directory_privs is None or directory_privs == ['']:
-        directory_privs = []
 
     # This list will hold all grant the user currently has
     total_sql = []
