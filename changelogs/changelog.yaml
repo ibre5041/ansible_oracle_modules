@@ -41,7 +41,13 @@ releases:
       - CRS build fixes
     release_date: '2024-06-04'
   3.2.4:
-    release_date: '2025-08-13'
     changes:
       breaking_changes:
       - oracle_tablespace rewritten, default values changed
+    release_date: '2025-08-13'
+  3.2.5:
+    release_date: '2026-02-03'
+    changes:
+      minor_changes:
+        - Fix for profile names having special characters in it
+        - Fix for oracle_user paramters locked and expired
