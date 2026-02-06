@@ -15,7 +15,8 @@ class database():
     
     def __init__(self):
         try:
-            connection = oracledb.connect(user='/', mode=oracledb.SYSDBA)
+            oracledb.init_oracle_client()
+            connection = oracledb.connect(mode=oracledb.SYSDBA)
             self._cursor = connection.cursor()
             self.ora_banner = None
             self.ora_alert_log = None
