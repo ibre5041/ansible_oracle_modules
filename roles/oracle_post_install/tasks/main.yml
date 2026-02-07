@@ -1,21 +1,21 @@
 ---
 # post instalation tasks 
 
-# - name: python2 cx_Oracle drivers
+# - name: python2 oracledb drivers
 #   yum:
-#     name=python2-cx_Oracle
+#     name=python2-oracledb
 #     state=latest
 #     disable_gpg_check=yes
 
-- name: Python cx_Oracle platform drivers
-  shell: "/usr/libexec/platform-python -m pip install --user cx_Oracle"
-  failed_when: False             # install cx_Oracle drivers for platform python
+- name: Python oracledb platform drivers
+  shell: "/usr/libexec/platform-python -m pip install --user oracledb"
+  failed_when: False             # install oracledb drivers for platform python
   become: yes
   become_user: "{{ oracle_os_user }}"
 
-- name: Python cx_Oracle drivers
+- name: Python oracledb drivers
   pip:
-    name: cx_Oracle
+    name: oracledb
     extra_args: --user
   become: yes
   become_user: "{{ oracle_os_user }}"

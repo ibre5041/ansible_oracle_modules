@@ -16,14 +16,14 @@
     <<: *con_param
     script: |
       begin
-        dbms_output.put_line('This is the cx_Oracle manual');
+        dbms_output.put_line('This is the oracledb manual');
         dbms_output.put_line('Demonstrating how to use DBMS_OUTPUT');
       end;
       /
   register: _
   failed_when: |
     _.failed or
-    'cx_Oracle manual' not in _.output_lines[0] or
+    'oracledb manual' not in _.output_lines[0] or
     'Demonstrating' not in _.output_lines[1]
 
 - name: execute procedure with dbms_ouput.put_line() (ignoring case)
@@ -31,20 +31,20 @@
     <<: *con_param
     script: |
       begin
-        dbms_output.PUt_lINe('This is the cx_Oracle manual');
+        dbms_output.PUt_lINe('This is the oracledb manual');
       end;
       /
   register: _
   failed_when: |
     _.failed or
-    'cx_Oracle manual' not in _.output_lines[0]
+    'oracledb manual' not in _.output_lines[0]
 
 - name: execute two procedures with dbms_ouput.put_line()
   oracle_sql:
     <<: *con_param
     script: |
       begin
-        dbms_output.put_line('This is the cx_Oracle manual');
+        dbms_output.put_line('This is the oracledb manual');
       end;
       /
       begin
@@ -54,7 +54,7 @@
   register: _
   failed_when: |
     _.failed or
-    'cx_Oracle manual' not in _.output_lines[0] or
+    'oracledb manual' not in _.output_lines[0] or
     'Demonstrating' not in _.output_lines[1]
 
 - name: execute procedure without dbms_ouput.put_line()
