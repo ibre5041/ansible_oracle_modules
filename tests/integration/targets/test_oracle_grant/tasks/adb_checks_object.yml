@@ -12,6 +12,10 @@
       mode: "{{ mode }}"
       oracle_home: "{{ oracle_home }}"
 
+- name: 'Connection paramters - see or use integration_config.yml.template'
+  debug:
+    var: connection_parameters
+      
 - name: "user u_foo tear down"
   oracle_user:
     <<: *con_param
