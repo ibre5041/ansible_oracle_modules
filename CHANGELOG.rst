@@ -4,11 +4,22 @@ Ibre5041.Ansible\_Oracle\_Modules Release Notes
 
 .. contents:: Topics
 
+v3.3.0
+======
+
+Breaking Changes / Porting Guide
+--------------------------------
+
+- use oracledb instead of cx_Oracle
+
 v3.2.5
 ======
 
-- Fix for profile names having special characters in it
+Minor Changes
+-------------
+
 - Fix for oracle_user paramters locked and expired
+- Fix for profile names having special characters in it
 
 v3.2.4
 ======

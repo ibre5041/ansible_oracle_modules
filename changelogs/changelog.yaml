@@ -46,8 +46,15 @@ releases:
       - oracle_tablespace rewritten, default values changed
     release_date: '2025-08-13'
   3.2.5:
-    release_date: '2026-02-03'
     changes:
       minor_changes:
-        - Fix for profile names having special characters in it
-        - Fix for oracle_user paramters locked and expired
+      - Fix for oracle_user paramters locked and expired
+      - Fix for profile names having special characters in it
+    release_date: '2026-02-03'
+  3.3.0:
+    release_date: '2026-02-07'
+    changes:
+      breaking_changes:
+        - does not depend on cx_Oracle anymore, use oracledb
+      minor_changes:
+        - fixes for oracle_grant, oracle_profile, oracle_user
