@@ -332,7 +332,8 @@ class oracleConnection:
             name = cursor.var(str)
             try:
                 cursor.execute(statement, {'object_name': object_name.upper(), 'owner': schema, 'name': name})
-                return schema.getvalue() + "." + name.getvalue()
+                if schema.getvalue() and name.getvalue():
+                    return schema.getvalue() + "." + name.getvalue()
             except oracledb.DatabaseError as e:
                 pass
         return ''
