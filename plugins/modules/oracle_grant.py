@@ -167,9 +167,21 @@ def get_obj_privs(conn, schema, wanted_privs_list, grant_mode):
     revoke_list = []
 
     # OBJECT PRIVS
-    w_object_name_l = [w.split(':')[1].lower().strip() for w in wanted_privs_list]
-    w_object_priv_l = [w.split(':')[0].lower().strip() for w in wanted_privs_list]
-    w_object_priv_l = [set(w.split(',')) for w in w_object_priv_l]
+    w_object_name_l = [] # wanted object names in privilege list
+    w_object_priv_l = [] # wanted privileges in privilege list
+    for priv in wanted_privs_list:
+        object_name = priv.split(':')[1].lower().strip()
+        object_priv = priv.split(':')[0].lower().strip()
+        object_priv = set(object_priv.split(','))
+        if '.' not in object_name:
+            r = conn.resolve_object_name(object_name).lower()
+            object_name = r if r else object_name
+        w_object_name_l.extend([object_name])
+        w_object_priv_l.extend([object_priv])
+
+    #w_object_name_l = [w.split(':')[1].lower().strip() for w in wanted_privs_list]
+    #w_object_priv_l = [w.split(':')[0].lower().strip() for w in wanted_privs_list]
+    #w_object_priv_l = [set(w.split(',')) for w in w_object_priv_l]
     wanted_privs_d = dict(zip(w_object_name_l, w_object_priv_l))
 
     currsql_all = """

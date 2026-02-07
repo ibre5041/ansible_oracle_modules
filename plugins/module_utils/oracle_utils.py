@@ -104,12 +104,13 @@ class oracleConnection:
             self.oracle_home = None
 
         if self.oracle_home:
+            # oracledb module operates in Thin Mode by default
+            # Switch to Thick mode
             try:
                 oracledb.init_oracle_client(lib_dir=self.oracle_home)
             except oracledb.DatabaseError as exc:
                 error, = exc.args
-                #module.warn(str(error))
-
+                module.warn(str(error))
             try:
                 oracledb.init_oracle_client()
             except oracledb.ProgrammingError as exc:
@@ -136,8 +137,6 @@ class oracleConnection:
 
         try:
             if not user and not password: # If neither user or password is supplied, the use of an oracle connect internal or wallet is assumed
-                # oracledb module operates in Thin Mode by default
-                # Switch to Thick mode
                 if mode == 'sysdba':
                     connect = '/'
                     conn = oracledb.connect(mode=oracledb.SYSDBA)
@@ -279,7 +278,66 @@ class oracleConnection:
             error = e.args[0]
             self.module.fail_json(msg=error.message, code=error.code, request=statement)
 
-            
+    def resolve_object_name(self, object_name):
+        statement = """
+        DECLARE
+            v_result1 VARCHAR2(200);
+            v_result2 VARCHAR2(200);
+        BEGIN
+            -- 1. Check YOUR objects first (highest priority)
+            BEGIN
+                SELECT user, object_name INTO v_result1, v_result2
+                FROM user_objects
+                WHERE object_name = :object_name AND ROWNUM = 1;
+                :owner := v_result1;
+                :name  := v_result2;
+                --dbms_output.put_line('1:'|| v_result1);
+                RETURN;
+            EXCEPTION WHEN NO_DATA_FOUND THEN
+                --dbms_output.put_line('1: not found: ' || :object_name); 
+                NULL;
+            END;
+            -- 2. Check YOUR private synonyms
+            BEGIN
+                SELECT table_owner, table_name INTO v_result1, v_result2
+                FROM user_synonyms 
+                WHERE synonym_name = :object_name AND ROWNUM = 1;
+                :owner := v_result1;
+                :name  := v_result2;
+                dbms_output.put_line('2:'|| v_result1);
+                RETURN;
+            EXCEPTION WHEN NO_DATA_FOUND THEN
+                --dbms_output.put_line('2: not found' || :object_name);
+                NULL;
+            END;
+            -- 3. Check PUBLIC synonyms (final fallback)
+            BEGIN
+                SELECT table_owner, table_name INTO v_result1, v_result2
+                FROM all_synonyms 
+                WHERE owner = 'PUBLIC' AND synonym_name = :object_name AND ROWNUM = 1;
+                :owner := v_result1;
+                :name  := v_result2;
+                --dbms_output.put_line('3:'|| v_result1);
+                RETURN;
+            EXCEPTION WHEN NO_DATA_FOUND THEN
+                --dbms_output.put_line('3: not found: ' || :object_name || ' by user: ' || user);
+                :owner := NULL;
+                :name  := NULL;
+            END;
+        END;
+        """
+
+        with self.conn.cursor() as cursor:
+            schema = cursor.var(str)
+            name = cursor.var(str)
+            try:
+                cursor.execute(statement, {'object_name': object_name.upper(), 'owner': schema, 'name': name})
+                return schema.getvalue() + "." + name.getvalue()
+            except oracledb.DatabaseError as e:
+                pass
+        return ''
+
+
 class dictcur(object):
     # need to monkeypatch the built-in execute function to always return a dict
     def __init__(self, cursor):
