@@ -41,6 +41,9 @@
     - include_tasks: adb_checks_directory.yml
       when: running_on_adb
 
+    - include_tasks: "issue6.yml"
+      when: running_on_cdb  
+      
   environment:
     ORACLE_SID: "{{ oracle_sid | default() }}"
     ORACLE_HOME: "{{ oracle_home | default() }}"

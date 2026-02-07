@@ -1,0 +1,83 @@
+
+
+---
+
+- name: "define connection parameters"
+  set_fact:
+    connection_parameters: &con_param
+      hostname: "{{ oracle_cdb_hostname }}"      
+      port: "{{ oracle_port }}"
+      username: pdbadmin
+      password: pdbpass
+      mode: "{{ mode }}"
+      port: "{{ oracle_port }}"    
+      service_name: "pdb37"
+
+- name: reset user's privilege
+  oracle_grant:
+    <<: *con_param
+    grantee: "u_foo"
+    grant_mode: "exact"    
+
+- name: Define objects and privileges for DBCENTER_CLIENTE
+  set_fact:
+    dbcenter_cliente_objects:      
+      - { owner: "SYS", object: "V_$SESSION", privilege: "SELECT" }
+      - { owner: "SYS", object: "DBCENTER_FS_INSTANCIA", privilege: "SELECT" }
+      - { owner: "AUDSYS", object: "AUD$UNIFIED", privilege: "SELECT" }
+      - { owner: "AUDSYS", object: "UNIFIED_AUDIT_TRAIL", privilege: "SELECT" }
+      - { owner: "AUDSYS", object: "DBMS_AUDIT_MGMT", privilege: "EXECUTE" }
+      - { owner: "SYS", object: "DBA_AUDIT_MGMT_LAST_ARCH_TS", privilege: "SELECT" }
+      - { owner: "SYS", object: "V_$DATABASE", privilege: "SELECT" }
+      - { owner: "SYS", object: "DBA_DATA_FILES", privilege: "SELECT" }
+      - { owner: "SYS", object: "DBA_DB_LINKS", privilege: "SELECT" }
+      - { owner: "SYS", object: "DBA_HIST_SNAPSHOT", privilege: "SELECT" }
+      - { owner: "SYS", object: "DBA_HIST_SQLSTAT", privilege: "SELECT" }
+      - { owner: "SYS", object: "DBA_HIST_WR_CONTROL", privilege: "SELECT" }
+      - { owner: "SYS", object: "DBA_JOBS", privilege: "SELECT" }
+      - { owner: "SYS", object: "DBA_OBJECTS", privilege: "SELECT" }
+      - { owner: "SYS", object: "DBA_PART_TABLES", privilege: "SELECT" }
+      - { owner: "SYS", object: "DBA_PROFILES", privilege: "SELECT" }
+      - { owner: "SYS", object: "DBA_ROLES", privilege: "SELECT" }
+      - { owner: "SYS", object: "DBA_ROLE_PRIVS", privilege: "SELECT" }
+      - { owner: "SYS", object: "DBA_SEGMENTS", privilege: "SELECT" }
+      - { owner: "SYS", object: "DBA_STMT_AUDIT_OPTS", privilege: "SELECT" }
+      - { owner: "SYS", object: "DBA_TABLESPACES", privilege: "SELECT" }
+      - { owner: "SYS", object: "DBA_TAB_PARTITIONS", privilege: "SELECT" }
+      - { owner: "SYS", object: "DBA_USERS", privilege: "SELECT" }
+      - { owner: "SYS", object: "V_$INSTANCE", privilege: "SELECT" }
+      - { owner: "SYS", object: "V_$PARAMETER", privilege: "SELECT" }
+      - { owner: "SYS", object: "V_$PGASTAT", privilege: "SELECT" }
+      - { owner: "SYS", object: "V_$SGA", privilege: "SELECT" }
+      - { owner: "VCS", object: "SYS_ALIVE", privilege: "SELECT" }
+      - { owner: "SYS", object: "USER$", privilege: "SELECT" }
+      - { owner: "SYS", object: "V_$MEMORY_DYNAMIC_COMPONENTS", privilege: "SELECT" }
+      - { owner: "SYS", object: "V_$SGA_DYNAMIC_COMPONENTS", privilege: "SELECT" }
+      - { owner: "SYS", object: "DBA_SCHEDULER_JOBS", privilege: "SELECT" }
+      - { owner: "SYS", object: "DBA_REGISTRY", privilege: "SELECT" }
+      - { owner: "SYS", object: "V_$CONTROLFILE", privilege: "SELECT" }
+                    
+- name: Grant for DBCENTER_CLIENTE 1
+  oracle_grant:
+    grantee: u_foo
+    object_privs: " {{ item.privilege }}:{{ item.owner }}.{{ item.object }} "
+  loop: "{{ dbcenter_cliente_objects }}"
+  loop_control:
+    label: "{{ item.owner }}.{{ item.object }}"
+      
+- name: Grant for DBCENTER_CLIENTE 2
+  oracle_grant:
+    <<: *con_param
+    grantee: u_foo
+    object_privs: " {{ item.privilege }}:{{ item.owner }}.{{ item.object }} "
+  loop: "{{ dbcenter_cliente_objects }}"
+  loop_control:
+    label: "{{ item.owner }}.{{ item.object }}"
+
+- name: Grant for DBCENTER_CLIENTE 3
+  oracle_grant:
+    <<: *con_param
+    grantee: u_foo
+    object_privs: "{{ dbcenter_cliente_objects }}"
+
+    
