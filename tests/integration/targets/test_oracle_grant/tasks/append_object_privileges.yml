@@ -3,16 +3,13 @@
 - name: "define connection parameters"
   set_fact:
     connection_parameters: &con_param
-      hostname: "{{ oracle_hostname }}"      
-      port: "{{ oracle_port }}"      
-      #service_name: "{{ oracle_service_name }}"
-      #username: "{{ oracle_username }}"
-      #password: "{{ oracle_password }}"
-      # Connect into PDB
-      service_name: "{{ oracle_service_name }}_PDB"
+      hostname: "{{ oracle_cdb_hostname }}"      
+      port: "{{ oracle_port }}"
       username: pdbadmin
-      password: pdbpass      
-      mode: "sysdba"
+      password: pdbpass
+      mode: "{{ mode }}"
+      port: "{{ oracle_port }}"    
+      service_name: "pdb37"
 
 - name: reset user's privilege
   oracle_grant:
@@ -25,7 +22,7 @@
     <<: *con_param
     grantee: "u_foo"
     objects_privileges:
-      - execute:dbms_random
+      - execute:sys.dbms_random
       # dbms_random:
       #   - "execute"
     state: "present"
@@ -37,7 +34,7 @@
     <<: *con_param
     grantee: "u_foo"
     objects_privileges:
-      - execute:dbms_random
+      - execute:sys.dbms_random
       # dbms_random:
       #   - "execute"
     state: "present"
@@ -49,8 +46,8 @@
     <<: *con_param
     grantee: "u_foo"
     objects_privileges:
-      - execute:dbms_random
-      - read,select:dba_users
+      - execute:sys.dbms_random
+      - read,select:sys.dba_users
       # dbms_random:
       #   - "execute"
       # dba_users:

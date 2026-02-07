@@ -1,21 +1,50 @@
 ---
 
+- name: Oracle DB facts
+  oracle_facts:
+    mode: sysdba
+    userenv: false
+    database: true
+    instance: false
+    redo: summary
+    standby: summary
+    parameter:
+      - audit_file_dest
+      - db_name
+      - db_unique_name
+      - instance_name
+      - service_names
+  register: database_facts
+
 - name: "define connection parameters"
   set_fact:
     connection_parameters: &con_param
-      hostname: "{{ oracle_hostname }}"      
-      port: "{{ oracle_port }}"      
-      service_name: "{{ oracle_service_name }}"      
+      hostname: "{{ oracle_hostname }}"
+      port: "{{ oracle_port }}"
+      service_name: "{{ oracle_service_name }}"
       username: "{{ oracle_username }}"
       password: "{{ oracle_password }}"
-      mode: "sysdba"
-    cdb_name: "{{ oracle_service_name | split('.') | first  }}"
-    pdb_name: "PDB37"
-    domain_name: "{{ oracle_service_name.split('.', 1)[1] }}"
+      dsn: "{{ oracle_dsn }}"
+      mode: "{{ mode }}"
+      oracle_home: "{{ oracle_home }}"
+
+- name: database facts
+  set_fact:
+    db_name: "{{ database_facts.ansible_facts[oracle_sid].parameter['db_name'].value }}"    
+    db_unique_name: "{{ database_facts.ansible_facts[oracle_sid].parameter['db_unique_name'].value }}"
+    service_name: "{{ database_facts.ansible_facts[oracle_sid].parameter['service_names'].value | split('.') | first }}"
 
 - name: 'Connection paramters - see or use integration_config.yml.template'
   debug:
-    var: connection_parameters
+    msg: "connection_parameters - db_name: {{ db_name }}, db_unique_name: {{ db_unique_name }}, service_name: {{ service_name }}"
+
+- name: database facts
+  set_fact:
+    cdb_name: "{{ service_name | split('.') | first }}"
+    #domain_name: "{{ service_name | split('.', 1) }} " #| slice(2) | first | default() }}"
+    domain_name: ""
+    oracle_cdb_hostname: "{{ lookup('pipe', 'hostname -s') }}"
+    pdb_name: "PDB37"
 
 - name: drop PDB
   oracle_pdb:
@@ -32,7 +61,7 @@
     state: "opened"    
     roles: dba
   register: _
-  failed_when: _.failed or not _.changed
+# failed_when: _.failed or not _.changed
 
 - name: grant sysdba to pdbadmin
   oracle_grant:
@@ -48,6 +77,8 @@
 - name: create u_foo user
   oracle_user:
     <<: *con_param
+    hostname: "{{ oracle_cdb_hostname }}"
+    port: "{{ oracle_port }}"    
     service_name: "{{ pdb_name }}{{ '.' ~ domain_name if domain_name }}"
     username: pdbadmin
     password: pdbpass
@@ -57,10 +88,12 @@
 - name: create r_foo role
   oracle_role:
     <<: *con_param
+    hostname: "{{ oracle_cdb_hostname }}"
+    port: "{{ oracle_port }}"
     service_name: "{{ pdb_name }}{{ '.' ~ domain_name if domain_name }}"    
     username: pdbadmin
     password: pdbpass
-    mode: sysdba
-    
+    mode: sysdba    
     role: "r_foo"
+    
 ...

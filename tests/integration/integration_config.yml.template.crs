@@ -16,8 +16,8 @@ running_on_server_crs: true
 
 running_on_db_asm: true
 running_on_db_fs: false
-running_on_cdb: false
-running_on_pdb: false
+running_on_cdb: true
+running_on_pdb: true
 running_on_client: false
 running_on_adb: false
 

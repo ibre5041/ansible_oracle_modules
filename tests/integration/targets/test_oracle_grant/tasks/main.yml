@@ -1,41 +1,48 @@
 ---
-- include_tasks: "set_up.yml"
-  when: running_on_cdb
-  
-- include_tasks: "append_system_privileges.yml"
-  when: running_on_cdb
-  
-- include_tasks: "remove_system_privileges.yml"
-  when: running_on_cdb
-  
-- include_tasks: "replace_system_privileges.yml"
-  when: running_on_cdb
-  
-- include_tasks: "append_object_privileges.yml"
-  when: running_on_cdb
-  
-- include_tasks: "remove_object_privileges.yml"
-  when: running_on_cdb
-  
-- include_tasks: "replace_object_privileges.yml"
-  when: running_on_cdb
-  
-- include_tasks: "append_remove_privileges_role.yml"
-  when: running_on_cdb
-  
-- include_tasks: "append_remove_directory_privileges.yml"
-  when: running_on_cdb
-  
-- include_tasks: "check_mode.yml"
-  when: running_on_cdb  
 
-- include_tasks: "tear_down.yml"
-  when: running_on_cdb
-
-- include_tasks: adb_checks_object.yml
-  when: running_on_adb
-
-- include_tasks: adb_checks_directory.yml
-  when: running_on_adb
+- name: Role tasks with env
+  block:
+    - include_tasks: "set_up.yml"
+      when: running_on_cdb
   
+    - include_tasks: "append_system_privileges.yml"
+      when: running_on_cdb
+  
+    - include_tasks: "remove_system_privileges.yml"
+      when: running_on_cdb
+  
+    - include_tasks: "replace_system_privileges.yml"
+      when: running_on_cdb
+  
+    - include_tasks: "append_object_privileges.yml"
+      when: running_on_cdb
+  
+    - include_tasks: "remove_object_privileges.yml"
+      when: running_on_cdb
+  
+    - include_tasks: "replace_object_privileges.yml"
+      when: running_on_cdb
+  
+    - include_tasks: "append_remove_privileges_role.yml"
+      when: running_on_cdb
+  
+    - include_tasks: "append_remove_directory_privileges.yml"
+      when: running_on_cdb
+  
+    - include_tasks: "check_mode.yml"
+      when: running_on_cdb  
+
+    - include_tasks: "tear_down.yml"
+      when: running_on_cdb
+
+    - include_tasks: adb_checks_object.yml
+      when: running_on_adb
+
+    - include_tasks: adb_checks_directory.yml
+      when: running_on_adb
+
+  environment:
+    ORACLE_SID: "{{ oracle_sid | default() }}"
+    ORACLE_HOME: "{{ oracle_home | default() }}"
+      
 ...

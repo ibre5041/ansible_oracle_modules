@@ -2,24 +2,21 @@
 - name: "define connection parameters"
   set_fact:
     connection_parameters: &con_param
-      hostname: "{{ oracle_hostname }}"      
-      port: "{{ oracle_port }}"      
-      #service_name: "{{ oracle_service_name }}"
-      #username: "{{ oracle_username }}"
-      #password: "{{ oracle_password }}"
-      # Connect into PDB
-      service_name: "{{ oracle_service_name }}_PDB"
+      hostname: "{{ oracle_cdb_hostname }}"      
+      port: "{{ oracle_port }}"
       username: pdbadmin
-      password: pdbpass    
-      mode: "sysdba"
+      password: pdbpass
+      mode: "{{ mode }}"
+      port: "{{ oracle_port }}"    
+      service_name: "pdb37"
 
 - name: set objects privileges to user
   oracle_grant:
     <<: *con_param
     grantee: "u_foo"
     objects_privileges:
-      - execute:dbms_random
-      - read,select:dba_users
+      - execute:sys.dbms_random
+      - read,select:sys.dba_users
       # dbms_random:
       #   - "execute"
       # dba_users:
@@ -34,8 +31,8 @@
     <<: *con_param
     grantee: "u_foo"
     objects_privileges:
-      - execute:dbms_random
-      - read,select:dba_users
+      - execute:sys.dbms_random
+      - read,select:sys.dba_users
       # dbms_random:
       #   - "execute"
       # dba_users:
@@ -50,13 +47,13 @@
     <<: *con_param
     grantee: "u_foo"
     objects_privileges:
-      - execute:dbms_random
-      - read:dba_users
-      - select:dba_views
+      - execute:sys.dbms_random
+      - read:sys.dba_users
+      - select:sys.dba_views
       # dbms_random:
       #   - "execute"
-      # dba_users:
-      #   - "read"
+      #dba_users:
+      #  - "read"
       # dba_views:
       #   - "select"
     grant_mode: "exact"
@@ -64,10 +61,10 @@
   failed_when: |
     _.failed or
     not _.changed or
-    'revoke select on dba_users' not in _.ddls[0] or
-    'grant select on dba_views' not in _.ddls[1] or
-    'grant read on dba_users' in _.ddls[0] or
-    'grant read on dba_users' in _.ddls[1]    
+    'revoke select on sys.dba_users' not in _.ddls[0] or
+    'grant select on sys.dba_views' not in _.ddls[1] or
+    'grant read on sys.dba_users' in _.ddls[0] or
+    'grant read on sys.dba_users' in _.ddls[1]    
 
 - name: reset user's privilege
   oracle_grant:
