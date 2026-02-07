@@ -7,7 +7,6 @@
       username: pdbadmin
       password: pdbpass
       mode: "{{ mode }}"
-      port: "{{ oracle_port }}"    
       service_name: "pdb37"
 
 - name: remove inexistent privilege from user
@@ -79,5 +78,9 @@
   oracle_grant:
     <<: *con_param
     grantee: "u_foo"
-    grant_mode: "exact"    
+    grant_mode: "exact"
+  register: _
+
+- debug: var=_
+  
 ...

@@ -1,5 +1,3 @@
-
-
 ---
 
 - name: "define connection parameters"
@@ -10,7 +8,6 @@
       username: pdbadmin
       password: pdbpass
       mode: "{{ mode }}"
-      port: "{{ oracle_port }}"    
       service_name: "pdb37"
 
 - name: reset user's privilege
@@ -21,9 +18,8 @@
 
 - name: Define objects and privileges for DBCENTER_CLIENTE
   set_fact:
-    dbcenter_cliente_objects:      
+    dbcenter_cliente_objects:
       - { owner: "SYS", object: "V_$SESSION", privilege: "SELECT" }
-      - { owner: "SYS", object: "DBCENTER_FS_INSTANCIA", privilege: "SELECT" }
       - { owner: "AUDSYS", object: "AUD$UNIFIED", privilege: "SELECT" }
       - { owner: "AUDSYS", object: "UNIFIED_AUDIT_TRAIL", privilege: "SELECT" }
       - { owner: "AUDSYS", object: "DBMS_AUDIT_MGMT", privilege: "EXECUTE" }
@@ -49,17 +45,81 @@
       - { owner: "SYS", object: "V_$PARAMETER", privilege: "SELECT" }
       - { owner: "SYS", object: "V_$PGASTAT", privilege: "SELECT" }
       - { owner: "SYS", object: "V_$SGA", privilege: "SELECT" }
-      - { owner: "VCS", object: "SYS_ALIVE", privilege: "SELECT" }
       - { owner: "SYS", object: "USER$", privilege: "SELECT" }
       - { owner: "SYS", object: "V_$MEMORY_DYNAMIC_COMPONENTS", privilege: "SELECT" }
       - { owner: "SYS", object: "V_$SGA_DYNAMIC_COMPONENTS", privilege: "SELECT" }
       - { owner: "SYS", object: "DBA_SCHEDULER_JOBS", privilege: "SELECT" }
       - { owner: "SYS", object: "DBA_REGISTRY", privilege: "SELECT" }
       - { owner: "SYS", object: "V_$CONTROLFILE", privilege: "SELECT" }
-                    
+    dbcenter_cliente_objects_list:
+      - "SELECT:V$SESSION"
+      - "SELECT:AUDSYS.AUD$UNIFIED" # this object is not visible in ALL_OBEJCTS
+      - "SELECT:AUDSYS.UNIFIED_AUDIT_TRAIL"
+      - "EXECUTE:DBMS_AUDIT_MGMT"
+      - "SELECT:DBA_AUDIT_MGMT_LAST_ARCH_TS"
+      - "SELECT:V$DATABASE"
+      - "SELECT:DBA_DATA_FILES"
+      - "SELECT:DBA_DB_LINKS"
+      - "SELECT:DBA_HIST_SNAPSHOT"
+      - "SELECT:DBA_HIST_SQLSTAT"
+      - "SELECT:DBA_HIST_WR_CONTROL"
+      - "SELECT:DBA_JOBS"
+      - "SELECT:DBA_OBJECTS"
+      - "SELECT:DBA_PART_TABLES"
+      - "SELECT:DBA_PROFILES"
+      - "SELECT:DBA_ROLES"
+      - "SELECT:DBA_ROLE_PRIVS"
+      - "SELECT:DBA_SEGMENTS"
+      - "SELECT:DBA_STMT_AUDIT_OPTS"
+      - "SELECT:DBA_TABLESPACES"
+      - "SELECT:DBA_TAB_PARTITIONS"
+      - "SELECT:DBA_USERS"
+      - "SELECT:V$INSTANCE"
+      - "SELECT:V$PARAMETER"
+      - "SELECT:SYS.V_$PGASTAT"
+      - "SELECT:SYS.V_$SGA"
+      - "SELECT:SYS.USER$"
+      - "select:v$memory_dynamic_components"
+      - "select:v$sga_dynamic_components"
+      - "select:dba_scheduler_jobs"
+      - "select:dba_registry"
+      - "select:v_$controlfile"
+      
+    dbcenter_cliente_objects_synonyms:
+      - { owner: null, object: "V$SESSION", privilege: "SELECT" }
+      - { owner: null, object: "DBA_AUDIT_MGMT_LAST_ARCH_TS", privilege: "SELECT" }
+      - { owner: null, object: "V$DATABASE", privilege: "SELECT" }
+      - { owner: null, object: "DBA_DATA_FILES", privilege: "SELECT" }
+      - { owner: null, object: "DBA_DB_LINKS", privilege: "SELECT" }
+      - { owner: null, object: "DBA_HIST_SNAPSHOT", privilege: "SELECT" }
+      - { owner: null, object: "DBA_HIST_SQLSTAT", privilege: "SELECT" }
+      - { owner: null, object: "DBA_HIST_WR_CONTROL", privilege: "SELECT" }
+      - { owner: null, object: "DBA_JOBS", privilege: "SELECT" }
+      - { owner: null, object: "DBA_OBJECTS", privilege: "SELECT" }
+      - { owner: null, object: "DBA_PART_TABLES", privilege: "SELECT" }
+      - { owner: null, object: "DBA_PROFILES", privilege: "SELECT" }
+      - { owner: null, object: "DBA_ROLES", privilege: "SELECT" }
+      - { owner: null, object: "DBA_ROLE_PRIVS", privilege: "SELECT" }
+      - { owner: null, object: "DBA_SEGMENTS", privilege: "SELECT" }
+      - { owner: null, object: "DBA_STMT_AUDIT_OPTS", privilege: "SELECT" }
+      - { owner: null, object: "DBA_TABLESPACES", privilege: "SELECT" }
+      - { owner: null, object: "DBA_TAB_PARTITIONS", privilege: "SELECT" }
+      - { owner: null, object: "DBA_USERS", privilege: "SELECT" }
+      - { owner: null, object: "V$INSTANCE", privilege: "SELECT" }
+      - { owner: null, object: "V$PARAMETER", privilege: "SELECT" }
+      - { owner: null, object: "V$PGASTAT", privilege: "SELECT" }
+      - { owner: null, object: "V$SGA", privilege: "SELECT" }
+      - { owner: null, object: "USER$", privilege: "SELECT" }
+      - { owner: null, object: "V$MEMORY_DYNAMIC_COMPONENTS", privilege: "SELECT" }
+      - { owner: null, object: "V$SGA_DYNAMIC_COMPONENTS", privilege: "SELECT" }
+      - { owner: null, object: "DBA_SCHEDULER_JOBS", privilege: "SELECT" }
+      - { owner: null, object: "DBA_REGISTRY", privilege: "SELECT" }
+      - { owner: null, object: "V$CONTROLFILE", privilege: "SELECT" }
+      
 - name: Grant for DBCENTER_CLIENTE 1
   oracle_grant:
-    grantee: u_foo
+    <<: *con_param    
+    grantee: u_foo    
     object_privs: " {{ item.privilege }}:{{ item.owner }}.{{ item.object }} "
   loop: "{{ dbcenter_cliente_objects }}"
   loop_control:
@@ -78,6 +138,43 @@
   oracle_grant:
     <<: *con_param
     grantee: u_foo
-    object_privs: "{{ dbcenter_cliente_objects }}"
+    object_privs: "{{ dbcenter_cliente_objects_list }}"
+  register: _
+- debug: var=_
 
+- name: reset user's privilege
+  oracle_grant:
+    <<: *con_param
+    grantee: "u_foo"
+    grant_mode: "exact"    
+  register: _
+- debug: var=_
     
+- name: Grant for DBCENTER_CLIENTE 3
+  oracle_grant:
+    <<: *con_param
+    grantee: u_foo
+    object_privs: " {{ item.privilege }}:{{ item.object }} "
+  loop: "{{ dbcenter_cliente_objects_synonyms }}"
+  loop_control:
+    label: "{{ item.owner }}.{{ item.object }}"
+    
+- name: Grant for DBCENTER_CLIENTE 4
+  oracle_grant:
+    <<: *con_param
+    grantee: u_foo
+    object_privs:
+      - "SELECT:DBA_USERS"
+      - "SELECT:V$INSTANCE"
+      - "SELECT:V$PARAMETER"
+      - "SELECT:SYS.V_$PGASTAT"
+      - "SELECT:SYS.V_$SGA"
+      - "SELECT:SYS.USER$"
+      - "select:v$memory_dynamic_components"
+      - "select:v$sga_dynamic_components"
+      - "select:dba_scheduler_jobs"
+      - "select:dba_registry"
+      - "select:v_$controlfile"
+  register: _
+
+- debug: var=_

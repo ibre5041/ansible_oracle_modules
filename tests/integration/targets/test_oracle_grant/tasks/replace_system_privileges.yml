@@ -7,7 +7,6 @@
       username: pdbadmin
       password: pdbpass
       mode: "{{ mode }}"
-      port: "{{ oracle_port }}"    
       service_name: "pdb37"
 
 - name: set privileges to user

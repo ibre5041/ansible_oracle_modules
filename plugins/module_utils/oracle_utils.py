@@ -288,7 +288,7 @@ class oracleConnection:
             BEGIN
                 SELECT user, object_name INTO v_result1, v_result2
                 FROM user_objects
-                WHERE object_name = :object_name AND ROWNUM = 1;
+                WHERE object_name = :object_name and object_type <> 'SYNONYM' AND ROWNUM = 1;
                 :owner := v_result1;
                 :name  := v_result2;
                 --dbms_output.put_line('1:'|| v_result1);
