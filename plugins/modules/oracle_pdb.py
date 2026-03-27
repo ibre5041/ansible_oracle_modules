@@ -155,9 +155,6 @@ EXAMPLES = '''
     state: present
 '''
 
-import os
-
-
 # Check if the pdb exists
 def check_pdb_exists(conn, pdb_name):
     sql = sql = 'select name, open_mode, restricted from v$pdbs where upper(name) = :pdb_name'
@@ -173,7 +170,8 @@ def check_pdb_exists(conn, pdb_name):
 
     sql = "select property_name, property_value" \
           " from database_properties " \
-          " where property_name in ('DEFAULT_TBS_TYPE','DEFAULT_PERMANENT_TABLESPACE','DEFAULT_TEMP_TABLESPACE', 'DBTIMEZONE') " \
+          " where property_name in " \
+          "('DEFAULT_TBS_TYPE','DEFAULT_PERMANENT_TABLESPACE','DEFAULT_TEMP_TABLESPACE','DBTIMEZONE') " \
           " order by 1"
     prop = conn.execute_select(sql, None, fetchone=False)
     result.update(dict(prop))
@@ -234,14 +232,17 @@ def create_pdb(conn, module):
         if roles:
             createsql += ' roles = (%s)' % ','.join(roles)
     else:
-        module.fail_json(msg="Missing one parameter: [plug_file, sourcedb, pdb_admin_password]", changed=conn.changed, ddls=conn.ddls)
+        module.fail_json(msg="Missing one parameter: [plug_file, sourcedb, pdb_admin_password]",
+                         changed=conn.changed, ddls=conn.ddls)
 
     if file_name_convert:
-        quoted = ','.join(["'%s', '%s'" % (x[0], x[1]) for x in zip(file_name_convert.keys(), file_name_convert.values())])
+        pairs = zip(file_name_convert.keys(), file_name_convert.values())
+        quoted = ','.join(["'%s', '%s'" % (k, v) for k, v in pairs])
         createsql += ' file_name_convert = (%s)' % quoted
 
     if service_name_convert:
-        quoted = ','.join(["'%s', '%s'" % (x[0], x[1]) for x in zip(service_name_convert.keys(), service_name_convert.values())])
+        pairs = zip(service_name_convert.keys(), service_name_convert.values())
+        quoted = ','.join(["'%s', '%s'" % (k, v) for k, v in pairs])
         createsql += ' service_name_convert = (%s)' % quoted
 
     if datafile_dest:
@@ -310,7 +311,8 @@ def ensure_pdb_state(conn, module, current_state):
 
     changes = set(wanted_state.items()).difference(current_state)
 
-    about_to_open = wanted_state.get('open_mode') in ('READ WRITE', 'READ ONLY') or dict(current_state).get('open_mode') == 'READ WRITE'
+    about_to_open = (wanted_state.get('open_mode') in ('READ WRITE', 'READ ONLY')
+                     or dict(current_state).get('open_mode') == 'READ WRITE')
 
     if 'open_mode' in dict(changes):
         change_db_sql.append(ensure_sql)
@@ -389,7 +391,9 @@ def main():
             pdb_admin_username     = dict(required=False, default='pdb_admin', aliases=['pdbadmun']),
             pdb_admin_password     = dict(required=False, no_log=True, default='pdb_admin', aliases=['pdbadmpw']),
             roles                  = dict(type='list', elements='str', default=[]),
-            state                  = dict(default="present", choices=["present", "absent", "opened", "closed", "read_only", "read_write", "status", "unplugged"]),
+            state                  = dict(default="present",
+                                         choices=["present", "absent", "opened", "closed",
+                                                  "read_only", "read_write", "status", "unplugged"]),
             save_state             = dict(default=True, type='bool'),
             datafile_dest          = dict(required=False, aliases=['dfd', 'create_file_dest']),
             #unplug_dest            = dict(required=False, aliases=['plug_dest', 'upd', 'pd']),

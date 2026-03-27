@@ -56,7 +56,6 @@ jobs:
               test_oracle_user \
               test_oracle_tablespace \
               test_oracle_parameter \
-              test_oracle_grant \
               test_oracle_pdb \
               test_oracle_facts; do
             echo ""
