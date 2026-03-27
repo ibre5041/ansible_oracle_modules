@@ -3,9 +3,11 @@ from conftest import ExitJson, module_path, load_module_from_path
 
 class FakeAnsibleModule:
     params = {}
+    check_mode = False
 
     def __init__(self, **_kwargs):
         self.params = dict(self.__class__.params)
+        self.check_mode = self.__class__.check_mode
 
     def exit_json(self, **kwargs):
         raise ExitJson(kwargs)
@@ -18,6 +20,7 @@ class FakeConn:
     last = None
 
     def __init__(self, _module):
+        self.module = _module
         self.changed = False
         self.ddls = []
         self.data = [{"dummy": 1}]
