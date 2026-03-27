@@ -308,9 +308,10 @@ class oracleConnection:
                             if num_lines < chunk_size:  # if less lines than the chunk value was fetched, it's the end
                                 break
                 else:
-                    with self.conn.cursor() as cursor:                    
+                    with self.conn.cursor() as cursor:
                         cursor.execute(statement)
                 self.ddls.append(statement)
+                self.changed = True
             else:
                 self.ddls.append('--' + statement)
             return output_lines

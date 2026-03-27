@@ -82,7 +82,7 @@
   register: _    
   failed_when: _.changed
   when: not running_on_adb
-  
+
 - name: "change pga_aggregate_target"
   oracle_parameter:
     <<: *pdb_con_param
@@ -90,8 +90,8 @@
     value: "500M"
     state: "present"
     scope: both
-  when: not running_on_adb
-  
+  when: not running_on_adb and not running_on_xe | bool
+
 - name: "change pga_aggregate_target +1(change)"
   oracle_parameter:
     <<: *pdb_con_param
@@ -99,10 +99,10 @@
     value: "500M"
     state: "present"
     scope: both
-  register: _    
+  register: _
   failed_when: not _.changed
-  when: not running_on_adb
-  
+  when: not running_on_adb and not running_on_xe | bool
+
 - name: "change pga_aggregate_target +1(no change)"
   oracle_parameter:
     <<: *pdb_con_param
@@ -110,10 +110,10 @@
     value: "501M"
     state: "present"
     scope: both
-  register: _    
+  register: _
   failed_when: _.changed
-  when: not running_on_adb
-  
+  when: not running_on_adb and not running_on_xe | bool
+
 - name: "change pga_aggregate_target +2(change in memory)"
   oracle_parameter:
     <<: *pdb_con_param
@@ -121,9 +121,9 @@
     value: "502M"
     state: "present"
     scope: memory
-  register: _    
+  register: _
   failed_when: not _.changed
-  when: not running_on_adb
+  when: not running_on_adb and not running_on_xe | bool
 
 - name: "change blank_trimming"
   oracle_parameter:

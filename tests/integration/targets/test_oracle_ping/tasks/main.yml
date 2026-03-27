@@ -54,12 +54,12 @@
     mode:              sysdba
     session_container: "{{ oracle_session_container }}"
   register: _oracle_instance_session_container
-  when: running_on_client and oracle_session_container is defined and oracle_session_container
+  when: running_on_client | bool and oracle_session_container is defined and oracle_session_container | length > 0
 
 - name: 'Connection succeeded: CDB + session_container'
   debug:
     var: _oracle_instance_session_container
-  when: running_on_client and oracle_session_container is defined and oracle_session_container
+  when: running_on_client | bool and oracle_session_container is defined and oracle_session_container | length > 0
 
 # Mode C : connexion normale username/password (sans SYSDBA)
 - name: "Connect as normal user (no SYSDBA) (Mode C)"
@@ -71,11 +71,11 @@
     password:     "{{ oracle_normal_password }}"
     mode:         "{{ oracle_normal_mode }}"
   register: _oracle_instance_normal
-  when: running_on_client and oracle_normal_username is defined and oracle_normal_username
+  when: running_on_client | bool and oracle_normal_username is defined and oracle_normal_username | length > 0
 
 - name: 'Connection succeeded: normal user'
   debug:
     var: _oracle_instance_normal
-  when: running_on_client and oracle_normal_username is defined and oracle_normal_username
+  when: running_on_client | bool and oracle_normal_username is defined and oracle_normal_username | length > 0
 
 ...

@@ -2,7 +2,13 @@
 
 - name: Oracle DB facts
   oracle_facts:
+    hostname:     "{{ oracle_hostname }}"
+    port:         "{{ oracle_port }}"
+    service_name: "{{ oracle_service_name }}"
+    username:     "{{ oracle_username }}"
+    password:     "{{ oracle_password }}"
     mode: sysdba
+    oracle_home:  "{{ oracle_home }}"
     userenv: false
     database: true
     instance: false

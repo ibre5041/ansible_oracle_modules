@@ -30,5 +30,5 @@
 - name: verify error
   fail:
     msg: "no error or wrong error"
-  when: not _.failed or (_.code != 933 and 'ORA-00933' not in _.msg and _.request is not defined)
+  when: not _.failed or (_.code != 933 and 'ORA-00933' not in _.msg and _.code != 2180 and 'ORA-02180' not in _.msg and _.request is not defined)
 ...

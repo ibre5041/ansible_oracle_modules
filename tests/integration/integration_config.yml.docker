@@ -46,3 +46,4 @@ running_on_pdb:        true    # XEPDB1 disponible (oracle_pdb_service_name)
 running_on_db_asm:     false   # stockage filesystem (pas ASM)
 running_on_db_fs:      true    # stockage filesystem
 running_on_adb:        false   # pas Oracle ADB
+running_on_xe:         true    # Oracle XE (certains paramètres mémoire non modifiables dans un PDB)
