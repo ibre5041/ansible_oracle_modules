@@ -1,0 +1,42 @@
+[MASTER]
+# Exclure le code tiers (antlr3 runtime) et les tests d'intégration
+ignore-paths =
+    # Code tiers : antlr3 runtime
+    plugins/module_utils/antlr3,
+    # Code généré par ANTLR (importe depuis antlr3, camelCase, redéfinitions de builtins)
+    plugins/module_utils/dotora.py,
+    # Templates Jinja2 avec extension .py (variables injectées au runtime, pas du Python pur)
+    roles/oracle_post_install/templates
+
+[MESSAGES CONTROL]
+disable =
+    # Style choix intentionnels dans ce projet
+    C0114,  # missing-module-docstring
+    C0115,  # missing-class-docstring
+    C0116,  # missing-function-docstring
+    C0209,  # consider-using-f-string (% formatting utilisé partout)
+    R1735,  # use-dict-literal (dict() utilisé dans argument_spec)
+    W0511,  # fixme (TODO intentionnels)
+    R0801,  # duplicate-code (boilerplate Ansible hostname/port/service_name identique dans tous les modules)
+
+    # Spécificités Ansible (imports en fin de fichier, ansible non installé en CI pylint)
+    E0401,  # import-error (ansible, oracledb non disponibles dans l'env pylint)
+    W0401,  # wildcard-import (from ansible.module_utils.basic import *)
+    C0413,  # wrong-import-position (ansible imports en fin de fichier)
+    C0411,  # wrong-import-order (idem)
+
+[FORMAT]
+# Ansible modules ont tendance aux longues lignes (SQL, argument_spec)
+max-line-length = 120
+
+[DESIGN]
+# Les modules Ansible avec plusieurs états ont naturellement plus de branches/variables
+max-branches = 20
+max-locals = 20
+max-args = 12
+max-statements = 60
+
+[VARIABLES]
+# AnsibleModule est importé via 'from ansible.module_utils.basic import *'
+# pylint ne peut pas résoudre l'import wildcard sans ansible installé
+additional-builtins = AnsibleModule

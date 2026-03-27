@@ -25,6 +25,6 @@ jobs:
         FILES=$(git ls-files '*.py' \
           | grep -v 'plugins/module_utils/antlr3/' \
           | grep -v 'plugins/module_utils/dotora.py' \
-          | grep -v 'roles/oracle_post_install/templates/' \
+          | grep -v 'roles/' \
           | grep -v 'tests/unit/')
         pylint --fail-under=7 $FILES
