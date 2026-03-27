@@ -277,9 +277,10 @@ def ensure_service_state(oc, module, msg):
             module.exit_json(msg="Service %s (%s) successfully created" % (name, database_name), changed=True)
         else:
             msg = "Service %s (%s) is in the intended state" % (name, database_name)
+            change = False
             if configchange:
                 msg += 'after configchanges had been applied'
-                change=True
+                change = True
             module.exit_json(msg=msg, changed=change)
 
     if state == 'started':
@@ -503,6 +504,7 @@ def main():
     global configchange
     configchange = False
     newservice = False
+    msg = ""
     module = AnsibleModule(
         argument_spec = dict(
             user               = dict(required=False, aliases=['un', 'username']),
@@ -572,11 +574,11 @@ def main():
         if not check_service_exists(oc, module, msg, name, database_name):
             if create_service(oc, module, msg):
                 newservice = True
-                ensure_service_state(oc, module, msg, name, database_name, state, preferred_instances,available_instances, pdb, role, clbgoal, rlbgoal)
+                ensure_service_state(oc, module, msg)
             else:
                 module.fail_json(msg=msg, changed=False)
         else:
-            ensure_service_state(oc, module, msg, name, database_name, state, preferred_instances,available_instances, pdb, role, clbgoal, rlbgoal)
+            ensure_service_state(oc, module, msg)
             # msg = 'Service %s already exists in database %s' % (name, database_name)
             # module.exit_json(msg=msg, changed=False)
 
@@ -609,7 +611,7 @@ def main():
 
     elif state == 'restarted':
         if stop_service(oc, module, msg, name, database_name):
-            if start_service(oc, module, msg, name, database_name):
+            if start_service(oc, module, msg, name, database_name, configchange):
                 msg = "Service %s restarted in database %s" % (name, database_name)
                 module.exit_json(msg=msg, changed=True)
             else:

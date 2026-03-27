@@ -17,7 +17,10 @@ class FailJson(Exception):
 
 def load_module_from_path(module_path, module_name):
     _ensure_fake_ansible_basic()
-    spec = importlib.util.spec_from_file_location(module_name, str(module_path))
+    path = Path(module_path)
+    if not path.is_absolute():
+        path = REPO_ROOT / path
+    spec = importlib.util.spec_from_file_location(module_name, str(path))
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)  # type: ignore[union-attr]
     return module
@@ -48,6 +51,7 @@ def _ensure_fake_ansible_basic():
     basic_mod.to_bytes = lambda v, **_kwargs: v.encode() if isinstance(v, str) else v
     basic_mod.to_native = lambda v, **_kwargs: str(v)
     basic_mod.os = __import__("os")
+    basic_mod.re = __import__("re")
     text_mod.to_native = lambda v, **_kwargs: str(v)
     text_mod.to_text = lambda v, **_kwargs: str(v)
 
