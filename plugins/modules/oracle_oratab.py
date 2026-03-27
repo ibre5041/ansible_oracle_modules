@@ -98,7 +98,7 @@ from ansible.module_utils.basic import AnsibleModule
 # In these we do import from collections
 try:
     from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_homes import OracleHomes
-except:
+except ImportError:
     pass
 
 # Ansible code
@@ -131,22 +131,31 @@ def main():
             sqlplus_path = os.path.join(h.facts_item[sid]['ORACLE_HOME'], 'bin', 'oracle')
             oracle_owner = getpwuid(os.stat(sqlplus_path).st_uid).pw_name
             h.facts_item[sid]['owner'] = oracle_owner
-        except:
+        except Exception:
             pass
 
-        if h.facts_item[sid]["running"]:
-            status = h.query_db_status(oracle_owner = h.facts_item[sid]['owner']
-                                       , oracle_home = h.facts_item[sid]['ORACLE_HOME']
-                                       , oracle_sid = h.facts_item[sid]['ORACLE_SID'])
-            h.facts_item[sid]['status'] = status
-        else:
-            h.facts_item[sid]['status'] = ['DOWN']
+        status = ['DOWN']
+        should_probe = bool(h.facts_item[sid]["running"])
+        if not should_probe and sid.startswith('+ASM') and h.facts_item[sid].get('owner'):
+            # Best-effort ASM probing when process discovery is restricted.
+            should_probe = True
+        if should_probe:
+            try:
+                status = h.query_db_status(oracle_owner = h.facts_item[sid]['owner']
+                                           , oracle_home = h.facts_item[sid]['ORACLE_HOME']
+                                           , oracle_sid = h.facts_item[sid]['ORACLE_SID'])
+                if 'ASM' in status:
+                    h.facts_item[sid]['running'] = True
+            except Exception:
+                status = ['DOWN']
+        h.facts_item[sid]['status'] = status
         
     if running_only:
         for sid in list(h.facts_item):
             if not h.facts_item[sid]["running"]:
                 del h.facts_item[sid]
-                module.warn('ORACLE_SID: {} is down'.format(sid))
+                if not sid.startswith('+ASM'):
+                    module.warn('ORACLE_SID: {} is down'.format(sid))
 
     if asm_only:
         for sid in list(h.facts_item):
@@ -154,20 +163,18 @@ def main():
                 del h.facts_item[sid]
                 module.warn('ORACLE_SID: {} is not ASM'.format(sid))
                 
-    if running_only:
-        for sid in list(h.facts_item):
-            if not h.facts_item[sid]["running"]:
-                del h.facts_item[sid]
-                module.warn('ORACLE_SID: {} is down'.format(sid))
-
     if open_only:
         for sid in list(h.facts_item):
+            if 'ASM' in h.facts_item[sid]["status"]:
+                continue
             if 'OPEN' not in h.facts_item[sid]["status"]:
                 del h.facts_item[sid]
                 module.warn('ORACLE_SID: {} is not open'.format(sid))
 
     if writable_only:
         for sid in list(h.facts_item):
+            if 'ASM' in h.facts_item[sid]["status"]:
+                continue
             if 'READ WRITE' not in h.facts_item[sid]["status"]:
                 del h.facts_item[sid]
                 module.warn('ORACLE_SID: {} is not open'.format(sid))

@@ -372,6 +372,7 @@ def main():
             service_name  = dict(required=False, aliases=['sn']),
             dsn           = dict(required=False, aliases=['datasource_name']),
             oracle_home   = dict(required=False, aliases=['oh']),
+            session_container = dict(required=False),
 
             grantee       = dict(required=True, type='str', aliases=['name', 'schema_name', 'role', 'role_name']),
 
@@ -392,12 +393,15 @@ def main():
     directory_privs = module.params["directory_privs"] or []
     grant_mode = module.params["grant_mode"]
     container = module.params["container"]
+    session_container = module.params["session_container"]
     state = module.params["state"]
 
     oc = oracleConnection(module)
 
-    if container:
-        oc.execute_ddl('alter session set container = %s' % container)
+    # Keep backward compatibility: container previously selected the session.
+    effective_container = session_container or container
+    if effective_container:
+        oc.set_container(effective_container)
 
     if state == 'present':
         ensure_grant(module, oc, grantee, grants, object_privs, directory_privs, grant_mode, container)
@@ -422,7 +426,7 @@ from ansible.module_utils.basic import *
 # In these we do import from collections
 try:
     from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_utils import oracleConnection
-except:
+except ImportError:
     pass
 
 

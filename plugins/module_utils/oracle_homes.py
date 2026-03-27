@@ -50,7 +50,7 @@ class OracleHomes():
                             self.oracle_crs = True
                         self.oracle_gi_managed = True
                         self.oracle_standalone = False
-        except:
+        except (IOError, OSError):
             pass
 
         # Try to detect CRS_HOME
@@ -64,7 +64,7 @@ class OracleHomes():
                         crsctl = os.path.join(crs_home, 'bin', 'crsctl')
                         if os.access(crsctl, os.X_OK):
                             self.crsctl = crsctl
-        except:
+        except (IOError, OSError):
             pass
 
         # Try to parse inventory.xml file to get list of ORACLE_HOMEs
@@ -81,7 +81,7 @@ class OracleHomes():
             for home in homes:
                 # TODO: skip for deleted ORACLE_HOME
                 self.add_home(home.attributes['LOC'].value)
-        except:
+        except (IOError, OSError, KeyError):
             pass
 
     def module_warn(self, msg):
@@ -178,7 +178,7 @@ class OracleHomes():
 
 
     def list_processes(self):
-        """
+        r"""
         # Emulate trick form tanelpoder
         # https://tanelpoder.com/2011/02/28/finding-oracle-homes-with/
         #
@@ -214,7 +214,7 @@ class OracleHomes():
                 oraclefile = os.readlink(exefile)
                 ORACLE_HOME = os.path.dirname(oraclefile)
                 ORACLE_HOME = os.path.dirname(ORACLE_HOME)
-            except:
+            except OSError:
                 # In case oracle binary is suid, ptrace does not work,
                 # stat/readlink /proc/<pid>/exec does not work
                 # fails with: Permission denied
@@ -293,9 +293,13 @@ class OracleHomes():
                     break
         return ORACLE_BASE
 
+    def _is_valid_oracle_home(self, oracle_home):
+        return bool(oracle_home and os.path.isdir(oracle_home))
+
     def add_home(self, ORACLE_HOME):
-        if not os.path.isdir(ORACLE_HOME):
-            self.module_warn('ORACLE_HOME: {} does not have valid directory'.format(ORACLE_HOME))
+        if not self._is_valid_oracle_home(ORACLE_HOME):
+            if ORACLE_HOME:
+                self.module_warn('ORACLE_HOME: {} does not have valid directory'.format(ORACLE_HOME))
             return
         if ORACLE_HOME and ORACLE_HOME not in self.homes:
             ORACLE_BASE = self.base_from_home(ORACLE_HOME)
@@ -319,7 +323,7 @@ class OracleHomes():
                     elif component_name == "oracle.tg":
                         component_name = "gateway"
                         break
-            except:
+            except (IOError, OSError):
                 component_name = 'unknown'
                 oracle_owner = 'unknown'
             self.homes[ORACLE_HOME] = {'ORACLE_HOME': ORACLE_HOME
@@ -328,8 +332,9 @@ class OracleHomes():
                 , 'owner': oracle_owner}
 
     def add_sid(self, ORACLE_SID, ORACLE_HOME=None, DB_UNIQUE_NAME=None, crsname=None, running=None):
-        if not os.path.isdir(ORACLE_HOME):
-            self.module_warn('ORACLE_HOME: {} does not have valid directory'.format(ORACLE_HOME))
+        if not self._is_valid_oracle_home(ORACLE_HOME):
+            if ORACLE_HOME:
+                self.module_warn('ORACLE_HOME: {} does not have valid directory'.format(ORACLE_HOME))
             return
         if ORACLE_SID in self.facts_item:
             sid = self.facts_item[ORACLE_SID]
@@ -396,7 +401,13 @@ class OracleHomes():
         delim  = False
         value  = None
         r      = {}
-        out = process.communicate(input=sql.encode(), timeout=10)
+        try:
+            out = process.communicate(input=sql.encode(), timeout=10)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            return ['UNKNOWN']
+        except Exception:
+            return ['UNKNOWN']
         for l in out[0].decode('utf-8').splitlines():
             # module_warn("{}:{}".format(oracle_sid,l.rstrip()))
             if l.strip() in ('STATUS', 'OPEN_MODE', 'ORA_DG_ON', 'DATABASE_ROLE'):
@@ -414,21 +425,32 @@ class OracleHomes():
                 value = False
                 # module_warn(str(r))
         # module_warn("Exit code {}".format(process.returncode))
-        if oracle_sid.startswith('+ASM') and r['STATUS'] == 'STARTED':
+        if process.returncode not in (0, None):
+            return ['UNKNOWN']
+
+        status = r.get('STATUS')
+        open_mode = r.get('OPEN_MODE', 'UNKNOWN')
+        dg_on = r.get('ORA_DG_ON', '0')
+
+        if oracle_sid.startswith('+ASM') and status == 'STARTED':
             return ['ASM', 'STARTED']
         elif oracle_sid.startswith('+ASM'):
-            return ['ASM']
+            return ['ASM', status or 'UNKNOWN']
 
-        if r['STATUS'] == 'STARTED':
+        if not status:
+            return ['UNKNOWN']
+
+        if status == 'STARTED':
             return ['STARTED']
-        elif r['STATUS'] == 'MOUNTED' and int(r['ORA_DG_ON']):
+        elif status == 'MOUNTED' and int(dg_on):
             return ['MOUNTED', 'STANDBY']
-        elif r['STATUS'] == 'MOUNTED':
+        elif status == 'MOUNTED':
             return ['MOUNTED']
-        elif r['STATUS'] == 'OPEN' and int(r['ORA_DG_ON']):
-            return ['OPEN', 'PRIMARY', r['OPEN_MODE']]
-        elif r['STATUS'] == 'OPEN':
-            return ['OPEN', r['OPEN_MODE']]
+        elif status == 'OPEN' and int(dg_on):
+            return ['OPEN', 'PRIMARY', open_mode]
+        elif status == 'OPEN':
+            return ['OPEN', open_mode]
+        return ['UNKNOWN']
 
     @staticmethod
     def demote(user_uid, user_gid, supplementary_groups):

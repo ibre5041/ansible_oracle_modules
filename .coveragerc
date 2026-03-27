@@ -1,0 +1,4 @@
+[run]
+include =
+    plugins/modules/oracle_sql.py
+    plugins/modules/oracle_tnsnames.py

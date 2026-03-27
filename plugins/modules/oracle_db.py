@@ -863,6 +863,7 @@ def main():
             oracle_home         = dict(default=None, aliases=['oh']),
             sid                 = dict(required=False, aliases=['oracle_sid']),
             db_name             = dict(required=True, aliases=['db', 'database_name', 'name']),
+            session_container   = dict(required=False),
             db_unique_name      = dict(required=False, aliases=['dbunqn', 'unique_name']),
             sys_password        = dict(required=False, no_log=True, aliases=['syspw', 'sysdbapassword', 'sysdbapw']),
             system_password     = dict(required=False, no_log=True, aliases=['systempw']),
@@ -1022,7 +1023,7 @@ from ansible.module_utils.basic import *
 try:
     from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_utils import oracleConnection
     from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_homes import *
-except:
+except ImportError:
     pass
     
 

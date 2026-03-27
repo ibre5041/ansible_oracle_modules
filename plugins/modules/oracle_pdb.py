@@ -136,7 +136,7 @@ def check_pdb_exists(conn, pdb_name):
     if not result['open_mode'].startswith('READ'):
         return set(result.items())
 
-    conn.execute_ddl('ALTER SESSION SET CONTAINER = %s' % pdb_name, no_change=True)
+    conn.set_container(pdb_name)
 
     sql = "select property_name, property_value" \
           " from database_properties " \
@@ -231,7 +231,7 @@ def remove_pdb(conn, module, current_state):
 
     if dict(current_state)['open_mode'].startswith('READ'):
         run_sql.append(close_sql)
-    conn.execute_ddl("ALTER SESSION SET CONTAINER = CDB$ROOT", no_change=True)
+    conn.set_container("CDB$ROOT")
     run_sql.append(dropsql)
     for sql in run_sql:
         conn.execute_ddl(sql)
@@ -348,6 +348,7 @@ def main():
             service_name           = dict(required=False, aliases=['sn']),
             dsn                    = dict(required=False, aliases=['datasource_name']),
             oracle_home            = dict(required=False, aliases=['oh']),
+            session_container      = dict(required=False),
 
             pdb_name               = dict(required=True, aliases=['pdb', 'name']),
 
@@ -430,7 +431,7 @@ def main():
 # In these we do import from collections
 try:
     from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_utils import oracleConnection
-except:
+except ImportError:
     pass
 
 

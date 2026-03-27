@@ -181,6 +181,16 @@ except ImportError:
 else:
     oracledb_exists = True
 
+
+def apply_session_container(module, conn):
+    session_container = module.params.get("session_container")
+    if not session_container:
+        return
+    if not re.match(r'^[A-Za-z][A-Za-z0-9_$#]*$', session_container):
+        module.fail_json(msg='Invalid session_container for alter session', changed=False)
+    c = conn.cursor()
+    c.execute('ALTER SESSION SET CONTAINER = %s' % session_container)
+
 # Ansible code
 def main():
     global lconn, conn, lparam, module
@@ -193,6 +203,7 @@ def main():
             user          = dict(required=False),
             password      = dict(required=False, no_log=True),
             mode          = dict(default='normal', choices=["normal","sysdba"]),
+            session_container = dict(required=False),
             state         = dict(default="present", choices=["present", "absent"]),
             privs         = dict(required=True, type='list', aliases=['priv']),
             objs          = dict(required=False, type='list', aliases=['obj']), # CASE SENSITIVE! Can use wildcard %
@@ -256,13 +267,24 @@ def main():
 
     except oracledb.DatabaseError as exc:
         error, = exc.args
-        msg[0] = 'Could not connect to database - %s, connect descriptor: %s' % (error.message, connect)
+        error_msg = getattr(error, 'message', str(error))
+        if 'DPI-1047' in error_msg:
+            msg[0] = (
+                "Oracle Client libraries cannot be loaded (DPI-1047). "
+                "Install Oracle Instant Client or use a thin-compatible connection mode."
+            )
+        else:
+            msg[0] = 'Oracle connection failed: %s' % error_msg
         module.fail_json(msg=msg[0], changed=False)
     if conn.version < "11.2":
         module.fail_json(msg="Database version must be 11gR2 or greater", changed=False)
+    apply_session_container(module, conn)
     #
     if module.check_mode:
-        module.exit_json(changed=False)
+        module.exit_json(
+            changed=True,
+            msg='Check mode: changement possible (estimation conservative pour un calcul de privilèges complexe)'
+        )
     #
     c = conn.cursor()
     var_changes = c.var(oracledb.NUMBER)

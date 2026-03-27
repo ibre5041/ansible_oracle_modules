@@ -133,6 +133,7 @@ def main():
             service_name  = dict(required=False, aliases=['sn']),
             dsn           = dict(required=False, aliases=['datasource_name']),
             oracle_home   = dict(required=False, aliases=['oh']),
+            session_container = dict(required=False),
 
             role          = dict(required=True, type='str'),
             state         = dict(default="present", choices=["present", "absent"]),
@@ -177,7 +178,7 @@ from ansible.module_utils.basic import *
 # In these we do import from collections
 try:
     from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_utils import oracleConnection
-except:
+except ImportError:
     pass
 
 

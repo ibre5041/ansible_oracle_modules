@@ -441,7 +441,7 @@ def stop_service(oc, module, msg, name, database_name):
         (rc, stdout, stderr) = module.run_command(command)
 
         if rc != 0:
-            if 'PRCR-1005' in stdout or 'CRS-2500' or 'PRCD-1316' in stdout: # Already stopped
+            if ('PRCR-1005' in stdout) or ('CRS-2500' in stdout) or ('PRCD-1316' in stdout): # Already stopped
                 return False
             elif 'PRCR-1001' in stdout or 'PRCD-1132' in stdout:
                 msg = 'Service %s doesn\'t exist in database %s' % (name, database_name)
@@ -512,6 +512,7 @@ def main():
             port               = dict(required=False, default=1521, type='int'),
             service_name       = dict(required=False, aliases=['sn']),
             oracle_home        = dict(required=False, aliases=['oh']),
+            session_container  = dict(required=False),
 
             name                = dict(required=True, aliases=['service']),
             database_name       = dict(required=True, aliases=['db']),
@@ -645,7 +646,7 @@ from ansible.module_utils.basic import *
 try:
     from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_utils import oracleConnection
     from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_homes import *
-except:
+except ImportError:
     pass
 
 

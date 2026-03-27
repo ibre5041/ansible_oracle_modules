@@ -448,6 +448,7 @@ def main():
             output              = dict(default="short", choices=["short", "verbose"]),
             state               = dict(default="present", choices=["present", "absent", "opatchversion", "lspatches"]),
         ),
+        supports_check_mode=True,
     )
 
     oracle_home         = module.params["oracle_home"]
@@ -509,6 +510,18 @@ def main():
 
     if state == 'opatchversion':
         module.exit_json(msg=opatch_version, changed=False)
+
+    if module.check_mode and state in ('present', 'absent'):
+        is_applied = check_patch_applied(module, oracle_home, patch_id, patch_version, opatchauto)
+        if state == 'present':
+            module.exit_json(
+                msg='Check mode: patch %s would be applied to %s' % (patch_id, oracle_home),
+                changed=not is_applied
+            )
+        module.exit_json(
+            msg='Check mode: patch %s would be removed from %s' % (patch_id, oracle_home),
+            changed=is_applied
+        )
 
     if state == 'present':
         if not check_patch_applied(module, oracle_home, patch_id, patch_version, opatchauto):

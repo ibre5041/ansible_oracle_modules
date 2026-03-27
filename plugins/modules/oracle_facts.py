@@ -312,6 +312,7 @@ def main():
             service_name  = dict(required=False, aliases=['sn']),
             dsn           = dict(required=False, aliases=['datasource_name']),
             oracle_home   = dict(required=False, aliases=['oh']),
+            session_container = dict(required=False),
             
             password_file=dict(default=False, type='bool', aliases=['paths'], no_log=False),
             instance=dict(default=False, type='bool'),
@@ -366,7 +367,7 @@ def main():
 
     if module.params['userenv']:
         userenv = query_userenv(module, conn)
-        db.update({sid: {'userenv': userenv}})
+        db.update({'userenv': userenv})
 
     if module.params['redo']:
         redo = query_redo(module, conn)
@@ -387,7 +388,7 @@ def main():
             pdb = conn.execute_select_to_dict("SELECT con_id, rawtohex(guid) guid_hex, name, open_mode FROM v$pdbs ORDER BY name")
         else:
             pdb = []
-    except:
+    except Exception:
         pdb = []
 
     db.update({'rac': rac, 'pdb': pdb})
@@ -408,7 +409,7 @@ from ansible.module_utils.basic import *
 try:
     from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_utils import oracleConnection
     from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_homes import OracleHomes
-except:    
+except ImportError:
     pass
 
 
