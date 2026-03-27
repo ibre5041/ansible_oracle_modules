@@ -284,15 +284,22 @@ def ensure_pdb_state(conn, module, current_state):
 
     wanted_state = {}
     ensure_sql = 'alter pluggable database %s ' % pdb_name
+    current_open_mode = dict(current_state).get('open_mode', 'MOUNTED')
     if state in ('opened', 'read_write'):
         wanted_state.update({'open_mode': 'READ WRITE'})
-        ensure_sql += ' open force'
+        if current_open_mode == 'MOUNTED':
+            ensure_sql += 'open read write'
+        else:
+            ensure_sql += 'open read write force'
     elif state == 'closed':
         wanted_state.update({'open_mode': 'MOUNTED'})
-        ensure_sql += ' close immediate'
+        ensure_sql += 'close immediate'
     elif state == 'read_only':
         wanted_state.update({'open_mode': 'READ ONLY'})
-        ensure_sql += 'open read only force'
+        if current_open_mode == 'MOUNTED':
+            ensure_sql += 'open read only'
+        else:
+            ensure_sql += 'open read only force'
     # elif state == 'restricted':
     #     wanted_state = [('read write', 'yes')]
     #     ensure_sql += 'open restricted force'
