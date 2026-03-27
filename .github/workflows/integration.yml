@@ -33,7 +33,10 @@ jobs:
         run: pip install ansible oracledb
 
       - name: Build and install collection
-        run: make build && make install
+        run: |
+          make build
+          VERSION=$(grep ^version: galaxy.yml | cut -d" " -f2)
+          ansible-galaxy collection install --force ibre5041-ansible_oracle_modules-${VERSION}.tar.gz
 
       - name: Configure integration config (Docker)
         run: |
