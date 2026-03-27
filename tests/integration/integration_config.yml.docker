@@ -15,7 +15,7 @@ oracle_sid:          XE
 oracle_dsn:
 oracle_username:     SYS
 oracle_password:     Oracle_4U
-oracle_home:         /opt/oracle/instantclient
+oracle_home:
 mode:                sysdba
 
 # ── Mode A2 : SYSDBA direct sur PDB ──────────────────────────────────────────

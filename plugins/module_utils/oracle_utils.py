@@ -164,7 +164,9 @@ class oracleConnection:
             dsn = None
 
         wallet_connect = '/@%s' % service_name
-        requires_thick = (mode == 'sysdba') or (not user and not password)
+        # Thick mode is only required for OS-authenticated connections (no user/password).
+        # SYSDBA over TCP with explicit credentials works in python-oracledb thin mode (2.x+).
+        requires_thick = not user and not password
         _ensure_oracle_client(module, oracle_home=self.oracle_home, required=requires_thick)
 
         connect = '<unresolved>'
