@@ -34,6 +34,21 @@ def _ensure_fake_ansible_basic():
     if "ansible.module_utils.basic" in sys.modules:
         return
 
+    # Inject a minimal fake oracledb so modules that do
+    #   try: import oracledb / except ImportError: oracledb_exists = False
+    # get oracledb_exists = True even when oracledb is not installed in the
+    # test environment.  Individual tests can still monkeypatch mod.oracledb
+    # or mod.oracledb_exists to control behaviour.
+    if "oracledb" not in sys.modules:
+        _fake_oracledb = types.ModuleType("oracledb")
+        _fake_oracledb.DatabaseError = Exception
+        _fake_oracledb.NUMBER = int
+        _fake_oracledb.STRING = str
+        _fake_oracledb.SYSDBA = 2
+        _fake_oracledb.connect = lambda *a, **kw: None
+        _fake_oracledb.makedsn = lambda **kw: "fake_dsn"
+        sys.modules["oracledb"] = _fake_oracledb
+
     ansible_mod = types.ModuleType("ansible")
     module_utils_mod = types.ModuleType("ansible.module_utils")
     basic_mod = types.ModuleType("ansible.module_utils.basic")
