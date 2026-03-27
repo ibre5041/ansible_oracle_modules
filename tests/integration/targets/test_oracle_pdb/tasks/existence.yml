@@ -21,6 +21,8 @@
     state: "opened"
     pdb_admin_username: foo
     pdb_admin_password: bar
+    file_name_convert:
+      "/opt/oracle/oradata/XE/pdbseed": "/opt/oracle/oradata/XE/XEPDB2"
 
 - name: check an existing PDB is present
   oracle_pdb:
@@ -51,6 +53,8 @@
     state: "present"
     pdb_admin_username: foo
     pdb_admin_password: bar
+    file_name_convert:
+      "/opt/oracle/oradata/XE/pdbseed": "/opt/oracle/oradata/XE/XEPDB3"
   register: _
   failed_when: _.failed or not _.changed
 

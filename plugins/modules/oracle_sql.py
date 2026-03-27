@@ -123,6 +123,8 @@ def execute_statements(conn, script):
     for query in re.split(seperator, script, flags=re.MULTILINE):
         if query.strip():
             output_lines += conn.execute_statement(query.strip())
+            if not conn.module.check_mode:
+                conn.changed = True
 
 
 def main():

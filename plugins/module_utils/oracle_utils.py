@@ -311,7 +311,6 @@ class oracleConnection:
                     with self.conn.cursor() as cursor:
                         cursor.execute(statement)
                 self.ddls.append(statement)
-                self.changed = True
             else:
                 self.ddls.append('--' + statement)
             return output_lines

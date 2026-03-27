@@ -25,4 +25,5 @@
     <<: *pdb_con_param
     name: "open_cursors"
     state: "reset"
+  ignore_errors: yes
 ...
