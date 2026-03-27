@@ -309,8 +309,13 @@ class oracleConnection:
                                 break
                 else:
                     with self.conn.cursor() as cursor:
-                        cursor.execute(statement)
-                self.ddls.append(statement)
+                        cursor.execute(statement, params)
+                        _MUTATING = ('CREATE', 'ALTER', 'DROP', 'INSERT', 'UPDATE',
+                                     'DELETE', 'MERGE', 'TRUNCATE', 'RENAME', 'GRANT', 'REVOKE')
+                        is_mutating = statement.strip().upper().startswith(_MUTATING) or cursor.rowcount > 0
+                    if is_mutating:
+                        self.ddls.append(statement)
+                        self.changed = True
             else:
                 self.ddls.append('--' + statement)
             return output_lines
