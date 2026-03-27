@@ -35,8 +35,9 @@ def _ensure_oracle_client(module, oracle_home=None, required=False):
     init_errors = []
     candidates = []
     if oracle_home:
-        candidates.append({"lib_dir": oracle_home.rstrip("/")})
-    candidates.append({})
+        candidates.append({"lib_dir": os.path.join(oracle_home.rstrip("/"), "lib")})  # Full DB install
+        candidates.append({"lib_dir": oracle_home.rstrip("/")})  # Instant Client
+    candidates.append({})  # System default (LD_LIBRARY_PATH, ORACLE_HOME env, etc.)
 
     for kwargs in candidates:
         try:
@@ -48,22 +49,23 @@ def _ensure_oracle_client(module, oracle_home=None, required=False):
         except oracledb.DatabaseError as exc:
             error = exc.args[0] if exc.args else exc
             init_errors.append(error)
-            if _is_dpi_1047(error):
-                # Do not warn when thick mode is optional.
-                if not required:
-                    return False
-                module.fail_json(
-                    msg=(
-                        "Oracle Client libraries are required for this operation but cannot be loaded "
-                        "(DPI-1047). Install Oracle Instant Client or switch to a thin-compatible "
-                        "connection mode."
-                    ),
-                    changed=False,
-                )
+            # Continue to next candidate regardless of error type.
 
-    if required:
-        detail = str(init_errors[-1]) if init_errors else "unknown error"
-        module.fail_json(msg="Unable to initialize Oracle Client: %s" % detail, changed=False)
+    # All candidates exhausted.
+    if not required:
+        return False
+    has_dpi_1047 = any(_is_dpi_1047(e) for e in init_errors)
+    if has_dpi_1047:
+        module.fail_json(
+            msg=(
+                "Oracle Client libraries are required for this operation but cannot be loaded "
+                "(DPI-1047). Install Oracle Instant Client or set LD_LIBRARY_PATH to include "
+                "$ORACLE_HOME/lib."
+            ),
+            changed=False,
+        )
+    detail = str(init_errors[-1]) if init_errors else "unknown error"
+    module.fail_json(msg="Unable to initialize Oracle Client: %s" % detail, changed=False)
     return False
 
 def oracle_connect(module):
