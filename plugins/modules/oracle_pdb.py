@@ -254,11 +254,6 @@ def create_pdb(conn, module):
     for sql in run_sql:
         conn.execute_ddl(sql)
 
-    # Oracle 21c switches the session container to the newly created PDB
-    # after CREATE PLUGGABLE DATABASE. Reset to CDB$ROOT so the subsequent
-    # ALTER PLUGGABLE DATABASE ... OPEN runs from the correct context.
-    conn.execute_ddl('ALTER SESSION SET CONTAINER = CDB$ROOT', no_change=True)
-
     return set({'name': pdb_name.upper(), 'open_mode': 'MOUNTED'}.items())
 
 def remove_pdb(conn, module, current_state):
@@ -359,9 +354,10 @@ def ensure_pdb_state(conn, module, current_state):
         module.exit_json(msg=msg, changed=conn.changed, ddls=conn.ddls)
 
     for sql in change_db_sql:
-        # ORA-65046 can occur for SAVE STATE on certain Oracle XE configurations;
-        # it is non-fatal because the PDB is already in the intended open mode.
-        conn.execute_ddl(sql, ignore_errors=[65046] if 'save state' in sql.lower() else [])
+        # Diagnostic: log current container before each DDL so CI logs reveal container switches
+        con_name = conn.execute_select('SELECT SYS_CONTEXT(\'USERENV\',\'CON_NAME\') FROM DUAL', fetchone=True)
+        module.warn('oracle_pdb: con_name=%s before: %s' % (con_name, sql))
+        conn.execute_ddl(sql)
 
     msg = 'Pluggable database %s has been put in the intended state: %s' % (pdb_name, state)
     module.exit_json(msg=msg, changed=conn.changed, ddls=conn.ddls)

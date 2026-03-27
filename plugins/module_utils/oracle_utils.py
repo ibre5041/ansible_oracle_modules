@@ -282,6 +282,8 @@ class oracleConnection:
                 self.changed = True
         except oracledb.DatabaseError as e:
             error = e.args[0]
+            self.module.warn('oracle_utils: DatabaseError code=%r type=%s ignore_errors=%r' % (
+                getattr(error, 'code', 'N/A'), type(error).__name__, ignore_errors))
             if error.code not in ignore_errors:
                 self.module.fail_json(msg=error.message, code=error.code, ddls=self.ddls, changed=self.changed)
             else:
