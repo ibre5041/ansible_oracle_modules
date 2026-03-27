@@ -66,6 +66,18 @@ def _ensure_oracle_client(module, oracle_home=None, required=False):
         module.fail_json(msg="Unable to initialize Oracle Client: %s" % detail, changed=False)
     return False
 
+def sanitize_string_params(module_params):
+    """Strip leading/trailing whitespace from every string value in module.params.
+
+    Mutates the dict in place so all downstream reads of module.params are
+    automatically cleaned without changing any call site. Non-string values
+    (None, int, bool, list, dict) are left untouched.
+    """
+    for key, value in module_params.items():
+        if isinstance(value, str):
+            module_params[key] = value.strip()
+
+
 def oracle_connect(module):
     """
     Connect to the database using parameter provided by Ansible module instance.
@@ -313,8 +325,8 @@ class oracleConnection:
                         _MUTATING = ('CREATE', 'ALTER', 'DROP', 'INSERT', 'UPDATE',
                                      'DELETE', 'MERGE', 'TRUNCATE', 'RENAME', 'GRANT', 'REVOKE')
                         is_mutating = statement.strip().upper().startswith(_MUTATING) or cursor.rowcount > 0
+                    self.ddls.append(statement)
                     if is_mutating:
-                        self.ddls.append(statement)
                         self.changed = True
             else:
                 self.ddls.append('--' + statement)

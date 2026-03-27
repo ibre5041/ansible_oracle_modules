@@ -359,7 +359,9 @@ def ensure_pdb_state(conn, module, current_state):
         module.exit_json(msg=msg, changed=conn.changed, ddls=conn.ddls)
 
     for sql in change_db_sql:
-        conn.execute_ddl(sql)
+        # ORA-65046 can occur for SAVE STATE on certain Oracle XE configurations;
+        # it is non-fatal because the PDB is already in the intended open mode.
+        conn.execute_ddl(sql, ignore_errors=[65046] if 'save state' in sql.lower() else [])
 
     msg = 'Pluggable database %s has been put in the intended state: %s' % (pdb_name, state)
     module.exit_json(msg=msg, changed=conn.changed, ddls=conn.ddls)
@@ -421,6 +423,8 @@ def main():
         mutually_exclusive=[['sourcedb', 'plug_file']],
         supports_check_mode=True
     )
+    sanitize_string_params(module.params)
+
 
     pdb_name = module.params["pdb_name"]
     state = module.params["state"]
@@ -484,9 +488,9 @@ def main():
 
 # In these we do import from collections
 try:
-    from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_utils import oracleConnection
+    from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_utils import oracleConnection, sanitize_string_params
 except ImportError:
-    pass
+    sanitize_string_params = lambda p: None
 
 
 from ansible.module_utils.basic import *

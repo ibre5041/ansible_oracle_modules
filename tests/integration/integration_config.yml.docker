@@ -33,7 +33,7 @@ oracle_session_container: XEPDB1
 # ── Mode C : connexion normale username/password (sans SYSDBA) ───────────────
 # Utilisé par : test_oracle_ping (bloc Mode C), test_oracle_facts (no_sysdba.yml)
 oracle_normal_service_name: XEPDB1
-oracle_normal_username:     PDBADMIN
+oracle_normal_username:     SYSTEM
 oracle_normal_password:     Oracle_4U
 oracle_normal_mode:         normal
 
