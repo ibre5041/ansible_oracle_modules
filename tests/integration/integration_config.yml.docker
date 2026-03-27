@@ -1,0 +1,48 @@
+# Oracle XE 21c — Docker integration config
+# Usage: make test-docker
+#        (ou manuellement : make integration-config-docker && make test ROLE=xxx)
+#
+# Image: gvenzl/oracle-xe:21-slim
+# Démarrer avec: docker compose up -d
+# Le conteneur est prêt quand le healthcheck passe (~90s)
+
+# ── Mode A1 : SYSDBA direct sur CDB ──────────────────────────────────────────
+# Utilisé par : test_oracle_pdb (CREATE/DROP PLUGGABLE DATABASE)
+oracle_hostname:     localhost
+oracle_port:         1521
+oracle_service_name: XE        # service CDB
+oracle_sid:          XE
+oracle_dsn:
+oracle_username:     SYS
+oracle_password:     Oracle_4U
+oracle_home:
+mode:                sysdba
+
+# ── Mode A2 : SYSDBA direct sur PDB ──────────────────────────────────────────
+# Utilisé par : test_oracle_user, test_oracle_role, test_oracle_grant,
+#               test_oracle_tablespace, test_oracle_parameter, etc.
+oracle_pdb_service_name: XEPDB1
+oracle_pdb_username:     SYS
+oracle_pdb_password:     Oracle_4U
+
+# ── Mode B : SYSDBA sur CDB + session_container ──────────────────────────────
+# Connexion à XE (CDB) puis ALTER SESSION SET CONTAINER = XEPDB1
+# Utilisé par : test_oracle_ping (bloc Mode B)
+oracle_session_container: XEPDB1
+
+# ── Mode C : connexion normale username/password (sans SYSDBA) ───────────────
+# Utilisé par : test_oracle_ping (bloc Mode C), test_oracle_facts (no_sysdba.yml)
+oracle_normal_service_name: XEPDB1
+oracle_normal_username:     PDBADMIN
+oracle_normal_password:     Oracle_4U
+oracle_normal_mode:         normal
+
+# ── Flags d'environnement ─────────────────────────────────────────────────────
+running_on_client:     true    # connexion TCP distante
+running_on_server:     false   # pas d'accès OS Oracle
+running_on_server_crs: false   # pas de Grid Infrastructure
+running_on_cdb:        true    # XE est un CDB
+running_on_pdb:        true    # XEPDB1 disponible (oracle_pdb_service_name)
+running_on_db_asm:     false   # stockage filesystem (pas ASM)
+running_on_db_fs:      true    # stockage filesystem
+running_on_adb:        false   # pas Oracle ADB
