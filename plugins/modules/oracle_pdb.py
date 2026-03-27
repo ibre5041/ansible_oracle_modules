@@ -253,6 +253,11 @@ def create_pdb(conn, module):
     for sql in run_sql:
         conn.execute_ddl(sql)
 
+    # Oracle 21c switches the session container to the newly created PDB
+    # after CREATE PLUGGABLE DATABASE. Reset to CDB$ROOT so the subsequent
+    # ALTER PLUGGABLE DATABASE ... OPEN runs from the correct context.
+    conn.execute_ddl('ALTER SESSION SET CONTAINER = CDB$ROOT', no_change=True)
+
     return set({'name': pdb_name.upper(), 'open_mode': 'MOUNTED'}.items())
 
 def remove_pdb(conn, module, current_state):
