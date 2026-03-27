@@ -228,7 +228,8 @@ def create_pdb(conn, module):
         if snapshot_copy:
             createsql += ' snapshot copy'
     elif pdb_admin_username:
-        createsql += " admin user %s identified by \"%s\" " % (pdb_admin_username, pdb_admin_password)
+        safe_pdb_admin_password = pdb_admin_password.replace('"', '""')
+        createsql += " admin user %s identified by \"%s\" " % (pdb_admin_username, safe_pdb_admin_password)
         if roles:
             createsql += ' roles = (%s)' % ','.join(roles)
     else:
