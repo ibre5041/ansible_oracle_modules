@@ -29,6 +29,17 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Install Oracle Instant Client
+        run: |
+          sudo apt-get install -y libaio1 wget unzip
+          wget -q https://download.oracle.com/otn_software/linux/instantclient/instantclient-basiclite-linuxx64.zip
+          sudo unzip -q instantclient-basiclite-linuxx64.zip -d /opt/oracle
+          IC_DIR=$(ls -d /opt/oracle/instantclient_*)
+          sudo sh -c "echo ${IC_DIR} > /etc/ld.so.conf.d/oracle-instantclient.conf"
+          sudo ldconfig
+          echo "LD_LIBRARY_PATH=${IC_DIR}" >> $GITHUB_ENV
+          echo "ORACLE_HOME=${IC_DIR}" >> $GITHUB_ENV
+
       - name: Install dependencies
         run: pip install ansible oracledb
 
