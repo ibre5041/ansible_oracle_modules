@@ -268,7 +268,8 @@ def main():
     except oracledb.DatabaseError as exc:
         error, = exc.args
         error_msg = getattr(error, 'message', str(error))
-        if 'DPI-1047' in error_msg:
+        requires_thick = (mode == 'sysdba') or (not user and not password)
+        if 'DPI-1047' in error_msg and requires_thick:
             msg[0] = (
                 "Oracle Client libraries cannot be loaded (DPI-1047). "
                 "Install Oracle Instant Client or use a thin-compatible connection mode."

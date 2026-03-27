@@ -1,4 +1,5 @@
 [run]
-include =
-    plugins/modules/oracle_sql.py
-    plugins/modules/oracle_tnsnames.py
+source =
+    plugins/modules
+omit =
+    plugins/modules/__init__.py
