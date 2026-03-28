@@ -1894,7 +1894,7 @@ def test_pdb_unplug_missing_exits(monkeypatch):
 
 
 def test_pdb_unplug_executes_ddls(monkeypatch):
-    """unplug_pdb: executes close, unplug, drop DDLs (module has unplug_dest bug)."""
+    """unplug_pdb: executes close, unplug, drop DDLs and exits successfully."""
     mod = _load("oracle_pdb")
 
     class _M(BaseFakeModule):
@@ -1903,13 +1903,11 @@ def test_pdb_unplug_executes_ddls(monkeypatch):
     m = _M()
     conn = _PdbConn(m, "MOUNTED")
 
-    # The module has a bug: 'unplug_dest' is undefined at line 171, so NameError
-    # is expected after DDLs are executed.
-    try:
+    with pytest.raises(ExitJson) as exc:
         mod.unplug_pdb(conn, m)
-    except NameError:
-        pass
 
-    assert len(conn.ddls) == 3
-    assert any("unplug" in d.lower() for d in conn.ddls)
-    assert any("drop" in d.lower() for d in conn.ddls)
+    result = exc.value.args[0]
+    assert result["changed"] is True
+    assert len(result["ddls"]) == 3
+    assert any("unplug" in d.lower() for d in result["ddls"])
+    assert any("drop" in d.lower() for d in result["ddls"])
