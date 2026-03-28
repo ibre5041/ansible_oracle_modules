@@ -353,10 +353,12 @@ def ensure_pdb_state(conn, module, current_state):
         msg = 'Pluggable database %s already in the intended state' % pdb_name
         module.exit_json(msg=msg, changed=conn.changed, ddls=conn.ddls)
 
+    # check_pdb_exists may have switched the session into the PDB (to query properties).
+    # Reset to CDB$ROOT before state-change DDLs so Oracle does not send session-container
+    # change piggybacks that break python-oracledb thin-mode protocol parsing.
+    conn.set_container("CDB$ROOT")
+
     for sql in change_db_sql:
-        # Diagnostic: log current container before each DDL so CI logs reveal container switches
-        con_name = conn.execute_select('SELECT SYS_CONTEXT(\'USERENV\',\'CON_NAME\') FROM DUAL', fetchone=True)
-        module.warn('oracle_pdb: con_name=%s before: %s' % (con_name, sql))
         conn.execute_ddl(sql)
 
     msg = 'Pluggable database %s has been put in the intended state: %s' % (pdb_name, state)
@@ -410,7 +412,7 @@ def main():
             #unplug_dest            = dict(required=False, aliases=['plug_dest', 'upd', 'pd']),
             file_name_convert      = dict(type='dict', required=False, aliases=['fnc']),
             service_name_convert   = dict(type='dict', required=False, aliases=['snc']),
-            default_tablespace_type = dict(default='smallfile', choices=['smallfile', 'bigfile']),
+            default_tablespace_type = dict(default=None, choices=['smallfile', 'bigfile']),
             default_tablespace  = dict(required=False),
             default_temp_tablespace = dict(required=False),
             timezone            = dict(required=False)
