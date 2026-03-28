@@ -68,6 +68,18 @@ def _ensure_oracle_client(module, oracle_home=None, required=False):
     module.fail_json(msg="Unable to initialize Oracle Client: %s" % detail, changed=False)
     return False
 
+def sanitize_string_params(module_params):
+    """Strip leading/trailing whitespace from every string value in module.params.
+
+    Mutates the dict in place so all downstream reads of module.params are
+    automatically cleaned without changing any call site. Non-string values
+    (None, int, bool, list, dict) are left untouched.
+    """
+    for key, value in module_params.items():
+        if isinstance(value, str):
+            module_params[key] = value.strip()
+
+
 def oracle_connect(module):
     """
     Connect to the database using parameter provided by Ansible module instance.
@@ -166,7 +178,9 @@ class oracleConnection:
             dsn = None
 
         wallet_connect = '/@%s' % service_name
-        requires_thick = (mode == 'sysdba') or (not user and not password)
+        # Thick mode is only required for OS-authenticated connections (no user/password).
+        # SYSDBA over TCP with explicit credentials works in python-oracledb thin mode (2.x+).
+        requires_thick = not user and not password
         _ensure_oracle_client(module, oracle_home=self.oracle_home, required=requires_thick)
 
         connect = '<unresolved>'
@@ -308,9 +322,14 @@ class oracleConnection:
                             if num_lines < chunk_size:  # if less lines than the chunk value was fetched, it's the end
                                 break
                 else:
-                    with self.conn.cursor() as cursor:                    
-                        cursor.execute(statement)
-                self.ddls.append(statement)
+                    with self.conn.cursor() as cursor:
+                        cursor.execute(statement, params)
+                        _MUTATING = ('CREATE', 'ALTER', 'DROP', 'INSERT', 'UPDATE',
+                                     'DELETE', 'MERGE', 'TRUNCATE', 'RENAME', 'GRANT', 'REVOKE')
+                        is_mutating = statement.strip().upper().startswith(_MUTATING) or cursor.rowcount > 0
+                    self.ddls.append(statement)
+                    if is_mutating:
+                        self.changed = True
             else:
                 self.ddls.append('--' + statement)
             return output_lines

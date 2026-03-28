@@ -528,6 +528,8 @@ def main():
             force               = dict(default=False, type='bool')
         ),
     )
+    sanitize_string_params(module.params)
+
 
     name                = module.params["name"]
     oracle_home         = module.params["oracle_home"]
@@ -646,10 +648,10 @@ from ansible.module_utils.basic import *
 
 # In these we do import from collections
 try:
-    from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_utils import oracleConnection
+    from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_utils import oracleConnection, sanitize_string_params
     from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_homes import *
 except ImportError:
-    pass
+    sanitize_string_params = lambda p: None
 
 
 if __name__ == '__main__':

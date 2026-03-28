@@ -11,11 +11,12 @@
       dsn: "{{ oracle_dsn }}"
       mode: "{{ mode }}"
       oracle_home: "{{ oracle_home }}"
-      
+
 - name: 'Connection paramters - see or use integration_config.yml.template'
   debug:
     var: connection_parameters
 
+# Mode A1 : SYSDBA local via OS (/ as sysdba)
 - name: "Connect / as sysdba"
   oracle_ping:
     mode: sysdba
@@ -24,21 +25,57 @@
     ORACLE_SID: "{{ oracle_sid }}"
   register: _oracle_instance
   when: running_on_server
-    
+
 - name: 'Connection succeeded "/ as sysdba"'
   debug:
     var: _oracle_instance
   when: running_on_server
 
-- name: "Connect remote"
+# Mode A1 : SYSDBA distant direct (service CDB ou PDB selon oracle_service_name)
+- name: "Connect remote (SYSDBA direct)"
   oracle_ping:
     <<: *con_param
   register: _oracle_instance
   when: running_on_client
-    
-- name: 'Connection succeeded: remote'
+
+- name: 'Connection succeeded: remote SYSDBA direct'
   debug:
     var: _oracle_instance
   when: running_on_client
+
+# Mode B : SYSDBA sur CDB + session_container → bascule dans le PDB
+- name: "Connect via CDB + session_container (Mode B)"
+  oracle_ping:
+    hostname:          "{{ oracle_hostname }}"
+    port:              "{{ oracle_port }}"
+    service_name:      "{{ oracle_service_name }}"
+    username:          "{{ oracle_username }}"
+    password:          "{{ oracle_password }}"
+    mode:              sysdba
+    session_container: "{{ oracle_session_container }}"
+  register: _oracle_instance_session_container
+  when: running_on_client | bool and oracle_session_container is defined and oracle_session_container | length > 0
+
+- name: 'Connection succeeded: CDB + session_container'
+  debug:
+    var: _oracle_instance_session_container
+  when: running_on_client | bool and oracle_session_container is defined and oracle_session_container | length > 0
+
+# Mode C : connexion normale username/password (sans SYSDBA)
+- name: "Connect as normal user (no SYSDBA) (Mode C)"
+  oracle_ping:
+    hostname:     "{{ oracle_hostname }}"
+    port:         "{{ oracle_port }}"
+    service_name: "{{ oracle_normal_service_name }}"
+    username:     "{{ oracle_normal_username }}"
+    password:     "{{ oracle_normal_password }}"
+    mode:         "{{ oracle_normal_mode }}"
+  register: _oracle_instance_normal
+  when: running_on_client | bool and oracle_normal_username is defined and oracle_normal_username | length > 0
+
+- name: 'Connection succeeded: normal user'
+  debug:
+    var: _oracle_instance_normal
+  when: running_on_client | bool and oracle_normal_username is defined and oracle_normal_username | length > 0
 
 ...

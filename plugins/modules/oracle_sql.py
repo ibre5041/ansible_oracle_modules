@@ -97,9 +97,9 @@ from ansible.module_utils.basic import AnsibleModule
 
 # In thise we do import from collections
 try:
-    from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_utils import oracleConnection
+    from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_utils import oracleConnection, sanitize_string_params
 except ImportError:
-    pass
+    sanitize_string_params = lambda p: None
 
 
 output_lines = []
@@ -148,6 +148,8 @@ def main():
         required_together=[('username', 'password')],
         supports_check_mode=True
     )
+    sanitize_string_params(module.params)
+
 
     script = module.params["script"]
     sql = module.params["sql"]

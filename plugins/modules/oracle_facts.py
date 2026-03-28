@@ -327,6 +327,8 @@ def main():
         ),
         supports_check_mode=True
     )
+    sanitize_string_params(module.params)
+
 
     # Connect to database
     conn = oracleConnection(module)
@@ -407,10 +409,10 @@ from ansible.module_utils.basic import *
 #    pass
 
 try:
-    from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_utils import oracleConnection
+    from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_utils import oracleConnection, sanitize_string_params
     from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_homes import OracleHomes
 except ImportError:
-    pass
+    sanitize_string_params = lambda p: None
 
 
 if __name__ == '__main__':

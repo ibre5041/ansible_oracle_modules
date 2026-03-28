@@ -462,6 +462,8 @@ def main():
         mutually_exclusive=[['schema_password', 'schema_password_hash']],
         supports_check_mode=True,
     )
+    sanitize_string_params(module.params)
+
 
     schema = module.params["schema"]
     state = module.params["state"]
@@ -496,9 +498,9 @@ from ansible.module_utils.basic import *
 
 # In these we do import from collections
 try:
-    from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_utils import oracleConnection
+    from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_utils import oracleConnection, sanitize_string_params
 except ImportError:
-    pass
+    sanitize_string_params = lambda p: None
 
 
 if __name__ == '__main__':
