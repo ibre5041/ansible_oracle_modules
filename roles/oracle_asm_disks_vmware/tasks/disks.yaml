@@ -36,9 +36,13 @@
   register: _asm_disk_partitions
   when: first_rac_node is not defined or ansible_hostname == first_rac_node
 
+- debug:
+    var: _asm_disk_partitions
+  when: first_rac_node is not defined or ansible_hostname == first_rac_node
+
 - name: Build a list of all ASM partitions
   set_fact:
-    asm_disk_partitions : "{{ _asm_disks.files | map(attribute='path') | list }}"
+    asm_disk_partitions : "{{ _asm_disk_partitions.files | map(attribute='path') | list }}"
   when: first_rac_node is not defined or ansible_hostname == first_rac_node
 
 - debug:
