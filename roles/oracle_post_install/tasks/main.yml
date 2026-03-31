@@ -17,6 +17,7 @@
   pip:
     name: oracledb
     extra_args: --user
+  failed_when: False             # this will fail on Centos 8, when platform-python is ver. 3.6
   become: yes
   become_user: "{{ oracle_os_user }}"
 
