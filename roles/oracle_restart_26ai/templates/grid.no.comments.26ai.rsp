@@ -1,0 +1,40 @@
+oracle.install.responseFileVersion=/oracle/install/rspfmt_crsinstall_response_schema_v23.0.0
+INVENTORY_LOCATION={{ oracle_inventory_location }}
+installOption={{ 'HA_CONFIG' if oracle_install_type == 'restart' else 'CRS_CONFIG' }}
+
+ORACLE_BASE={{ oracle_install_dir_base }}
+
+clusterUsage=RAC
+zeroDowntimeGIPatching=false
+skipDriverUpdate=false
+OSDBA=asmdba
+OSASM=asmadmin
+scanType=LOCAL_SCAN
+configureAsExtendedCluster=false
+configureGNS=false
+configureDHCPAssignedVIPs=false
+storageOption=FLEX_ASM_STORAGE
+useIPMI=false
+diskGroupName=XDATA
+redundancy=EXTERNAL
+auSize=4
+
+disksWithFailureGroupNames={{ asm_disk_partitions|join(',,') }},
+diskList={{ asm_disk_partitions|join(',') }}
+diskString=/dev/asmshared*p1*
+
+ignoreDownNodes=false
+configureBackupDG=false
+backupDGName=RECO
+backupDGRedundancy=NORMAL
+backupDGAUSize=1
+managementOption=NONE
+omsPort=0
+executeRootScript=false
+sudoPath=/usr/local/bin/sudo
+sudoUserName=oracle
+enableAutoFixup=false
+
+sysasmPassword={{ oracle_password }}
+asmsnmpPassword={{ oracle_password }}
+
