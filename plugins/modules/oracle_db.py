@@ -578,9 +578,12 @@ def ensure_db_state(module, ohomes, newdb):
     if timezone:
         wanted_set.add(('timezone', timezone))
 
-    sid = guess_oracle_sid(module, ohomes)
-    conn = oracleConnection(module)
 
+    sid = guess_oracle_sid(module, ohomes)
+    if not ohomes.facts_item[sid]['running'] : # try to start DB if it is down
+        start_instance(module, ohomes, 'open', sid)
+    conn = oracleConnection(module)
+    
     propsql = """
     select property_name, property_value 
     from database_properties 
@@ -824,10 +827,10 @@ def start_instance(module, ohomes, open_mode, instance_name):
             crsname = db_name
 
         srvctl = os.path.join(oracle_home, 'bin', 'srvctl')
-        if ohomes.facts_item[sid]['israc']:
+        if ohomes.oracle_crs:
             command = [srvctl, 'start', 'instance', '-d', crsname, '-i', instance_name]
         else:
-            command = [srvctl, 'start', 'database', '-d', crsname]
+            command = [srvctl, 'start', 'database', '-d', db_unique_name]
         if open_mode:
             command.extend(['-o', open_mode])
         (rc, stdout, stderr) = module.run_command(command)
@@ -1024,7 +1027,7 @@ from ansible.module_utils.basic import *
 # In these we do import from collections
 try:
     from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_utils import oracleConnection, sanitize_string_params
-    from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_homes import *
+    from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_homes import OracleHomes
 except ImportError:
     sanitize_string_params = lambda p: None
     
