@@ -442,31 +442,31 @@ class OracleHomes():
         return result
 
 
-# def main():
-#     h = OracleHomes(None)
-#     h.list_crs_instances()
-#     h.list_processes()
-#     h.parse_oratab()
-#
-#     for sid in list(h.facts_item):
-#         try:
-#             sqlplus_path = os.path.join(h.facts_item[sid]['ORACLE_HOME'], 'bin', 'oracle')
-#             oracle_owner = getpwuid(os.stat(sqlplus_path).st_uid).pw_name
-#             h.facts_item[sid]['owner'] = oracle_owner
-#         except BaseException as e:
-#             print(e)
-#             pass
-#
-#         if h.facts_item[sid]["running"]:
-#             status = h.query_db_status(oracle_owner=h.facts_item[sid]['owner']
-#                                        , oracle_home=h.facts_item[sid]['ORACLE_HOME']
-#                                        , oracle_sid=h.facts_item[sid]['ORACLE_SID'])
-#             h.facts_item[sid]['status'] = status
-#         else:
-#             h.facts_item[sid]['status'] = ['DOWN']
-#
-#     print(json.dumps(h.facts_item, sort_keys=True, indent=2))
-#
-#
-# if __name__ == '__main__':
-#     main()
+def main():
+    h = OracleHomes(None)
+    h.list_crs_instances()
+    h.list_processes()
+    h.parse_oratab()
+
+    for sid in list(h.facts_item):
+        try:
+            sqlplus_path = os.path.join(h.facts_item[sid]['ORACLE_HOME'], 'bin', 'oracle')
+            oracle_owner = getpwuid(os.stat(sqlplus_path).st_uid).pw_name
+            h.facts_item[sid]['owner'] = oracle_owner
+        except BaseException as e:
+            print(e)
+            pass
+
+        if h.facts_item[sid]["running"]:
+            status = h.query_db_status(oracle_owner=h.facts_item[sid]['owner']
+                                       , oracle_home=h.facts_item[sid]['ORACLE_HOME']
+                                       , oracle_sid=h.facts_item[sid]['ORACLE_SID'])
+            h.facts_item[sid]['status'] = status
+        else:
+            h.facts_item[sid]['status'] = ['DOWN']
+
+    print(json.dumps(h.facts_item, sort_keys=True, indent=2))
+
+
+if __name__ == '__main__':
+    main()
