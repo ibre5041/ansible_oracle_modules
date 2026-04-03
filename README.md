@@ -12,21 +12,11 @@ To use this collection place this in requirements.yml
 
     ---
     collections:
-      - name: https://github.com/cmodiano/oracle_modules.git
+      - name: https://github.com/ibre5041/ansible_oracle_modules.git
         type: git
         version: main
 
 And then execute: `ansible-galaxy collection install -r collections/requirements.yml`
-
-In playbooks, set the collection once and call modules without repeating FQCN:
-
-    - hosts: all
-      collections:
-        - ibre5041.ansible_oracle_modules
-      tasks:
-        - oracle_ping:
-            hostname: db01
-            service_name: cdb1
 
 Most (if not all) modules require `oracledb` either on your  managed node or on "control machine".
 To install `oracledb` you can use: `pip3 install --user oracledb` (`/usr/libexec/platform-python -m pip install --user oracledb` on RHEL8)
@@ -37,14 +27,6 @@ The default behaviour for the modules using `oracledb` is this:
 - If neither username and password is passed as input to the module(s), the use of an Oracle wallet is assumed.
 - In that case, the `oracledb.makedsn` step is skipped, and the connection will use the `'/@<service_name>'` format instead.
 - You then need to make sure that you're using the correct tns-entry (service_name) to match the credential stored in the wallet.
-
-## Recent improvements
-
-- Runtime handling is hardened for thin/thick mode and clearer DPI-1047 messages.
-- Status probing was hardened to reduce ASM/DB false positives.
-- Session container routing is standardized with `session_container` across DB modules.
-- `pdb_local_connection` has been removed from `oracle_sql`; use `session_container` (or `pdb_name` local fallback) instead.
-- French documentation is now split by module under `docs/fr/modules/`.
 
 # Modules:
 
@@ -123,7 +105,7 @@ The default behaviour for the modules using `oracledb` is this:
 - `ln -s "$PWD/ansible_oracle_modules/plugins/module_utils" ~/devroot/ansible_collections/ibre5041/ansible_oracle_modules/plugins/module_utils`
 - `export PYTHONPATH="$PWD/devroot:$PYTHONPATH"`
 - `python3 -c "import ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_homes"`
-- prepare module parameter .json file, like: `module_args.db.json`
+- prepare module paremeter .json file, like: `module_args.db.json`
 - check it: `cat module_args.db.json | jq .`
 - execute and develop module:
 
