@@ -294,8 +294,16 @@ from ansible.module_utils.basic import *
 # In these we do import from collections
 try:
     from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_homes import OracleHomes
-except ImportError as e:
-    raise ImportError("Failed to import OracleHomes: {}".format(e))
+except ImportError as collections_error:
+    try:
+        # Unit tests and non-collection execution paths can resolve module_utils directly.
+        from ansible.module_utils.oracle_homes import OracleHomes
+    except ImportError as local_error:
+        raise ImportError(
+            "Failed to import OracleHomes from collection ({}) and local module_utils ({})".format(
+                collections_error, local_error
+            )
+        )
 
 if __name__ == '__main__':
     main()
