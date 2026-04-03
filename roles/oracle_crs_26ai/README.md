@@ -1,38 +1,66 @@
-Role Name
-=========
+oracle_crs_26ai
+===============
 
-A brief description of the role goes here.
+Install and configure Oracle Grid Infrastructure (CRS) 26ai, including OS-level prerequisites for ASM disks and RAC-oriented bootstrap steps.
 
 Requirements
 ------------
 
-Any pre-requisites that may not be covered by Ansible itself or the role should be mentioned here. For instance, if the role uses the EC2 module, it may be a good idea to mention in this section that the boto package is required.
+- Linux host with required OS packages and kernel parameters.
+- Oracle Grid Infrastructure media available via variables used by `oracle_download_package`.
+- Inventory variables for network interfaces and cluster topology.
 
 Role Variables
 --------------
 
-A description of the settable variables for this role should go here, including any variables that are in defaults/main.yml, vars/main.yml, and any variables that can/should be set via parameters to the role. Any variables that are read from other roles and/or the global scope (ie. hostvars, group vars, etc.) should be mentioned here as well.
+Commonly used variables are defined in:
+
+- `defaults/main.yml` (for example `oracle_home`, `oracle_gi_response_file`, `oracle_crs_public_iface`)
+- `vars/main.yml` (for example `first_rac_node`)
+- shared defaults from `default_vars_only`
 
 Dependencies
 ------------
 
-A list of other roles hosted on Galaxy should go here, plus any details in regards to parameters that may need to be set for other roles, or variables that are used from other roles.
+- `default_vars_only`
+- `oracle_crs_os_setup`
+- `oracle_download_package`
 
 Example Playbook
 ----------------
 
-Including an example of how to use your role (for instance, with variables passed in as parameters) is always nice for users too:
+```yaml
+- hosts: rac_nodes
+  become: true
+  roles:
+    - role: oracle_crs_26ai
+      vars:
+        oracle_release: "26ai"
+        oracle_install_type: "rac"
+```
 
-    - hosts: servers
-      roles:
-         - { role: username.rolename, x: 42 }
+Golden Image HOWTO
+------------------
+
+Reference procedure used during image preparation:
+
+- `http://www.ludovicocaldara.net/dba/2018/11/`
+- `mv OPatch OPatch.old`
+- `wget http://192.168.8.200/oracle/OPatch/p6880880_190000_Linux-x86-64.zip`
+- `unzip p6880880_190000_Linux-x86-64.zip`
+- `rm p6880880_190000_Linux-x86-64.zip`
+- `./gridSetup.sh -applyRU /home/oracle/30783556/30805684`
+- `./gridSetup.sh -applyRU /home/oracle/30783556/30899722`
+- `./gridSetup.sh -silent -responseFile /home/oracle/grid.swonly.rsp ORACLE_HOME_NAME=crs1907`
+- `lvextend /oracle/u01/gi/ (+30g)`
+- `./gridSetup.sh -createGoldImage -destinationLocation /oracle/u01/gi/ -silent`
 
 License
 -------
 
-BSD
+MIT
 
 Author Information
 ------------------
 
-An optional section for the role authors to include contact information, or a website (HTML is not allowed).
+Maintained by Ivan Brezina and contributors in this fork.

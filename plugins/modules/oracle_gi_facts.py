@@ -33,6 +33,8 @@ EXAMPLES = '''
 '''
 
 import socket
+import os
+import re
 from subprocess import check_output, CalledProcessError, TimeoutExpired
 
 
@@ -64,6 +66,7 @@ class OracleGiFacts:
         self.ohomes = ohomes
         self.networks = dict()
         self.vips = dict()
+        self.scans = dict()
         self.srvctl = os.path.join(ohomes.crs_home, 'bin', 'srvctl')
         self.cemutlo = os.path.join(ohomes.crs_home, 'bin', 'cemutlo')
         self.shorthostname = socket.gethostname().split('.', 1)[0]
@@ -259,14 +262,14 @@ def main():
     asm = oracle_gi_facts.get_asm()
     facts.update({'asm': asm})
     # VIPS
-    vips = oracle_gi_facts.get_vips()
-    facts.update({'vip': list(vips.values())})
+    oracle_gi_facts.vips = oracle_gi_facts.get_vips()
+    facts.update({'vip': list(oracle_gi_facts.vips.values())})
     # Networks
-    networks = oracle_gi_facts.get_networks()
-    facts.update({'network': list(networks.values())})
+    oracle_gi_facts.networks = oracle_gi_facts.get_networks()
+    facts.update({'network': list(oracle_gi_facts.networks.values())})
     # SCANs
-    scans = oracle_gi_facts.get_scans()
-    facts.update({'scan': list(scans.values())})
+    oracle_gi_facts.scans = oracle_gi_facts.get_scans()
+    facts.update({'scan': list(oracle_gi_facts.scans.values())})
     # Listener
     facts.update({'local_listener': oracle_gi_facts.local_listener()})
     facts.update({'scan_listener': list(oracle_gi_facts.scan_listener().values()) if ohomes.oracle_crs else []})
@@ -291,8 +294,8 @@ from ansible.module_utils.basic import *
 # In these we do import from collections
 try:
     from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_homes import OracleHomes
-except ImportError:
-    pass
+except ImportError as e:
+    raise ImportError("Failed to import OracleHomes: {}".format(e))
 
 if __name__ == '__main__':
     main()

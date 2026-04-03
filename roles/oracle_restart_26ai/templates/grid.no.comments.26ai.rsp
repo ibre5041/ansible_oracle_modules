@@ -21,7 +21,7 @@ auSize=4
 
 disksWithFailureGroupNames={{ asm_disk_partitions|join(',,') }},
 diskList={{ asm_disk_partitions|join(',') }}
-diskString=/dev/asmshared*p1*
+diskString=/dev/asmshared*p1
 
 ignoreDownNodes=false
 configureBackupDG=false

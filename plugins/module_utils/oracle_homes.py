@@ -9,7 +9,6 @@ import pwd
 import subprocess
 import re
 import glob
-import subprocess
 import socket
 from pwd import getpwuid
 from xml.dom import minidom
@@ -471,19 +470,22 @@ def main():
     h.parse_oratab()
 
     for sid in list(h.facts_item):
+        oracle_owner = None
         try:
             sqlplus_path = os.path.join(h.facts_item[sid]['ORACLE_HOME'], 'bin', 'oracle')
             oracle_owner = getpwuid(os.stat(sqlplus_path).st_uid).pw_name
             h.facts_item[sid]['owner'] = oracle_owner
-        except BaseException as e:
-            print(e)
-            pass
+        except (OSError, KeyError, TypeError):
+            h.facts_item[sid]['owner'] = None
 
-        if h.facts_item[sid]["running"]:
-            status = h.query_db_status(oracle_owner=h.facts_item[sid]['owner']
+        oracle_owner = h.facts_item[sid].get('owner')
+        if h.facts_item[sid]["running"] and oracle_owner:
+            status = h.query_db_status(oracle_owner=oracle_owner
                                        , oracle_home=h.facts_item[sid]['ORACLE_HOME']
                                        , oracle_sid=h.facts_item[sid]['ORACLE_SID'])
             h.facts_item[sid]['status'] = status
+        elif h.facts_item[sid]["running"]:
+            h.facts_item[sid]['status'] = ['UNKNOWN']
         else:
             h.facts_item[sid]['status'] = ['DOWN']
 

@@ -123,7 +123,7 @@ The default behaviour for the modules using `oracledb` is this:
 - `ln -s "$PWD/ansible_oracle_modules/plugins/module_utils" ~/devroot/ansible_collections/ibre5041/ansible_oracle_modules/plugins/module_utils`
 - `export PYTHONPATH="$PWD/devroot:$PYTHONPATH"`
 - `python3 -c "import ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_homes"`
-- prepare module paremeter .json file, like: `module_args.db.json`
+- prepare module parameter .json file, like: `module_args.db.json`
 - check it: `cat module_args.db.json | jq .`
 - execute and develop module:
 
