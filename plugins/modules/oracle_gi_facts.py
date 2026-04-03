@@ -218,6 +218,9 @@ class OracleGiFacts:
 
 # Ansible code
 def main():
+    if OracleHomes is None:
+        raise ImportError(ORACLE_HOMES_IMPORT_ERROR)
+
     module = AnsibleModule(
         argument_spec=dict(
             oracle_home=dict(required=False, aliases=['oh'])
@@ -292,6 +295,7 @@ from ansible.module_utils.basic import *
 #    pass
 
 # In these we do import from collections
+ORACLE_HOMES_IMPORT_ERROR = None
 try:
     from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_homes import OracleHomes
 except ImportError as collections_error:
@@ -299,11 +303,12 @@ except ImportError as collections_error:
         # Unit tests and non-collection execution paths can resolve module_utils directly.
         from ansible.module_utils.oracle_homes import OracleHomes
     except ImportError as local_error:
-        raise ImportError(
+        ORACLE_HOMES_IMPORT_ERROR = (
             "Failed to import OracleHomes from collection ({}) and local module_utils ({})".format(
                 collections_error, local_error
             )
         )
+        OracleHomes = None
 
 if __name__ == '__main__':
     main()
