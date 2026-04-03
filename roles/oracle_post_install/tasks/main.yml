@@ -63,8 +63,6 @@
   yum:
     name: rlwrap
     state: latest
-    enablerepo: epel-el8
-  when: epel_repo_mirror | default('') | length > 0    
   tags: [packages,slow]
   ignore_errors: true
 

@@ -501,13 +501,13 @@ def remove_db(module, ohomes):
     sys_password = module.params["sys_password"]
 
     sid = guess_oracle_sid(module, ohomes)
-    if ohomes.oracle_gi_managed:
+    if ohomes.oracle_gi_managed and ohomes.oracle_crs:
         if db_unique_name:
             db_to_remove = db_unique_name
         else:
             db_to_remove = db_name
     else:
-        db_to_remove = db_name
+        db_to_remove = sid
 
     dbca = os.path.join(oracle_home, 'bin', 'dbca')
     command = [dbca, '-deleteDatabase', '-silent', '-sourceDB', db_to_remove, '-sysDBAUserName', 'sys', '-sysDBAPassword', sys_password]

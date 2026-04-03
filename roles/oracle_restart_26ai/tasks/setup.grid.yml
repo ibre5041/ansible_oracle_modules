@@ -1,0 +1,30 @@
+
+- name: Grid Setup
+  block:
+    - name: install grid.rsp
+      template:
+        src:  "{{ oracle_gi_response_file }}"
+        dest: "{{ oracle_install_dir_temp }}"
+        mode: '0640'
+        owner: oracle
+
+    - name: "gridSetup.sh (part I)"
+      shell: "./gridSetup.sh -silent -responseFile {{ oracle_install_dir_temp }}/{{ oracle_gi_response_file }} ORACLE_HOME_NAME={{ oracle_home_name }}"
+      args:
+        chdir: "{{ oracle_home }}"
+        creates: "{{ oracle_inventory_location }}/oraInst.loc"
+      #ignore_errors: true
+      environment:
+        #CV_ASSUME_DISTID: OEL7.8
+      register: grid_setup_out
+      failed_when: grid_setup_out.rc > 6
+    - debug: 
+        msg: "Return code is {{ grid_setup_out.rc }}"
+      when: grid_setup_out.rc >= 2
+
+  rescue:
+    - fail:
+        msg: '"./gridSetup.sh failed'
+
+  become: yes
+  become_user: "{{ oracle_os_user }}"
