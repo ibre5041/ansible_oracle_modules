@@ -126,6 +126,9 @@ oracle_os_sysctl:
   - sysctl: kernel.panic_on_oops
     value: "1"
 
+  - sysctl: kernel.panic        # Required by 26ai
+    value: "1"
+    
   - sysctl: kernel.shmall
     value: "{{ shma }}"
 
