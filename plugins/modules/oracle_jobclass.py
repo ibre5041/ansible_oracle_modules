@@ -105,12 +105,24 @@ EXAMPLES = '''
       environment: "{{ oracle_env }}"
 '''
 
+import re
+
 try:
     import oracledb
 except ImportError:
     oracledb_exists = False
 else:
     oracledb_exists = True
+
+
+def apply_session_container(module, conn):
+    session_container = module.params.get("session_container")
+    if not session_container:
+        return
+    if not re.match(r'^[A-Za-z][A-Za-z0-9_$#]*$', session_container):
+        module.fail_json(msg='Invalid session_container for alter session', changed=False)
+    c = conn.cursor()
+    c.execute('ALTER SESSION SET CONTAINER = %s' % session_container)
 
 def query_existing(job_class_name):
     c = conn.cursor()
@@ -132,8 +144,9 @@ def main():
             port          = dict(default=1521, type='int'),
             service_name  = dict(required=True),
             user          = dict(required=False),
-            password      = dict(required=False),
+            password      = dict(required=False, no_log=True),
             mode          = dict(default='normal', choices=["normal","sysdba"]),
+            session_container = dict(required=False),
             state         = dict(default="present", choices=["present", "absent"]),
             name          = dict(required=True),
             resource_group= dict(required=False),
@@ -180,17 +193,39 @@ def main():
 
     except oracledb.DatabaseError as exc:
         error, = exc.args
-        msg[0] = 'Could not connect to database - %s, connect descriptor: %s' % (error.message, connect)
+        error_msg = getattr(error, 'message', str(error))
+        requires_thick = (mode == 'sysdba') or (not user and not password)
+        if 'DPI-1047' in error_msg and requires_thick:
+            msg[0] = (
+                "Oracle Client libraries cannot be loaded (DPI-1047). "
+                "Install Oracle Instant Client or use a thin-compatible connection mode."
+            )
+        else:
+            msg[0] = 'Oracle connection failed: %s' % error_msg
         module.fail_json(msg=msg[0], changed=False)
     if conn.version < "10.2":
         module.fail_json(msg="Database version must be 10gR2 or greater", changed=False)
+    apply_session_container(module, conn)
     #
+    result = query_existing(module.params['name'])
     if module.check_mode:
-        module.exit_json(changed=False)
+        would_change = (
+            (result['exists'] and module.params['state'] == "absent") or
+            (not result['exists'] and module.params['state'] == "present") or
+            (
+                result['exists'] and module.params['state'] == "present" and (
+                    (result['comments'] != module.params['comments']) or
+                    (result['resource_group'] != module.params['resource_group']) or
+                    (result['service'] != module.params['service']) or
+                    (result['history'] != module.params['history']) or
+                    (result['logging'] != module.params['logging'].upper())
+                )
+            )
+        )
+        module.exit_json(changed=would_change, msg='Check mode: no change executed')
     #
     #c = conn.cursor()
     result_changed = False
-    result = query_existing(module.params['name'])
     if result['exists'] and module.params['state'] == "present":
         # Check attributes and modify if needed
         if (result['comments'] != module.params['comments']) or (result['resource_group'] != module.params['resource_group']) or (result['service'] != module.params['service']) or (result['history'] != module.params['history']) or (result['logging'] != module.params['logging'].upper()):

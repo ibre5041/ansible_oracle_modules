@@ -45,7 +45,7 @@ __author__ = "$Author: mgruen $"
 
 class NoGridError(Exception):
     def __init__(self, msg):
-        msg = msg
+        super().__init__(msg)
 
 
 def get_gridhome():
@@ -77,9 +77,9 @@ def get_has_crs_version(grid_home=None):
         grid_home = get_gridhome()
     crs_path = os.path.join(grid_home, 'bin')
     out = subprocess.check_output(os.path.join(crs_path, 'crsctl ') + 'query crs softwareversion', shell=True)
-    vers_dict = re.search(r'(?P<host>\[.*\]).*(?P<version>\[[0-9.]+\])', out).groupdict()
-
-    print(out)
+    decoded_out = out.decode('utf-8', errors='ignore')
+    vers_dict = re.search(r'(?P<host>\[.*\]).*(?P<version>\[[0-9.]+\])', decoded_out).groupdict()
+    return vers_dict
 
 
 def decode_types(rtype):
@@ -144,7 +144,7 @@ def get_crs_status(statopt, grid_home=None, test=False):
     if not test:
         if not grid_home:
             grid_home = get_gridhome()
-            crs_path = os.path.join(grid_home, 'bin')
+        crs_path = os.path.join(grid_home, 'bin')
         cmd = os.path.join(crs_path, 'crsctl ')
         if statopt == 'basetypes':
             cmd += 'status res -t'
@@ -240,8 +240,8 @@ def get_resource_basetypes(grid_home=None, test=True):
         except subprocess.CalledProcessError as e:
             print('Exception occured in crs_status: {!s}'.format(e))
     else:
-        with open('crs_category.txt', 'r') as f:
-            out = f.read().decode('utf-8')
+        with open('crs_category.txt', 'r', encoding='utf-8') as f:
+            out = f.read()
     islocal = False
     iscluster = False
     resource_basetype = {}

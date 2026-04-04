@@ -21,9 +21,8 @@
     state: "opened"
     pdb_admin_username: foo
     pdb_admin_password: bar
-    # TODO: test this on non-ASM instance        
-    # file_name_convert:
-    #   "/opt/oracle/oradata/XE/pdbseed": "/tmp/xepdb2/dbf01"
+    file_name_convert:
+      "/opt/oracle/oradata/XE/pdbseed": "/opt/oracle/oradata/XE/XEPDB2"
 
 - name: open PDB source in read only
   oracle_pdb:
@@ -37,10 +36,8 @@
     pdb_name: "XESNAP1"
     state: "opened"
     clone_from: "XEPDB2"
-    # ORA-17517
-    #snapshot_copy: yes
-    # file_name_convert:
-    #   "/tmp/xepdb2/dbf01": "/tmp/xesnap1/dbf01"
+    file_name_convert:
+      "/opt/oracle/oradata/XE/XEPDB2": "/opt/oracle/oradata/XE/XESNAP1"
 
 - name: drop clone PDB
   oracle_pdb:

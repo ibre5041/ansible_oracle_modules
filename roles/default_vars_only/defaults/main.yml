@@ -190,7 +190,8 @@ oracle_os_packages_rhel8:
   - nvme-cli
   - sysstat
   
-oracle_os_packages_rhel9:
+oracle_install_compat_openssl11: false
+oracle_os_packages_rhel9_base:
   - libnsl
   - policycoreutils-python-utils
   - chrony
@@ -199,7 +200,7 @@ oracle_os_packages_rhel9:
   - nvme-cli
   - sysstat
   - chkconfig
-  - compat-openssl11
+oracle_os_packages_rhel9: "{{ oracle_os_packages_rhel9_base + (['compat-openssl11'] if oracle_install_compat_openssl11 else []) }}"
   
 oracle_os_packages_crs:
   - gcc-c++

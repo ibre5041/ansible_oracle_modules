@@ -18,14 +18,34 @@ options:
     required: False
     default: None
   sourcedb:
-    description: The container database which will house the pdb
+    description: >
+      Source PDB to clone from. Mutually exclusive with plug_file.
+      Use clone_from as a more explicit alias.
     required: False
     default: None
-    aliases: ['db']
+    aliases: ['db', 'container', 'cdb', 'clone_from']
+  snapshot_copy:
+    description: Use SNAPSHOT COPY when cloning from another PDB (requires compatible storage)
+    required: False
+    default: False
+    type: bool
+  plug_file:
+    description: Path to XML descriptor file for plug-in/unplug operations. Mutually exclusive with sourcedb.
+    required: False
+    default: None
+    aliases: ['plug_file_xml']
   state:
-    description: The intended state of the pdb. status will just show the status of the pdb
+    description: >
+      The intended state of the pdb.
+      present - create PDB if absent (leaves it in MOUNTED state).
+      opened/read_write - create if absent then open read-write.
+      closed - create if absent then leave/put in MOUNTED state.
+      read_only - create if absent then open read-only.
+      absent - drop the PDB including datafiles.
+      unplugged - unplug the PDB to an XML file (plug_file required).
+      status - return current PDB status.
     default: present
-    choices: ['present','absent', 'status']
+    choices: ['present', 'absent', 'opened', 'read_write', 'closed', 'read_only', 'status', 'unplugged']
   pdb_admin_username:
     description: The username for the pdb admin user
     required: false
@@ -81,7 +101,7 @@ author:
 
 EXAMPLES = '''
 ---
-- name: Creates a pdb on a different filesystem
+- name: Create a PDB from seed on a specific filesystem
   oracle_pdb:
     mode: sysdba
     pdb_name: "XEPDB2"
@@ -90,40 +110,50 @@ EXAMPLES = '''
     pdb_admin_password: bar
     roles: connect
     datafile_dest: /u02/oradata/pdb1
-    sourcedb: cdb1
+
+- name: Clone a PDB from another PDB (source must be open read-only or read-write)
+  oracle_pdb:
+    mode: sysdba
+    pdb_name: "XEPDB2_CLONE"
+    state: "opened"
+    clone_from: "XEPDB2"
+
+- name: Clone a PDB with explicit file placement
+  oracle_pdb:
+    mode: sysdba
+    pdb_name: "XEPDB2_CLONE"
+    state: "opened"
+    clone_from: "XEPDB2"
+    file_name_convert:
+      "/opt/oracle/oradata/XE/xepdb2": "/opt/oracle/oradata/XE/xepdb2_clone"
 
 - name: Remove a pdb
   oracle_pdb:
-    mode: sysdba    
+    mode: sysdba
     pdb_name: pdb1
     state: absent
 
 - name: Check the status for a pdb
   oracle_pdb:
-    mode: sysdba    
+    mode: sysdba
     pdb_name: pdb1
     state: status
   register: _oracle_pdb_status
 
 - name: Unplug a pdb
   oracle_pdb:
-    mode: sysdba    
+    mode: sysdba
     pdb_name: pdb1
     plug_file: /tmp/unplugged-pdb.xml
     state: unplugged
 
-- name: plug in a pdb
+- name: Plug in a pdb
   oracle_pdb:
     mode: sysdba
     pdb_name: plug1
     plug_file: /tmp/unplugged-pdb.xml
     state: present
-    pdb_admin_username: foo
-    pdb_admin_password: bar
 '''
-
-import os
-
 
 # Check if the pdb exists
 def check_pdb_exists(conn, pdb_name):
@@ -136,11 +166,12 @@ def check_pdb_exists(conn, pdb_name):
     if not result['open_mode'].startswith('READ'):
         return set(result.items())
 
-    conn.execute_ddl('ALTER SESSION SET CONTAINER = %s' % pdb_name, no_change=True)
+    conn.set_container(pdb_name)
 
     sql = "select property_name, property_value" \
           " from database_properties " \
-          " where property_name in ('DEFAULT_TBS_TYPE','DEFAULT_PERMANENT_TABLESPACE','DEFAULT_TEMP_TABLESPACE', 'DBTIMEZONE') " \
+          " where property_name in " \
+          "('DEFAULT_TBS_TYPE','DEFAULT_PERMANENT_TABLESPACE','DEFAULT_TEMP_TABLESPACE','DBTIMEZONE') " \
           " order by 1"
     prop = conn.execute_select(sql, None, fetchone=False)
     result.update(dict(prop))
@@ -168,7 +199,7 @@ def unplug_pdb(conn, module):
     run_sql.append(drop_sql)
     for sql in run_sql:
         conn.execute_ddl(sql)
-    msg = "Pluggable database %s successfully unplugged into '%s'" % (pdb_name, unplug_dest)
+    msg = "Pluggable database %s successfully unplugged into '%s'" % (pdb_name, plug_file)
     module.exit_json(msg=msg, changed=conn.changed, ddls=conn.ddls)
 
 
@@ -191,26 +222,28 @@ def create_pdb(conn, module):
 
     if plug_file:
         # TODO: copy/nocopy tempfile reuse
-        createsql += " using %s"
+        createsql += " using '%s'" % plug_file
     elif sourcedb:
-        # TODO: snapshot copy
         createsql += " from %s" % sourcedb
         if snapshot_copy:
             createsql += ' snapshot copy'
     elif pdb_admin_username:
-        createsql += " admin user %s identified by \"%s\" " % (pdb_admin_username, pdb_admin_password)
+        safe_pdb_admin_password = pdb_admin_password.replace('"', '""')
+        createsql += " admin user %s identified by \"%s\" " % (pdb_admin_username, safe_pdb_admin_password)
+        if roles:
+            createsql += ' roles = (%s)' % ','.join(roles)
     else:
-        module.fail_json("Missing one parameter: [plug_file, sourcedb, pdb_admin_password]", changed=conn.changed, ddls=conn.ddls)
-
-    if roles:
-        createsql += ' roles = (%s)' % ','.join(roles)
+        module.fail_json(msg="Missing one parameter: [plug_file, sourcedb, pdb_admin_password]",
+                         changed=conn.changed, ddls=conn.ddls)
 
     if file_name_convert:
-        quoted = ','.join(["'%s', '%s'" % (x[0], x[1]) for x in zip(file_name_convert.keys(), file_name_convert.values())])
+        pairs = zip(file_name_convert.keys(), file_name_convert.values())
+        quoted = ','.join(["'%s', '%s'" % (k, v) for k, v in pairs])
         createsql += ' file_name_convert = (%s)' % quoted
 
     if service_name_convert:
-        quoted = ','.join(["'%s', '%s'" % (x[0], x[1]) for x in zip(service_name_convert.keys(), service_name_convert.values())])
+        pairs = zip(service_name_convert.keys(), service_name_convert.values())
+        quoted = ','.join(["'%s', '%s'" % (k, v) for k, v in pairs])
         createsql += ' service_name_convert = (%s)' % quoted
 
     if datafile_dest:
@@ -231,7 +264,7 @@ def remove_pdb(conn, module, current_state):
 
     if dict(current_state)['open_mode'].startswith('READ'):
         run_sql.append(close_sql)
-    conn.execute_ddl("ALTER SESSION SET CONTAINER = CDB$ROOT", no_change=True)
+    conn.set_container("CDB$ROOT")
     run_sql.append(dropsql)
     for sql in run_sql:
         conn.execute_ddl(sql)
@@ -252,15 +285,22 @@ def ensure_pdb_state(conn, module, current_state):
 
     wanted_state = {}
     ensure_sql = 'alter pluggable database %s ' % pdb_name
+    current_open_mode = dict(current_state).get('open_mode', 'MOUNTED')
     if state in ('opened', 'read_write'):
         wanted_state.update({'open_mode': 'READ WRITE'})
-        ensure_sql += ' open force'
+        if current_open_mode == 'MOUNTED':
+            ensure_sql += 'open read write'
+        else:
+            ensure_sql += 'open read write force'
     elif state == 'closed':
         wanted_state.update({'open_mode': 'MOUNTED'})
-        ensure_sql += ' close immediate'
+        ensure_sql += 'close immediate'
     elif state == 'read_only':
         wanted_state.update({'open_mode': 'READ ONLY'})
-        ensure_sql += 'open read only force'
+        if current_open_mode == 'MOUNTED':
+            ensure_sql += 'open read only'
+        else:
+            ensure_sql += 'open read only force'
     # elif state == 'restricted':
     #     wanted_state = [('read write', 'yes')]
     #     ensure_sql += 'open restricted force'
@@ -279,7 +319,8 @@ def ensure_pdb_state(conn, module, current_state):
 
     changes = set(wanted_state.items()).difference(current_state)
 
-    about_to_open = wanted_state['open_mode'] in ['open', 'restricted', 'read_only'] or dict(current_state)['open_mode'] == 'READ WRITE'
+    about_to_open = (wanted_state.get('open_mode') in ('READ WRITE', 'READ ONLY')
+                     or dict(current_state).get('open_mode') == 'READ WRITE')
 
     if 'open_mode' in dict(changes):
         change_db_sql.append(ensure_sql)
@@ -311,6 +352,11 @@ def ensure_pdb_state(conn, module, current_state):
             module.exit_json(msg=msg, changed=conn.changed, ddls=conn.ddls)
         msg = 'Pluggable database %s already in the intended state' % pdb_name
         module.exit_json(msg=msg, changed=conn.changed, ddls=conn.ddls)
+
+    # check_pdb_exists may have switched the session into the PDB (to query properties).
+    # Reset to CDB$ROOT before state-change DDLs so Oracle does not send session-container
+    # change piggybacks that break python-oracledb thin-mode protocol parsing.
+    conn.set_container("CDB$ROOT")
 
     for sql in change_db_sql:
         conn.execute_ddl(sql)
@@ -348,6 +394,7 @@ def main():
             service_name           = dict(required=False, aliases=['sn']),
             dsn                    = dict(required=False, aliases=['datasource_name']),
             oracle_home            = dict(required=False, aliases=['oh']),
+            session_container      = dict(required=False),
 
             pdb_name               = dict(required=True, aliases=['pdb', 'name']),
 
@@ -357,30 +404,40 @@ def main():
             pdb_admin_username     = dict(required=False, default='pdb_admin', aliases=['pdbadmun']),
             pdb_admin_password     = dict(required=False, no_log=True, default='pdb_admin', aliases=['pdbadmpw']),
             roles                  = dict(type='list', elements='str', default=[]),
-            state                  = dict(default="present", choices=["absent", "opened", "closed", "read_only", "status"]),
+            state                  = dict(default="present",
+                                         choices=["present", "absent", "opened", "closed",
+                                                  "read_only", "read_write", "status", "unplugged"]),
             save_state             = dict(default=True, type='bool'),
             datafile_dest          = dict(required=False, aliases=['dfd', 'create_file_dest']),
             #unplug_dest            = dict(required=False, aliases=['plug_dest', 'upd', 'pd']),
             file_name_convert      = dict(type='dict', required=False, aliases=['fnc']),
             service_name_convert   = dict(type='dict', required=False, aliases=['snc']),
-            default_tablespace_type = dict(default='smallfile', choices=['smallfile', 'bigfile']),
+            default_tablespace_type = dict(default=None, choices=['smallfile', 'bigfile']),
             default_tablespace  = dict(required=False),
             default_temp_tablespace = dict(required=False),
             timezone            = dict(required=False)
         ),
         required_together=[['user', 'password'], ['pdb_admin_username', 'pdb_admin_password']],
-        #mutually_exclusive=[['datafile_dest', 'file_name_convert']],
-        mutually_exclusive=[['pdb_admin_username', 'clone_from', 'plug_file']],
-        required_if=[('state', 'present', ('pdb_admin_username', 'pdb_admin_password'))],
+        mutually_exclusive=[['sourcedb', 'plug_file']],
         supports_check_mode=True
     )
+    sanitize_string_params(module.params)
+
 
     pdb_name = module.params["pdb_name"]
     state = module.params["state"]
 
     oc = oracleConnection(module)
     pdb = check_pdb_exists(oc, pdb_name)
-    if state in ['closed', 'opened', 'restricted', 'read_only']:
+    if state == 'present':
+        if not pdb:
+            create_pdb(oc, module)
+            msg = 'Pluggable database %s successfully created' % pdb_name
+            module.exit_json(msg=msg, changed=oc.changed, ddls=oc.ddls)
+        else:
+            module.exit_json(msg='Pluggable database %s already exists' % pdb_name, changed=False, ddls=oc.ddls)
+
+    elif state in ['closed', 'opened', 'read_write', 'restricted', 'read_only']:
         if not pdb:
             pdb = create_pdb(oc, module)
             ensure_pdb_state(oc, module, pdb)
@@ -429,9 +486,9 @@ def main():
 
 # In these we do import from collections
 try:
-    from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_utils import oracleConnection
-except:
-    pass
+    from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_utils import oracleConnection, sanitize_string_params
+except ImportError:
+    sanitize_string_params = lambda p: None
 
 
 from ansible.module_utils.basic import *

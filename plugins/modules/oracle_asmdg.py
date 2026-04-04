@@ -238,7 +238,7 @@ def ensure_diskgroup_state(cursor, module, msg, name, state, disks, attribute_na
         if len(attribute_names_) != 0:
             current_properties = get_current_properties (cursor, module, msg, name, attribute_names_)
             # Convert to dict and compare current with wanted
-            if cmp(dict(current_properties),dict(wanted_attributes)) is not 0:
+            if cmp(dict(current_properties),dict(wanted_attributes)) != 0:
                 change_attr = True
                 for i in wanted_attributes:
                     total_sql.append("alter diskgroup %s set attribute '%s'='%s'" % (name, i[0], i[1]))
@@ -451,7 +451,7 @@ from ansible.module_utils.basic import *
 # In thise we do import from collections
 try:
     from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_utils import oracle_connect
-except:
+except ImportError:
     pass
 
 if __name__ == '__main__':

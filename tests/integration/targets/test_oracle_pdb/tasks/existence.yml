@@ -3,8 +3,8 @@
 - name: "define connection parameters"
   set_fact:
     connection_parameters: &con_param
-      hostname: "{{ oracle_hostname }}"      
-      port: "{{ oracle_port }}"      
+      hostname: "{{ oracle_hostname }}"
+      port: "{{ oracle_port }}"
       service_name: "{{ oracle_service_name }}"
       username: "{{ oracle_username }}"
       password: "{{ oracle_password }}"
@@ -21,9 +21,8 @@
     state: "opened"
     pdb_admin_username: foo
     pdb_admin_password: bar
-    # TODO: test this on non-ASM instance
-    # file_name_convert:
-    #   "/opt/oracle/oradata/XE/pdbseed": "/tmp/xepdb2/dbf01"
+    file_name_convert:
+      "/opt/oracle/oradata/XE/pdbseed": "/opt/oracle/oradata/XE/XEPDB2"
 
 - name: check an existing PDB is present
   oracle_pdb:
@@ -39,11 +38,39 @@
     pdb_name: "XEPDB2"
     state: "absent"
 
-- name: check an inexistent PDB is absent
+- name: check an inexistent PDB raises error with state=status
+  oracle_pdb:
+    <<: *con_param
+    pdb_name: "XEPDB3"
+    state: "status"
+  register: _
+  failed_when: not _.failed
+
+- name: create PDB with state=present (from seed)
   oracle_pdb:
     <<: *con_param
     pdb_name: "XEPDB3"
     state: "present"
+    pdb_admin_username: foo
+    pdb_admin_password: bar
+    file_name_convert:
+      "/opt/oracle/oradata/XE/pdbseed": "/opt/oracle/oradata/XE/XEPDB3"
   register: _
-  failed_when: not _.failed
+  failed_when: _.failed or not _.changed
+
+- name: state=present on existing PDB is idempotent
+  oracle_pdb:
+    <<: *con_param
+    pdb_name: "XEPDB3"
+    state: "present"
+    pdb_admin_username: foo
+    pdb_admin_password: bar
+  register: _
+  failed_when: _.failed or _.changed
+
+- name: drop XEPDB3
+  oracle_pdb:
+    <<: *con_param
+    pdb_name: "XEPDB3"
+    state: "absent"
 ...

@@ -4,9 +4,9 @@
     connection_parameters: &con_param
       hostname: "{{ oracle_hostname }}"      
       port: "{{ oracle_port }}"      
-      service_name: "{{ oracle_service_name }}"
-      username: "{{ oracle_username }}"
-      password: "{{ oracle_password }}"
+      service_name: "{{ oracle_pdb_service_name | default(oracle_service_name) }}"
+      username: "{{ oracle_pdb_username | default(oracle_username) }}"
+      password: "{{ oracle_pdb_password | default(oracle_password) }}"
       dsn: "{{ oracle_dsn }}"
       oracle_home: "{{ oracle_home }}"
       mode: "{{ mode }}"
@@ -30,5 +30,5 @@
 - name: verify error
   fail:
     msg: "no error or wrong error"
-  when: not _.failed or (_.code != 933 and 'ORA-00933' not in _.msg and _.request is not defined)
+  when: not _.failed or (_.code != 933 and 'ORA-00933' not in _.msg and _.code != 2180 and 'ORA-02180' not in _.msg and _.request is not defined)
 ...

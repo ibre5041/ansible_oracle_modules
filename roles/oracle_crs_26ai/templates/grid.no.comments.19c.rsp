@@ -41,7 +41,7 @@ oracle.install.asm.diskGroup.AUSize=4
 # For example =/dev/asmshared0100p1,,/dev/asmshared0101p1,,/dev/asmshared0102p1,,/dev/asmshared0103p1,
 oracle.install.asm.diskGroup.disksWithFailureGroupNames={{ asm_disk_partitions|join(',,') }},
 oracle.install.asm.diskGroup.disks={{ asm_disk_partitions|join(',') }}
-oracle.install.asm.diskGroup.diskDiscoveryString=/dev/asmshared*p1*
+oracle.install.asm.diskGroup.diskDiscoveryString=/dev/asmshared*p1
 
 oracle.install.asm.gimrDG.AUSize=1
 oracle.install.asm.configureAFD=false

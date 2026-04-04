@@ -116,7 +116,7 @@ EXAMPLES = '''
 # In this case we do import from collections
 try:
     from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.dotora import *
-except:
+except ImportError:
     pass
 
 from ansible.module_utils.basic import *
@@ -212,7 +212,8 @@ def main():
     if changed:
         if module.params['backup']:
             backup_file = module.backup_local(filename)
-        write_changes(module, new_content, filename)
+        if not module.check_mode:
+            write_changes(module, new_content, filename)
         
     # Output
     for line in orafile.warn:

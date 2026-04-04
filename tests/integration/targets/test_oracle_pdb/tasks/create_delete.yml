@@ -27,9 +27,8 @@
     state: "closed"
     pdb_admin_username: foo
     pdb_admin_password: bar
-    # TODO: test this on non-ASM instance
-    # file_name_convert:
-    #   "/opt/oracle/oradata/XE/pdbseed": "/tmp/xepdb2/dbf01"
+    file_name_convert:
+      "/opt/oracle/oradata/XE/pdbseed": "/opt/oracle/oradata/XE/XEPDB2"
     roles: connect
   register: _
   failed_when: _.failed or not _.changed

@@ -1,0 +1,5 @@
+[run]
+source =
+    plugins/modules
+omit =
+    plugins/modules/__init__.py
