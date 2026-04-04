@@ -205,4 +205,4 @@ oracle_os_packages_rhel9: "{{ oracle_os_packages_rhel9_base + (['compat-openssl1
 oracle_os_packages_crs:
   - gcc-c++
 
-  
+first_rac_node: "{{ ansible_play_batch | sort() | first }}"
