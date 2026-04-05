@@ -216,21 +216,6 @@ def check_prerequisites(conn, module):
     return status
 
 
-def build_force_clause(force_keystore):
-    """Build FORCE KEYSTORE clause."""
-    return 'FORCE KEYSTORE ' if force_keystore else ''
-
-
-def build_container_clause(container):
-    """Build CONTAINER clause."""
-    return ' CONTAINER = ALL' if container == 'all' else ''
-
-
-def build_backup_clause():
-    """Build WITH BACKUP clause."""
-    return ' WITH BACKUP'
-
-
 def set_master_key(conn, module):
     """Create and activate a new master encryption key."""
     check_prerequisites(conn, module)
@@ -556,6 +541,7 @@ from ansible.module_utils.basic import *  # noqa: F403
 try:
     from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_utils import (  # noqa: E501
         oracleConnection, sanitize_string_params,
+        build_backup_clause, build_container_clause, build_force_clause,
     )
 except ImportError:
     def sanitize_string_params(_params):
