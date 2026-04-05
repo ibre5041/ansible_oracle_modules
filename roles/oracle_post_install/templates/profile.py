@@ -63,7 +63,7 @@ class database():
         else:
             self.sys_tbls = None
                 
-        self.ora_banner = self.fetch_single_value(" SELECT banner FROM v$version WHERE banner LIKE '%Oracle Database%' ")
+        self.ora_banner = self.fetch_single_value(" SELECT banner FROM v$version WHERE banner LIKE '%Oracle %Database%' ")
         self.ora_version = self.fetch_single_value(" SELECT version from v$instance ")
         
         # This will fail on ASM, DBA_* views are nor accessible

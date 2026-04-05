@@ -38,6 +38,12 @@ options:
     required: False
     default: normal
     choices: ['normal','sysdba']
+  session_container:
+    description:
+      - Target PDB name for ALTER SESSION SET CONTAINER when using local SYSDBA connections.
+      - When set, the module issues ALTER SESSION SET CONTAINER=<value> before executing.
+      - Useful for local BEQ/SYSDBA connections where you connect to CDB but need to operate in a specific PDB.
+    required: false
 notes:
     - Returns information from v$instance
     - All other modules use the same parameters to connect to the database

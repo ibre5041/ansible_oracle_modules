@@ -278,8 +278,8 @@ def run_sql(module, sql, username=None, password=None, pdb=None):
         err_msg += "[ERR] sqlplus: %s\nERR Code: %s.\n" % (safe_sql_cmd, sqlplus_err.group())
         return "[ERR]\n%s\n" % sout.strip()
 
-    # SELECT/CTE reads do not mutate state and must keep idempotent changed=False.
-    if not sql.lstrip().lower().startswith(('select', 'with')):
+    # Read-only statements (SELECT, CTE, subquery) do not mutate state.
+    if not sql.lstrip().lower().startswith(('select', 'with', '(')):
         changed = True
     return sout.strip()
 

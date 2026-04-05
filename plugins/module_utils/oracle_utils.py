@@ -324,9 +324,9 @@ class oracleConnection:
                 else:
                     with self.conn.cursor() as cursor:
                         cursor.execute(statement, params)
-                        _MUTATING = ('CREATE', 'ALTER', 'DROP', 'INSERT', 'UPDATE',
-                                     'DELETE', 'MERGE', 'TRUNCATE', 'RENAME', 'GRANT', 'REVOKE')
-                        is_mutating = statement.strip().upper().startswith(_MUTATING) or cursor.rowcount > 0
+                        _READONLY_PREFIXES = ('SELECT', 'WITH', '(')
+                        trimmed = statement.strip().upper()
+                        is_mutating = not trimmed.startswith(_READONLY_PREFIXES) or cursor.rowcount > 0
                     self.ddls.append(statement)
                     if is_mutating:
                         self.changed = True

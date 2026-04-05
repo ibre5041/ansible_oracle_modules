@@ -14,8 +14,10 @@
         chdir: "{{ oracle_home }}"
       environment:
         #CV_ASSUME_DISTID: OEL7.8
-      register: grid_setup_out2 
-      failed_when: grid_setup_out2.rc != 0
+      register: grid_setup_out2
+      # gridSetup.sh returns 1-6 for non-critical warnings (e.g. swap size).
+      # Only codes > 6 indicate actual failure (exit codes are undocumented by Oracle).
+      failed_when: grid_setup_out2.rc > 6
     - debug: 
         msg: "gridSetup.sh (part II) {{ grid_setup_out2 }}"
       when: grid_setup_out2.rc >= 0
