@@ -80,6 +80,34 @@ def _ensure_oracle_client(module, oracle_home=None, required=False):
     module.fail_json(msg="Unable to initialize Oracle Client: %s" % detail, changed=False)
     return False
 
+# ---------------------------------------------------------------------------
+# Shared SQL clause builders (used by oracle_wallet, oracle_tde, etc.)
+# ---------------------------------------------------------------------------
+
+def build_force_clause(force_keystore):
+    """Build FORCE KEYSTORE clause for ADMINISTER KEY MANAGEMENT."""
+    if force_keystore:
+        return 'FORCE KEYSTORE '
+    return ''
+
+
+def build_container_clause(container):
+    """Build CONTAINER clause for ADMINISTER KEY MANAGEMENT."""
+    if container == 'all':
+        return ' CONTAINER = ALL'
+    return ''
+
+
+def build_backup_clause(backup=True, backup_tag=None):
+    """Build WITH BACKUP clause for ADMINISTER KEY MANAGEMENT."""
+    if not backup:
+        return ''
+    clause = ' WITH BACKUP'
+    if backup_tag:
+        clause += " USING '%s'" % backup_tag
+    return clause
+
+
 def sanitize_string_params(module_params):
     """Strip leading/trailing whitespace from every string value in module.params.
 
