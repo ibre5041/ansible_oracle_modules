@@ -192,30 +192,6 @@ def secret_exists(conn, client_name):
     return False
 
 
-def build_backup_clause(backup, backup_tag):
-    """Build the WITH BACKUP clause for key management commands."""
-    if not backup:
-        return ''
-    clause = ' WITH BACKUP'
-    if backup_tag:
-        clause += " USING '%s'" % backup_tag
-    return clause
-
-
-def build_container_clause(container):
-    """Build CONTAINER clause."""
-    if container == 'all':
-        return ' CONTAINER = ALL'
-    return ''
-
-
-def build_force_clause(force_keystore):
-    """Build FORCE KEYSTORE clause."""
-    if force_keystore:
-        return 'FORCE KEYSTORE '
-    return ''
-
-
 def ensure_keystore_present(conn, module):
     """Create a software keystore if it doesn't exist."""
     status = get_wallet_status(conn)
@@ -560,6 +536,7 @@ from ansible.module_utils.basic import *  # noqa: F403
 try:
     from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_utils import (  # noqa: E501
         oracleConnection, sanitize_string_params,
+        build_backup_clause, build_container_clause, build_force_clause,
     )
 except ImportError:
     def sanitize_string_params(_params):
