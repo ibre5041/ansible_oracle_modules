@@ -90,7 +90,7 @@ def main():
         argument_spec = dict(
             user          = dict(required=False, aliases=['un', 'username']),
             password      = dict(required=False, no_log=True, aliases=['pw']),
-            mode          = dict(default='normal', choices=["normal", "sysdba"]),
+            mode          = dict(default='normal', choices=["normal", "sysdba", "sysdg", "sysoper", "sysasm"]),
             hostname      = dict(required=False, default='localhost', aliases=['host']),
             port          = dict(required=False, default=1521, type='int'),
             service_name  = dict(required=False, aliases=['sn']),

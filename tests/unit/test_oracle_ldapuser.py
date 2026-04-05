@@ -131,6 +131,8 @@ def _ldap_params(**overrides):
         "service_name": "svc",
         "user": "u",
         "password": "p",
+        "oracle_home": None,
+        "dsn": None,
         "session_container": None,
         "mode": "normal",
         "user_default_tablespace": "USERS",
@@ -352,7 +354,11 @@ class _FakeOradbConn:
 
 
 class _FakeOradb:
-    """Fake oracledb module for oracle_ldapuser tests."""
+    """Fake oracledb module for oracle_ldapuser tests.
+
+    Kept so that references to oracledb.STRING, oracledb.NUMBER, and
+    oracledb.DatabaseError inside oracle_ldapuser.main() still resolve.
+    """
     STRING = str
     NUMBER = int
     SYSDBA = 2
@@ -367,6 +373,21 @@ class _FakeOradb:
         return "fake_dsn"
 
 
+class _FakeOracleConnection:
+    """Fake oracleConnection(module) result.
+
+    The refactored oracle_ldapuser.main() does:
+        oc = oracleConnection(module)
+        conn = oc.conn
+    So this object must have a .conn attribute pointing to a raw DB connection,
+    and a .version attribute.
+    """
+
+    def __init__(self, module):
+        self.conn = _FakeOradbConn()
+        self.version = "19.0.0"
+
+
 def test_main_success_with_mocked_dependencies(monkeypatch):
     """main(): all dependencies mocked → runs through to exit_json (lines 266-539)."""
     mod = _load()
@@ -375,6 +396,7 @@ def test_main_success_with_mocked_dependencies(monkeypatch):
     monkeypatch.setattr(mod, "ldap_module_exists", True, raising=False)
     monkeypatch.setattr(mod, "ldap", _FakeLdapModule, raising=False)
     monkeypatch.setattr(mod, "oracledb", _FakeOradb, raising=False)
+    monkeypatch.setattr(mod, "oracleConnection", _FakeOracleConnection, raising=False)
 
     Mod = _make_ldap_mod(_ldap_params())
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
@@ -393,6 +415,7 @@ def test_main_check_mode_exits_early(monkeypatch):
     monkeypatch.setattr(mod, "ldap_module_exists", True, raising=False)
     monkeypatch.setattr(mod, "ldap", _FakeLdapModule, raising=False)
     monkeypatch.setattr(mod, "oracledb", _FakeOradb, raising=False)
+    monkeypatch.setattr(mod, "oracleConnection", _FakeOracleConnection, raising=False)
 
     class CheckMod(BaseFakeModule):
         params = _ldap_params()
@@ -424,6 +447,7 @@ def test_main_no_users_found_fails(monkeypatch):
 
     monkeypatch.setattr(mod, "ldap", EmptyLdap, raising=False)
     monkeypatch.setattr(mod, "oracledb", _FakeOradb, raising=False)
+    monkeypatch.setattr(mod, "oracleConnection", _FakeOracleConnection, raising=False)
 
     Mod = _make_ldap_mod(_ldap_params())
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
@@ -441,6 +465,7 @@ def test_main_wallet_connection(monkeypatch):
     monkeypatch.setattr(mod, "ldap_module_exists", True, raising=False)
     monkeypatch.setattr(mod, "ldap", _FakeLdapModule, raising=False)
     monkeypatch.setattr(mod, "oracledb", _FakeOradb, raising=False)
+    monkeypatch.setattr(mod, "oracleConnection", _FakeOracleConnection, raising=False)
 
     Mod = _make_ldap_mod(_ldap_params(user=None, password=None))
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
@@ -470,6 +495,7 @@ def test_main_group_role_map(monkeypatch):
 
     monkeypatch.setattr(mod, "ldap", LdapWithGroups, raising=False)
     monkeypatch.setattr(mod, "oracledb", _FakeOradb, raising=False)
+    monkeypatch.setattr(mod, "oracleConnection", _FakeOracleConnection, raising=False)
 
     group_map = [{"dn": "CN=prod_db_reader,OU=SG,DC=domain,DC=int", "group": "prod_db_reader"}]
     Mod = _make_ldap_mod(_ldap_params(group_role_map=group_map))

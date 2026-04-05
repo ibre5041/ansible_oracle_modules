@@ -90,7 +90,7 @@ def main():
             service_name  = dict(required=False),
             user          = dict(required=False),
             password      = dict(required=False, no_log=True),
-            mode          = dict(default='normal', choices=["normal","sysdba"]),
+            mode          = dict(default='normal', choices=["normal", "sysdba", "sysdg", "sysoper", "sysasm"]),
             
             size          = dict(required=True),
             groups        = dict(required=True),

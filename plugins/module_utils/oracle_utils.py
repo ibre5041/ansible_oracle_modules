@@ -15,6 +15,18 @@ else:
     oracledb_exists = True
 
 
+# Mapping from module 'mode' parameter to oracledb auth-mode constants.
+# 'normal' is omitted — it means "no special mode flag".
+_AUTH_MODES = {}
+if oracledb_exists:
+    _AUTH_MODES = {
+        'sysdba': oracledb.SYSDBA,
+        'sysdg': getattr(oracledb, 'SYSDG', getattr(oracledb, 'AUTH_MODE_SYSDGD', None)),
+        'sysoper': getattr(oracledb, 'SYSOPER', getattr(oracledb, 'AUTH_MODE_SYSOPER', None)),
+        'sysasm': getattr(oracledb, 'SYSASM', getattr(oracledb, 'AUTH_MODE_SYSASM', None)),
+    }
+
+
 def _is_dpi_1047(error_obj):
     msg = str(getattr(error_obj, "message", error_obj))
     return "DPI-1047" in msg
@@ -114,29 +126,29 @@ def oracle_connect(module):
 
     wallet_connect = '/@%s' % service_name
 
+    auth_mode = _AUTH_MODES.get(mode)
+
     try:
-        if (not user and not password ): # If neither user or password is supplied, the use of an oracle wallet is assumed
+        if not user and not password:  # OS authentication or wallet
             _ensure_oracle_client(module, oracle_home=oracle_home, required=True)
-            if mode == 'sysdba':
+            if auth_mode:
                 connect = '/'
-                conn = oracledb.connect(mode=oracledb.SYSDBA)
+                conn = oracledb.connect(mode=auth_mode)
             else:
                 connect = wallet_connect
                 conn = oracledb.connect(wallet_connect)
 
-        elif (user and password ):
-            if mode == 'sysdba':
-                dsn = oracledb.makedsn(host=hostname, port=port, service_name=service_name)
-                connect = dsn
-                conn = oracledb.connect(user=user, password=password, dsn=dsn, mode=oracledb.SYSDBA)
+        elif user and password:
+            dsn = oracledb.makedsn(host=hostname, port=port, service_name=service_name)
+            connect = dsn
+            if auth_mode:
+                conn = oracledb.connect(user=user, password=password, dsn=dsn, mode=auth_mode)
             else:
-                dsn = oracledb.makedsn(host=hostname, port=port, service_name=service_name)
-                connect = dsn
                 conn = oracledb.connect(user=user, password=password, dsn=dsn)
 
-        elif (not(user) or not(password)):
+        elif not user or not password:
             module.fail_json(msg='Missing username or password for oracledb')
-            
+
     except oracledb.DatabaseError as exc:
         error, = exc.args
         msg = 'Could not connect to database - %s, connect descriptor: %s' % (error.message, connect)
@@ -179,25 +191,28 @@ class oracleConnection:
 
         wallet_connect = '/@%s' % service_name
         # Thick mode is only required for OS-authenticated connections (no user/password).
-        # SYSDBA over TCP with explicit credentials works in python-oracledb thin mode (2.x+).
+        # SYSDBA/SYSDG/SYSOPER/SYSASM over TCP with explicit credentials works in
+        # python-oracledb thin mode (2.x+).
         requires_thick = not user and not password
         _ensure_oracle_client(module, oracle_home=self.oracle_home, required=requires_thick)
 
+        auth_mode = _AUTH_MODES.get(mode)
+
         connect = '<unresolved>'
         try:
-            if not user and not password: # If neither user or password is supplied, the use of an oracle connect internal or wallet is assumed
-                if mode == 'sysdba':
+            if not user and not password:  # OS authentication or wallet
+                if auth_mode:
                     connect = '/'
-                    conn = oracledb.connect(mode=oracledb.SYSDBA)
+                    conn = oracledb.connect(mode=auth_mode)
                 else:
                     connect = wallet_connect
                     conn = oracledb.connect(wallet_connect)
-            elif user and password: # Assume supplied user has SYSDBA role granted
+            elif user and password:
                 if not dsn and hostname:
                     dsn = oracledb.makedsn(host=hostname, port=port, service_name=service_name)
                 connect = dsn
-                if mode == 'sysdba':
-                    conn = oracledb.connect(user=user, password=password, dsn=dsn, mode=oracledb.SYSDBA)
+                if auth_mode:
+                    conn = oracledb.connect(user=user, password=password, dsn=dsn, mode=auth_mode)
                 else:
                     conn = oracledb.connect(user=user, password=password, dsn=dsn)
             elif not user or not password:
