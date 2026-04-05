@@ -487,6 +487,14 @@ def test_orapki_create_credential(monkeypatch):
         mod.main()
     result = exc.value.args[0]
     assert result["changed"] is True
+    # Verify -password is used for credential password, -pwd for wallet password
+    cmd = Mod._commands_run[-1]
+    assert '-password' in cmd, "credential password should use -password flag"
+    pwd_idx = cmd.index('-password')
+    assert cmd[pwd_idx + 1] == 'SysPass123'
+    assert '-pwd' in cmd, "wallet password should use -pwd flag"
+    wpwd_idx = cmd.index('-pwd')
+    assert cmd[wpwd_idx + 1] == 'TestPass123'
 
 
 def test_orapki_modify_credential(monkeypatch):
@@ -513,6 +521,12 @@ def test_orapki_modify_credential(monkeypatch):
         mod.main()
     result = exc.value.args[0]
     assert result["changed"] is True
+    # Verify -password for credential, -pwd for wallet
+    cmd = Mod._commands_run[-1]
+    assert '-password' in cmd
+    assert cmd[cmd.index('-password') + 1] == 'NewPass123'
+    assert '-pwd' in cmd
+    assert cmd[cmd.index('-pwd') + 1] == 'TestPass123'
 
 
 def test_orapki_delete_credential(monkeypatch):

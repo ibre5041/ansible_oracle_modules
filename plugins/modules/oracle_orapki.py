@@ -635,7 +635,7 @@ def _upsert_credential(module, exists):
             if credential_user:
                 args.extend(['-user', credential_user])
             if credential_password:
-                args.extend(['-pwd', credential_password])
+                args.extend(['-password', credential_password])
         else:
             if not credential_db:
                 module.fail_json(
@@ -649,7 +649,9 @@ def _upsert_credential(module, exists):
             if credential_user:
                 args.extend(['-user', credential_user])
             if credential_password:
-                args.extend(['-pwd', credential_password])
+                args.extend(['-password', credential_password])
+        if wallet_password:
+            args.extend(['-pwd', wallet_password])
         _run_orapki(module, args)
         return True
 
