@@ -217,6 +217,11 @@ def ensure_keystore_present(conn, module):
                 changed=False
             )
 
+    if "'" in keystore_location:
+        module.fail_json(
+            msg='keystore_location must not contain single quotes',
+            changed=False,
+        )
     sql = "ADMINISTER KEY MANAGEMENT CREATE KEYSTORE '%s' IDENTIFIED BY \"%s\"" % (
         keystore_location, keystore_password
     )
@@ -369,21 +374,25 @@ def manage_secret(conn, module):
     backup_clause = build_backup_clause(backup, backup_tag)
     exists = secret_exists(conn, secret_client)
 
+    safe_client = secret_client.replace("'", "''")
+
     if secret_state == 'present':
         if not secret:
             module.fail_json(msg='secret is required when secret_state=present', changed=False)
 
+        safe_secret = secret.replace("'", "''")
         tag_clause = ""
         if secret_tag:
-            tag_clause = " USING TAG '%s'" % secret_tag
+            safe_tag = secret_tag.replace("'", "''")
+            tag_clause = " USING TAG '%s'" % safe_tag
 
         if exists:
             sql = "ADMINISTER KEY MANAGEMENT %sUPDATE SECRET '%s' FOR CLIENT '%s'%s IDENTIFIED BY \"%s\"%s" % (
-                force, secret, secret_client, tag_clause, keystore_password, backup_clause
+                force, safe_secret, safe_client, tag_clause, keystore_password, backup_clause
             )
         else:
             sql = "ADMINISTER KEY MANAGEMENT %sADD SECRET '%s' FOR CLIENT '%s'%s IDENTIFIED BY \"%s\"%s" % (
-                force, secret, secret_client, tag_clause, keystore_password, backup_clause
+                force, safe_secret, safe_client, tag_clause, keystore_password, backup_clause
             )
         conn.execute_ddl(sql)
 
@@ -391,7 +400,7 @@ def manage_secret(conn, module):
         if not exists:
             return  # Already absent, idempotent
         sql = "ADMINISTER KEY MANAGEMENT %sDELETE SECRET FOR CLIENT '%s' IDENTIFIED BY \"%s\"%s" % (
-            force, secret_client, keystore_password, backup_clause
+            force, safe_client, keystore_password, backup_clause
         )
         conn.execute_ddl(sql)
 
@@ -447,6 +456,8 @@ def main():
 
     # Secret management takes priority if secret_state is set
     if secret_state:
+        if module.check_mode:
+            module.exit_json(changed=False, msg='Check mode: no keystore operations executed')
         manage_secret(conn, module)
         status = get_wallet_status(conn)
         module.exit_json(
@@ -471,7 +482,10 @@ def main():
             secrets=[{'client': s.get('client', ''), 'tag': s.get('secret_tag', '')} for s in secrets],
         )
 
-    elif state == 'present':
+    if module.check_mode:
+        module.exit_json(changed=False, msg='Check mode: no keystore operations executed')
+
+    if state == 'present':
         status = ensure_keystore_present(conn, module)
 
         # Handle auto-login creation
@@ -539,8 +553,10 @@ try:
         build_backup_clause, build_container_clause, build_force_clause,
     )
 except ImportError:
-    def sanitize_string_params(_params):
-        pass
+    def sanitize_string_params(module_params):
+        for key, value in module_params.items():
+            if isinstance(value, str):
+                module_params[key] = value.strip()
 
 if __name__ == '__main__':
     main()
