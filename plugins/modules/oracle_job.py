@@ -221,14 +221,6 @@ else:
     oracledb_exists = True
 
 
-def apply_session_container(module, conn):
-    session_container = module.params.get("session_container")
-    if not session_container:
-        return
-    if not re.match(r'^[A-Za-z][A-Za-z0-9_$#]*$', session_container):
-        module.fail_json(msg='Invalid session_container for alter session', changed=False)
-    c = conn.cursor()
-    c.execute('ALTER SESSION SET CONTAINER = %s' % session_container)
 
 def query_existing(job_owner, job_name):
     c = conn.cursor()
@@ -444,7 +436,6 @@ def main():
     conn = oc.conn
     if conn.version < "10.2":
         module.fail_json(msg="Database version must be 10gR2 or greater", changed=False)
-    apply_session_container(module, conn)
     #
     result = query_existing(job_owner, job_name)
     desired_logging = module.params['logging_level'].upper() if module.params['logging_level'] else None

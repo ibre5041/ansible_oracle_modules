@@ -119,15 +119,6 @@ import re
 
 
 
-def apply_session_container(module, conn):
-    session_container = module.params.get("session_container")
-    if not session_container:
-        return
-    if not re.match(r'^[A-Za-z][A-Za-z0-9_$#]*$', session_container):
-        module.fail_json(msg='Invalid session_container for alter session', changed=False)
-    c = conn.cursor()
-    c.execute('ALTER SESSION SET CONTAINER = %s' % session_container)
-
 def query_existing(job_class_name):
     c = conn.cursor()
     c.execute("SELECT resource_consumer_group, service, logging_level, log_history, comments FROM all_scheduler_job_classes WHERE owner = 'SYS' AND job_class_name = :jobclass",
@@ -169,7 +160,6 @@ def main():
     conn = oc.conn
     if conn.version < "10.2":
         module.fail_json(msg="Database version must be 10gR2 or greater", changed=False)
-    apply_session_container(module, conn)
     #
     result = query_existing(module.params['name'])
     if module.check_mode:
