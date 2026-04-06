@@ -166,9 +166,14 @@ def oracle_connect(module):
     try:
         if not user and not password:  # OS authentication or wallet
             _ensure_oracle_client(module, oracle_home=oracle_home, required=True)
-            if auth_mode:
+            if auth_mode and service_name:
+                # TNS via wallet: /@service_name as sysdba
                 connect = wallet_connect
                 conn = oracledb.connect(wallet_connect, mode=auth_mode)
+            elif auth_mode:
+                # BEQ/OS auth: / as sysdba (local instance, no listener)
+                connect = '/'
+                conn = oracledb.connect(mode=auth_mode)
             else:
                 connect = wallet_connect
                 conn = oracledb.connect(wallet_connect)
@@ -238,9 +243,14 @@ class oracleConnection:
         connect = '<unresolved>'
         try:
             if not user and not password:  # OS authentication or wallet
-                if auth_mode:
+                if auth_mode and service_name:
+                    # TNS via wallet: /@service_name as sysdba
                     connect = wallet_connect
                     conn = oracledb.connect(wallet_connect, mode=auth_mode)
+                elif auth_mode:
+                    # BEQ/OS auth: / as sysdba (local instance, no listener)
+                    connect = '/'
+                    conn = oracledb.connect(mode=auth_mode)
                 else:
                     connect = wallet_connect
                     conn = oracledb.connect(wallet_connect)
