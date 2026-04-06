@@ -487,14 +487,16 @@ def test_orapki_create_credential(monkeypatch):
         mod.main()
     result = exc.value.args[0]
     assert result["changed"] is True
-    # Verify -password is used for credential password, -pwd for wallet password
+    # Verify correct orapki flags
     cmd = Mod._commands_run[-1]
+    assert '-connect_string' in cmd, "should use -connect_string flag"
+    assert cmd[cmd.index('-connect_string') + 1] == 'PROD'
+    assert '-username' in cmd, "should use -username flag"
+    assert cmd[cmd.index('-username') + 1] == 'sys'
     assert '-password' in cmd, "credential password should use -password flag"
-    pwd_idx = cmd.index('-password')
-    assert cmd[pwd_idx + 1] == 'SysPass123'
+    assert cmd[cmd.index('-password') + 1] == 'SysPass123'
     assert '-pwd' in cmd, "wallet password should use -pwd flag"
-    wpwd_idx = cmd.index('-pwd')
-    assert cmd[wpwd_idx + 1] == 'TestPass123'
+    assert cmd[cmd.index('-pwd') + 1] == 'TestPass123'
 
 
 def test_orapki_modify_credential(monkeypatch):
@@ -521,8 +523,12 @@ def test_orapki_modify_credential(monkeypatch):
         mod.main()
     result = exc.value.args[0]
     assert result["changed"] is True
-    # Verify -password for credential, -pwd for wallet
+    # Verify correct orapki flags for modify
     cmd = Mod._commands_run[-1]
+    assert '-connect_string' in cmd, "should use -connect_string for modify"
+    assert cmd[cmd.index('-connect_string') + 1] == 'primary_db'
+    assert '-username' in cmd, "should use -username flag"
+    assert cmd[cmd.index('-username') + 1] == 'newsys'
     assert '-password' in cmd
     assert cmd[cmd.index('-password') + 1] == 'NewPass123'
     assert '-pwd' in cmd
@@ -585,7 +591,7 @@ def test_orapki_create_entry(monkeypatch):
             credential_secret="sk-abc123",
         )
         _orapki_responses = {
-            'list_credentials': (0, LIST_CREDENTIALS_EMPTY, ''),
+            'list_entries': (0, '', ''),
             'create_entry': (0, '', ''),
         }
         _commands_run = []
@@ -610,7 +616,7 @@ def test_orapki_modify_entry(monkeypatch):
             credential_secret="new-secret-value",
         )
         _orapki_responses = {
-            'list_credentials': (0, LIST_CREDENTIALS_OUTPUT, ''),
+            'list_entries': (0, LIST_CREDENTIALS_OUTPUT, ''),
             'modify_entry': (0, '', ''),
         }
         _commands_run = []
@@ -634,7 +640,7 @@ def test_orapki_delete_entry(monkeypatch):
             credential_alias="primary_db",
         )
         _orapki_responses = {
-            'list_credentials': (0, LIST_CREDENTIALS_OUTPUT, ''),
+            'list_entries': (0, LIST_CREDENTIALS_OUTPUT, ''),
             'delete_entry': (0, '', ''),
         }
         _commands_run = []

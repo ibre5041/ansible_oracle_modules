@@ -290,12 +290,14 @@ def _run_orapki(module, args):
 def _parse_wallet_display(stdout):
     """Parse 'orapki wallet display' output into structured data.
 
-    Returns dict with keys: requested_certs, user_certs, trusted_certs (lists of DNs).
+    Returns dict with keys: requested_certs, user_certs, trusted_certs (lists of DNs),
+    and aliases (list of alias strings extracted from -complete output).
     """
     result = {
         'requested_certs': [],
         'user_certs': [],
         'trusted_certs': [],
+        'aliases': [],
     }
     current_section = None
     section_map = {
@@ -312,6 +314,10 @@ def _parse_wallet_display(stdout):
         if current_section and line.strip().startswith('Subject:'):
             dn = line.split(':', 1)[1].strip()
             result[current_section].append(dn)
+        if line.strip().startswith('Alias:'):
+            alias = line.split(':', 1)[1].strip()
+            if alias:
+                result['aliases'].append(alias)
 
     return result
 
@@ -347,7 +353,7 @@ def _wallet_display(module):
     wallet_location = module.params["wallet_location"]
     wallet_password = module.params["wallet_password"]
 
-    args = ['wallet', 'display', '-wallet', wallet_location]
+    args = ['wallet', 'display', '-wallet', wallet_location, '-complete']
     if wallet_password:
         args.extend(['-pwd', wallet_password])
 
@@ -392,6 +398,7 @@ def _ensure_wallet_present(module):
 def _ensure_wallet_absent(module):
     """Delete a wallet if it exists."""
     wallet_location = module.params["wallet_location"]
+    wallet_password = module.params["wallet_password"]
 
     if not _wallet_exists(wallet_location):
         return False
@@ -399,7 +406,10 @@ def _ensure_wallet_absent(module):
     if module.check_mode:
         return True
 
-    _run_orapki(module, ['wallet', 'delete', '-wallet', wallet_location])
+    args = ['wallet', 'delete', '-wallet', wallet_location]
+    if wallet_password:
+        args.extend(['-pwd', wallet_password])
+    _run_orapki(module, args)
     return True
 
 
@@ -445,9 +455,9 @@ def _cert_exists_in_wallet(module, dn=None, alias=None):
                 return True
 
     if alias:
-        raw = parsed.get('raw_output', '')
-        if alias in raw:
-            return True
+        for wallet_alias in parsed.get('aliases', []):
+            if wallet_alias.upper() == alias.upper():
+                return True
 
     return False
 
@@ -565,12 +575,13 @@ def _remove_cert(module):
 # Credential / secret store management
 # ============================================================================
 
-def _credential_exists(module, alias):
-    """Check if a credential alias exists in the wallet."""
+def _credential_exists(module, alias, credential_type='credential'):
+    """Check if a credential or entry alias exists in the wallet."""
     wallet_location = module.params["wallet_location"]
     wallet_password = module.params["wallet_password"]
 
-    args = ['secretstore', 'list_credentials',
+    subcmd = 'list_entries' if credential_type == 'entry' else 'list_credentials'
+    args = ['secretstore', subcmd,
             '-wallet', wallet_location]
     if wallet_password:
         args.extend(['-pwd', wallet_password])
@@ -592,7 +603,7 @@ def _manage_credential(module):
     wallet_location = module.params["wallet_location"]
     wallet_password = module.params["wallet_password"]
 
-    exists = _credential_exists(module, credential_alias)
+    exists = _credential_exists(module, credential_alias, credential_type)
 
     if credential_state == 'present':
         return _upsert_credential(module, exists)
@@ -602,10 +613,14 @@ def _manage_credential(module):
             return False
         if module.check_mode:
             return True
-        subcmd = 'delete_credential' if credential_type == 'credential' else 'delete_entry'
-        args = ['secretstore', subcmd,
-                '-wallet', wallet_location,
-                '-alias', credential_alias]
+        if credential_type == 'credential':
+            args = ['secretstore', 'delete_credential',
+                    '-wallet', wallet_location,
+                    '-connect_string', credential_alias]
+        else:
+            args = ['secretstore', 'delete_entry',
+                    '-wallet', wallet_location,
+                    '-alias', credential_alias]
         if wallet_password:
             args.extend(['-pwd', wallet_password])
         _run_orapki(module, args)
@@ -631,9 +646,9 @@ def _upsert_credential(module, exists):
         if exists:
             args = ['secretstore', 'modify_credential',
                     '-wallet', wallet_location,
-                    '-alias', credential_alias]
+                    '-connect_string', credential_alias]
             if credential_user:
-                args.extend(['-user', credential_user])
+                args.extend(['-username', credential_user])
             if credential_password:
                 args.extend(['-password', credential_password])
         else:
@@ -644,10 +659,9 @@ def _upsert_credential(module, exists):
                 )
             args = ['secretstore', 'create_credential',
                     '-wallet', wallet_location,
-                    '-alias', credential_alias,
-                    '-db', credential_db]
+                    '-connect_string', credential_db]
             if credential_user:
-                args.extend(['-user', credential_user])
+                args.extend(['-username', credential_user])
             if credential_password:
                 args.extend(['-password', credential_password])
         if wallet_password:
