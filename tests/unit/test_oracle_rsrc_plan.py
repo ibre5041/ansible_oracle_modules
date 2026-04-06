@@ -81,6 +81,20 @@ _DIRECTIVE_ROW = {
     'max_mbps': None,
 }
 
+# Oracle DBA_RSRC_PLAN_DIRECTIVES.TYPE uses PLAN (not SUBPLAN) for subplan children.
+_SUBPLAN_DIRECTIVE_ROW = {
+    'plan': 'TEST_PLAN',
+    'group_or_subplan': 'CHILD_PLAN',
+    'type': 'PLAN',
+    'cpu_p1': None,
+    'parallel_degree_limit_p1': None,
+    'active_sess_pool_p1': None,
+    'max_idle_time': None,
+    'max_idle_blocker_time': None,
+    'max_iops': None,
+    'max_mbps': None,
+}
+
 
 # ===========================================================================
 # Tests: state=status
@@ -319,6 +333,29 @@ def test_plan_present_no_drift_with_comment_and_directives(monkeypatch):
         Mod(),
         plan_rows=[plan_row],
         directive_rows=[_DIRECTIVE_ROW],
+    )
+    monkeypatch.setattr(mod, 'AnsibleModule', Mod)
+    monkeypatch.setattr(mod, 'oracleConnection', lambda m: conn, raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    result = exc.value.args[0]
+    assert result['changed'] is False
+    assert conn.ddls == []
+
+
+def test_plan_present_no_drift_ignores_plan_type_subplan_directive(monkeypatch):
+    mod = _load()
+    plan_row = dict(_PLAN_ROW, comments='My plan')
+    directives = [{'group': 'OTHER_GROUPS', 'cpu_p1': 100}]
+
+    class Mod(BaseFakeModule):
+        params = _plan_params(comment='My plan', directives=directives)
+
+    conn = _PlanConn(
+        Mod(),
+        plan_rows=[plan_row],
+        directive_rows=[_DIRECTIVE_ROW, _SUBPLAN_DIRECTIVE_ROW],
     )
     monkeypatch.setattr(mod, 'AnsibleModule', Mod)
     monkeypatch.setattr(mod, 'oracleConnection', lambda m: conn, raising=False)

@@ -195,7 +195,8 @@ def _consumer_group_directives_from_db(rows):
         return out
     for r in rows:
         rd = _row_keys_lower(r)
-        if (rd.get('type') or '').upper() == 'SUBPLAN':
+        # DBA_RSRC_PLAN_DIRECTIVES.TYPE is CONSUMER_GROUP or PLAN (subplan); not SUBPLAN.
+        if (rd.get('type') or '').upper() != 'CONSUMER_GROUP':
             continue
         g = rd.get('group_or_subplan')
         if not g:
@@ -485,6 +486,13 @@ try:
 except ImportError:
     def sanitize_string_params(_params):
         pass
+
+    class oracleConnection:  # noqa: N801
+        def __init__(self, module):
+            module.fail_json(
+                msg='oracle_utils is required. Ensure the collection is properly installed.',
+                changed=False,
+            )
 
 if __name__ == '__main__':
     main()
