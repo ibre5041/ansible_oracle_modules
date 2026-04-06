@@ -237,6 +237,58 @@ def test_plan_create_top_level_max_iops_mbps_applied_to_directives(monkeypatch):
     assert directive_calls[1]['max_iops'] == 999 and directive_calls[1]['max_mbps'] == 50
 
 
+def test_plan_create_rejects_directive_missing_group(monkeypatch):
+    mod = _load()
+
+    class Mod(BaseFakeModule):
+        params = _plan_params(state='present', directives=[{'cpu_p1': 10}])
+
+    conn = _PlanConn(Mod(), plan_rows=[], directive_rows=[])
+    monkeypatch.setattr(mod, 'AnsibleModule', Mod)
+    monkeypatch.setattr(mod, 'oracleConnection', lambda m: conn, raising=False)
+
+    with pytest.raises(FailJson) as exc:
+        mod.main()
+    assert 'directives[0]' in exc.value.args[0]['msg']
+    assert 'group' in exc.value.args[0]['msg'].lower()
+    assert conn.ddls == []
+
+
+def test_plan_create_rejects_directive_blank_group(monkeypatch):
+    mod = _load()
+
+    class Mod(BaseFakeModule):
+        params = _plan_params(
+            state='present',
+            directives=[{'group': '  ', 'cpu_p1': 10}],
+        )
+
+    conn = _PlanConn(Mod(), plan_rows=[], directive_rows=[])
+    monkeypatch.setattr(mod, 'AnsibleModule', Mod)
+    monkeypatch.setattr(mod, 'oracleConnection', lambda m: conn, raising=False)
+
+    with pytest.raises(FailJson) as exc:
+        mod.main()
+    assert 'directives[0]' in exc.value.args[0]['msg']
+    assert conn.ddls == []
+
+
+def test_plan_present_rejects_directive_missing_group(monkeypatch):
+    mod = _load()
+
+    class Mod(BaseFakeModule):
+        params = _plan_params(directives=[{'cpu_p1': 50}])
+
+    conn = _PlanConn(Mod(), plan_rows=[_PLAN_ROW], directive_rows=[_DIRECTIVE_ROW])
+    monkeypatch.setattr(mod, 'AnsibleModule', Mod)
+    monkeypatch.setattr(mod, 'oracleConnection', lambda m: conn, raising=False)
+
+    with pytest.raises(FailJson) as exc:
+        mod.main()
+    assert 'directives[0]' in exc.value.args[0]['msg']
+    assert conn.ddls == []
+
+
 def test_plan_create_idempotent(monkeypatch):
     mod = _load()
 

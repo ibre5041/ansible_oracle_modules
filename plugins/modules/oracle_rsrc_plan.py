@@ -154,13 +154,33 @@ def _open_pending_area(conn):
     )
 
 
+def _validate_and_normalize_directive_group(module, merged, index):
+    """Require a non-empty group for each user-supplied directive; normalize whitespace."""
+    raw = merged.get('group')
+    if raw is None:
+        module.fail_json(
+            msg='Each directive must include a non-empty "group" key '
+                 '(missing at directives[%s]).' % index,
+            changed=False,
+        )
+    name = raw.strip() if isinstance(raw, str) else str(raw).strip()
+    if not name:
+        module.fail_json(
+            msg='Each directive must include a non-empty "group" value '
+                 '(invalid at directives[%s]).' % index,
+            changed=False,
+        )
+    merged['group'] = name
+
+
 def _merge_directives_for_plan(module):
     directives = module.params['directives'] or []
     default_max_iops = module.params.get('max_iops')
     default_max_mbps = module.params.get('max_mbps')
     out = []
-    for d in directives:
+    for index, d in enumerate(directives):
         merged = dict(d)
+        _validate_and_normalize_directive_group(module, merged, index)
         if default_max_iops is not None and merged.get('max_iops') is None:
             merged['max_iops'] = default_max_iops
         if default_max_mbps is not None and merged.get('max_mbps') is None:
@@ -233,6 +253,9 @@ def update_resource_plan(conn, module):
     live_rows = get_plan(conn, plan)
     live_plan_row = live_rows[0]
     live_directive_rows = get_plan_directives(conn, plan)
+    merged_directives = None
+    if module.params.get('directives') is not None:
+        merged_directives = _merge_directives_for_plan(module)
     _open_pending_area(conn)
     if module.params.get('comment') is not None:
         want_c = (module.params.get('comment') or '').strip()
@@ -244,8 +267,8 @@ def update_resource_plan(conn, module):
                 "plan => :plan, new_comment => :comment); END;",
                 {'plan': plan, 'comment': want_c},
             )
-    if module.params.get('directives') is not None:
-        want_by = {x['group'].upper(): x for x in _merge_directives_for_plan(module)}
+    if merged_directives is not None:
+        want_by = {x['group'].upper(): x for x in merged_directives}
         live_by = {x['group'].upper(): x for x in _consumer_group_directives_from_db(live_directive_rows)}
         for g in sorted(set(live_by) - set(want_by)):
             conn.execute_ddl(
@@ -271,6 +294,7 @@ def create_plan(conn, module):
     """Create a resource plan with directives."""
     plan = module.params["plan"]
     comment = module.params["comment"] or ''
+    merged_directives = _merge_directives_for_plan(module)
 
     _open_pending_area(conn)
 
@@ -281,7 +305,7 @@ def create_plan(conn, module):
         {'plan': plan, 'comment': comment},
     )
 
-    for d in _merge_directives_for_plan(module):
+    for d in merged_directives:
         _create_directive(conn, plan, d)
 
     # Submit pending area
@@ -290,11 +314,22 @@ def create_plan(conn, module):
 
 def _create_directive(conn, plan, directive):
     """Create a single plan directive."""
+    grp = directive.get('group')
+    if grp is None:
+        raise ValueError(
+            'CREATE_PLAN_DIRECTIVE requires directive["group"]; '
+            'user directives must be validated via _merge_directives_for_plan.'
+        )
+    name = grp.strip() if isinstance(grp, str) else str(grp).strip()
+    if not name:
+        raise ValueError(
+            'CREATE_PLAN_DIRECTIVE requires a non-empty directive["group"].'
+        )
     fragments = [
         "BEGIN DBMS_RESOURCE_MANAGER.CREATE_PLAN_DIRECTIVE(",
         "plan => :plan, group_or_subplan => :group_or_subplan",
     ]
-    params = {'plan': plan, 'group_or_subplan': directive['group']}
+    params = {'plan': plan, 'group_or_subplan': name}
 
     for key, param in [('cpu_p1', 'cpu_p1'),
                        ('parallel_degree_limit_p1', 'parallel_degree_limit_p1'),
