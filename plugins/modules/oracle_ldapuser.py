@@ -510,8 +510,10 @@ try:
         oracleConnection, sanitize_string_params,
     )
 except ImportError:
-    def sanitize_string_params(_params):
-        pass
+    def sanitize_string_params(module_params):
+        for key, value in module_params.items():
+            if isinstance(value, str):
+                module_params[key] = value.strip()
 
 if __name__ == '__main__':
     main()
