@@ -159,6 +159,24 @@ def test_flashback_create_scn(monkeypatch):
     assert 'AS OF SCN 12345' in ddl
 
 
+def test_flashback_create_scn_zero(monkeypatch):
+    mod = _load()
+
+    class Mod(BaseFakeModule):
+        params = _flashback_params(state='present', scn=0)
+
+    conn = _FlashbackConn(Mod(), rp_rows=[])
+    monkeypatch.setattr(mod, 'AnsibleModule', Mod)
+    monkeypatch.setattr(mod, 'oracleConnection', lambda m: conn, raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    result = exc.value.args[0]
+    assert result['changed'] is True
+    ddl = conn.ddls[0]
+    assert 'AS OF SCN 0' in ddl
+
+
 def test_flashback_create_preserve(monkeypatch):
     mod = _load()
 

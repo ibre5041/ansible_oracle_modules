@@ -103,7 +103,7 @@ def create_restore_point(conn, module):
 
     sql = 'CREATE RESTORE POINT %s' % name
 
-    if scn:
+    if scn is not None:
         sql += ' AS OF SCN %d' % scn
 
     if preserve:
