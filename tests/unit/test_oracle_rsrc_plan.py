@@ -49,7 +49,7 @@ class _PlanConn(BaseFakeConn):
             if self._active_plan:
                 row = {'value': self._active_plan}
             else:
-                row = {'value': ''}
+                row = {'value': None}
             return row if fetchone else [row]
         return [] if not fetchone else {}
 
@@ -106,6 +106,7 @@ def test_plan_status(monkeypatch):
     assert result['exists'] is True
     assert result['plan'] == [_PLAN_ROW]
     assert result['directives'] == [_DIRECTIVE_ROW]
+    assert result['active_plan'] == 'OTHER_PLAN'
     assert result['is_active'] is False
 
 
@@ -129,6 +130,7 @@ def test_plan_status_not_exists(monkeypatch):
     assert result['exists'] is False
     assert result['plan'] == []
     assert result['directives'] == []
+    assert result['active_plan'] == ''
     assert result['is_active'] is False
 
 

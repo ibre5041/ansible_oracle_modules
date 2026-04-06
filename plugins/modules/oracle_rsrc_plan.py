@@ -114,7 +114,8 @@ def get_active_plan(conn):
     sql = """SELECT VALUE FROM V$PARAMETER
              WHERE NAME = 'resource_manager_plan'"""
     row = conn.execute_select_to_dict(sql, fetchone=True)
-    return row.get('value', '') if row else ''
+    val = row.get('value') if row else None
+    return '' if val is None else val
 
 
 def create_plan(conn, module):
@@ -123,8 +124,13 @@ def create_plan(conn, module):
     comment = module.params["comment"] or ''
     directives = module.params["directives"] or []
 
-    # Create pending area
-    conn.execute_ddl("BEGIN DBMS_RESOURCE_MANAGER.CREATE_PENDING_AREA(); END;")
+    # Reset any stale pending area, then open a new one
+    conn.execute_ddl(
+        "BEGIN "
+        "DBMS_RESOURCE_MANAGER.CLEAR_PENDING_AREA(); "
+        "DBMS_RESOURCE_MANAGER.CREATE_PENDING_AREA(); "
+        "END;"
+    )
 
     # Create plan
     conn.execute_ddl(
@@ -175,7 +181,12 @@ def _create_directive(conn, plan, directive):
 def drop_plan(conn, module):
     """Drop a resource plan."""
     plan = module.params["plan"]
-    conn.execute_ddl("BEGIN DBMS_RESOURCE_MANAGER.CREATE_PENDING_AREA(); END;")
+    conn.execute_ddl(
+        "BEGIN "
+        "DBMS_RESOURCE_MANAGER.CLEAR_PENDING_AREA(); "
+        "DBMS_RESOURCE_MANAGER.CREATE_PENDING_AREA(); "
+        "END;"
+    )
     conn.execute_ddl(
         "BEGIN DBMS_RESOURCE_MANAGER.DELETE_PLAN_CASCADE(plan => :plan); END;",
         {'plan': plan},
