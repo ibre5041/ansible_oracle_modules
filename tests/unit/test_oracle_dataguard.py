@@ -528,12 +528,9 @@ class _FakeOs:
     """Fake os module that makes path.exists return True for oracle_home."""
 
     def __init__(self, oracle_home):
-        self._oracle_home = oracle_home
         self.environ = dict(ORACLE_HOME=oracle_home)
 
     class path:
-        _oracle_home = None
-
         @classmethod
         def exists(cls, path_str):
             return True
@@ -546,7 +543,3 @@ class _FakeOs:
     def __getattr__(self, name):
         import os as _os
         return getattr(_os, name)
-
-
-# Ensure _FakeOs.path methods work for all tests
-_FakeOs.path._oracle_home = "/fake/oracle"
