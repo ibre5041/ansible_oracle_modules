@@ -181,7 +181,7 @@ def _host_ace_mutate_sql_params(module, procedure):
       privilege_list => xs$name_list(:privilege),
       principal_name => :principal,
       principal_type => xs_acl.ptype_db,
-      is_grant => :is_grant
+      granted => :granted
     )
   );
 END;""" % (procedure,)
@@ -191,7 +191,7 @@ END;""" % (procedure,)
         "upper_port": upper_port,
         "privilege": privilege,
         "principal": principal,
-        "is_grant": is_grant,
+        "granted": is_grant,
     }
     return sql, params
 
@@ -279,7 +279,7 @@ def main():
         module.exit_json(changed=conn.changed, ddls=conn.ddls, msg='ACE removed')
 
 
-from ansible.module_utils.basic import *  # noqa: F403
+from ansible.module_utils.basic import AnsibleModule
 
 try:
     from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_utils import (  # noqa: E501

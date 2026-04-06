@@ -150,11 +150,11 @@ def test_acl_create_ace(monkeypatch):
     assert 'host => :host' in ddl
     assert 'xs$name_list(:privilege)' in ddl
     assert 'principal_name => :principal' in ddl
-    assert 'is_grant => :is_grant' in ddl
+    assert 'granted => :granted' in ddl
     assert binds['host'] == 'dbserver.example.com'
     assert binds['privilege'] == 'connect'
     assert binds['principal'] == 'HR'
-    assert binds['is_grant'] is True
+    assert binds['granted'] is True
     assert binds['lower_port'] is None
     assert binds['upper_port'] is None
 
@@ -243,7 +243,7 @@ def test_acl_absent_host_wide_noop_when_only_port_scoped_ace(monkeypatch):
 
 
 def test_acl_create_ace_deny(monkeypatch):
-    """state=present with is_grant=False generates is_grant => FALSE."""
+    """state=present with is_grant=False binds granted => false in xs$ace_type."""
     mod = _load()
 
     class Mod(BaseFakeModule):
@@ -259,8 +259,8 @@ def test_acl_create_ace_deny(monkeypatch):
     assert result['changed'] is True
     ddl = conn.ddls[0]
     assert 'DBMS_NETWORK_ACL_ADMIN.APPEND_HOST_ACE' in ddl
-    assert 'is_grant => :is_grant' in ddl
-    assert conn.ddl_binds[0]['is_grant'] is False
+    assert 'granted => :granted' in ddl
+    assert conn.ddl_binds[0]['granted'] is False
 
 
 def test_acl_create_ace_resolve(monkeypatch):
@@ -319,7 +319,7 @@ def test_acl_create_when_grant_exists_but_deny_requested(monkeypatch):
     result = exc.value.args[0]
     assert result['changed'] is True
     assert 'ACE created' in result['msg']
-    assert conn.ddl_binds[0]['is_grant'] is False
+    assert conn.ddl_binds[0]['granted'] is False
 
 
 def test_acl_create_idempotent_deny(monkeypatch):
@@ -459,11 +459,11 @@ def test_acl_remove_ace(monkeypatch):
     assert 'host => :host' in ddl
     assert 'xs$name_list(:privilege)' in ddl
     assert 'principal_name => :principal' in ddl
-    assert 'is_grant => :is_grant' in ddl
+    assert 'granted => :granted' in ddl
     assert binds['host'] == 'dbserver.example.com'
     assert binds['privilege'] == 'connect'
     assert binds['principal'] == 'HR'
-    assert binds['is_grant'] is True
+    assert binds['granted'] is True
 
 
 def test_acl_remove_ace_deny(monkeypatch):
@@ -483,7 +483,7 @@ def test_acl_remove_ace_deny(monkeypatch):
         mod.main()
     result = exc.value.args[0]
     assert result['changed'] is True
-    assert conn.ddl_binds[0]['is_grant'] is False
+    assert conn.ddl_binds[0]['granted'] is False
 
 
 def test_acl_remove_ace_with_ports(monkeypatch):
@@ -510,7 +510,7 @@ def test_acl_remove_ace_with_ports(monkeypatch):
     assert 'upper_port => :upper_port' in ddl
     assert binds['lower_port'] == 25
     assert binds['upper_port'] == 25
-    assert binds['is_grant'] is True
+    assert binds['granted'] is True
 
 
 def test_acl_remove_idempotent(monkeypatch):
