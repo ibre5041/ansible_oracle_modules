@@ -3,4 +3,5 @@ tests/integration/integration_config.yml
 **/__pycache__/
 *.pyc
 .coverage
-
+.DS_Store
+.claude/

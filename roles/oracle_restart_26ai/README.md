@@ -1,0 +1,61 @@
+Role Name
+=========
+
+This role installs Oracle restart.
+It also prepares OS configuration for Oracle ASM.
+
+Requirements
+------------
+
+Role Variables
+--------------
+
+See `roles/default_vars_only/defaults/main.yml`
+
+ - `oracle_install_dir_root: /oracle/u01`
+ - `oracle_install_dir_temp: "{{ oracle_install_dir_root}}/tmp"`
+ - `oracle_install_dir_base: "{{ oracle_install_dir_root}}/base"`
+ - `oracle_install_dir_prod: "{{ oracle_install_dir_root}}/product"`
+ - `oracle_inventory_location: "{{ oracle_install_dir_root}}/oraInventory"`
+ - `oracle_os_user, oracle_os_uid, oracle_os_group, oracle_os_groups`
+
+Also:
+
+ - oracle_gi_media: name of golden image file
+ - oracle_url_base: HTTP(S) base URL to download install image from
+
+ - oracle_release: one of 18c, 19c, 21c, 26ai is used as a key in oracle_install_space
+
+Dependencies
+------------
+
+You should run base_oracle_ec2 role before.
+
+Example Playbook
+----------------
+
+Including an example of how to use your role (for instance, with variables passed in as parameters) is always nice for users too:
+
+    - hosts: all
+      collections:
+        - ibre5041.ansible_oracle_modules
+      become: yes
+      become_user: root
+      become_method: sudo
+
+    - role: oracle_restart_26ai
+      oracle_gi_media: "grid_home_2026_Jan.zip"
+      oracle_url_base: "http://imageserver/oracle/"
+      oracle_release: 26ai
+      tags: [ oraclerestart ]
+
+License
+-------
+
+BSD
+
+Author Information
+------------------
+
+Ivan Brezina
+

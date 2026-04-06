@@ -37,7 +37,7 @@ options:
     description: The mode with which to connect to the database
     required: False
     default: normal
-    choices: ['normal','sysdba']
+    choices: ['normal','sysdba','sysdg','sysoper','sysasm']
   session_container:
     description:
       - Target PDB name for ALTER SESSION SET CONTAINER when using local SYSDBA connections.

@@ -37,7 +37,17 @@ options:
             - The mode with which to connect to the database
         required: true
         default: normal
-        choices: ['normal','sysdba']
+        choices: ['normal','sysdba','sysdg','sysoper','sysasm']
+    oracle_home:
+        description:
+            - The ORACLE_HOME path
+        required: false
+        aliases: ['oh']
+    dsn:
+        description:
+            - Oracle Data Source Name (connect string or TNS alias), overrides hostname/port/service_name
+        required: false
+        aliases: ['datasource_name']
     state:
         description:
             - If present, job schedule is created, if absent then schedule is dropped
@@ -102,15 +112,6 @@ import re
 
 
 
-def apply_session_container(module, conn):
-    session_container = module.params.get("session_container")
-    if not session_container:
-        return
-    if not re.match(r'^[A-Za-z][A-Za-z0-9_$#]*$', session_container):
-        module.fail_json(msg='Invalid session_container for alter session', changed=False)
-    c = conn.cursor()
-    c.execute('ALTER SESSION SET CONTAINER = %s' % session_container)
-
 def query_existing(owner, name):
     c = conn.cursor()
     c.execute("SELECT repeat_interval, comments FROM all_scheduler_schedules WHERE owner = :owner AND schedule_name = :name",
@@ -157,7 +158,8 @@ def main():
     # Connect to database
     oc = oracleConnection(module)
     conn = oc.conn
-    apply_session_container(module, conn)
+    if conn.version < "10.2":
+        module.fail_json(msg="Database version must be 10gR2 or greater", changed=False)
     #
     result = query_existing(job_owner, job_name)
     if module.check_mode:
@@ -229,7 +231,13 @@ try:
         oracleConnection, sanitize_string_params,
     )
 except ImportError:
-    def sanitize_string_params(_params):
-        pass
+    def sanitize_string_params(module_params):
+        for key, value in module_params.items():
+            if isinstance(value, str):
+                module_params[key] = value.strip()
+
+    class oracleConnection:  # noqa: N801
+        def __init__(self, module):
+            module.fail_json(msg='oracle_utils is required. Ensure the collection is properly installed.', changed=False)
 if __name__ == '__main__':
     main()
