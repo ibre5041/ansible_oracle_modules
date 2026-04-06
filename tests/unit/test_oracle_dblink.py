@@ -227,6 +227,105 @@ def test_dblink_create_no_connect_using(monkeypatch):
     assert "connect_using" in result["msg"]
 
 
+def test_dblink_create_connect_user_without_password(monkeypatch):
+    mod = _load()
+
+    class Mod(BaseFakeModule):
+        params = _dblink_params(
+            state="present",
+            connect_user="REMOTE_USER",
+            connect_password=None,
+            connect_using="remote_db",
+        )
+
+    conn = _DblinkConn(Mod(), dblink_rows=[])
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "oracleConnection", lambda m: conn, raising=False)
+
+    with pytest.raises(FailJson) as exc:
+        mod.main()
+    result = exc.value.args[0]
+    assert result["changed"] is False
+    assert "connect_password" in result["msg"]
+    assert conn.ddls == []
+
+
+def test_dblink_create_connect_user_empty_password(monkeypatch):
+    mod = _load()
+
+    class Mod(BaseFakeModule):
+        params = _dblink_params(
+            state="present",
+            connect_user="REMOTE_USER",
+            connect_password="",
+            connect_using="remote_db",
+        )
+
+    conn = _DblinkConn(Mod(), dblink_rows=[])
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "oracleConnection", lambda m: conn, raising=False)
+
+    with pytest.raises(FailJson) as exc:
+        mod.main()
+    result = exc.value.args[0]
+    assert result["changed"] is False
+    assert "connect_password" in result["msg"]
+    assert conn.ddls == []
+
+
+def test_dblink_create_present_neither_fixed_nor_current_user(monkeypatch):
+    mod = _load()
+
+    class Mod(BaseFakeModule):
+        params = _dblink_params(
+            state="present",
+            connect_user=None,
+            connect_password=None,
+            current_user=False,
+            connect_using="remote_db",
+        )
+
+    conn = _DblinkConn(Mod(), dblink_rows=[])
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "oracleConnection", lambda m: conn, raising=False)
+
+    with pytest.raises(FailJson) as exc:
+        mod.main()
+    result = exc.value.args[0]
+    assert result["changed"] is False
+    assert "current_user=true" in result["msg"]
+    assert conn.ddls == []
+
+
+def test_dblink_create_check_mode_no_ddl(monkeypatch):
+    mod = _load()
+
+    class Mod(BaseFakeModule):
+        params = _dblink_params(
+            state="present",
+            connect_user="REMOTE_USER",
+            connect_password="secret",
+            connect_using="remote_db",
+        )
+        check_mode = True
+
+    conn = _DblinkConn(Mod(), dblink_rows=[])
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "oracleConnection", lambda m: conn, raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    result = exc.value.args[0]
+    assert result["changed"] is True
+    assert "check mode" in result["msg"]
+    assert conn.ddls == []
+    assert len(result["ddls"]) == 1
+    preview = result["ddls"][0]
+    assert preview.startswith("--CREATE ")
+    assert "IDENTIFIED BY \"********\"" in preview
+    assert "secret" not in preview
+
+
 # ===========================================================================
 # Tests: state=absent (drop)
 # ===========================================================================
@@ -287,3 +386,23 @@ def test_dblink_drop_idempotent(monkeypatch):
     assert result["changed"] is False
     assert "does not exist" in result["msg"]
     assert conn.ddls == []
+
+
+def test_dblink_drop_check_mode_no_ddl(monkeypatch):
+    mod = _load()
+
+    class Mod(BaseFakeModule):
+        params = _dblink_params(state="absent", link_type="private")
+        check_mode = True
+
+    conn = _DblinkConn(Mod(), dblink_rows=[_PRIVATE_LINK_ROW])
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "oracleConnection", lambda m: conn, raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    result = exc.value.args[0]
+    assert result["changed"] is True
+    assert "check mode" in result["msg"]
+    assert conn.ddls == []
+    assert result["ddls"] == ["--DROP DATABASE LINK TEST_LINK"]

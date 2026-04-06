@@ -24,10 +24,10 @@ options:
     default: private
     choices: ['public', 'private']
   connect_user:
-    description: User to connect as on the remote database (for fixed-user links)
+    description: User to connect as on the remote database (for fixed-user links). Must be used with I(connect_password); mutually exclusive with I(current_user).
     required: false
   connect_password:
-    description: Password for the remote user
+    description: Password for the remote user (required together with I(connect_user) for fixed-user links)
     required: false
     no_log: true
   connect_using:
@@ -103,8 +103,8 @@ def dblink_exists(conn, link_name, link_type):
     return bool(get_dblink(conn, link_name, link_type))
 
 
-def create_dblink(conn, module):
-    """Create a database link."""
+def build_create_dblink_sql(module, redact_password=False):
+    """Build CREATE DATABASE LINK DDL (optionally mask password for check-mode display)."""
     link_name = module.params["link_name"]
     link_type = module.params["link_type"]
     connect_user = module.params["connect_user"]
@@ -120,21 +120,32 @@ def create_dblink(conn, module):
     if current_user:
         sql += ' CONNECT TO CURRENT_USER'
     elif connect_user:
-        sql += " CONNECT TO %s IDENTIFIED BY \"%s\"" % (connect_user, connect_password)
+        pwd = '********' if redact_password else connect_password
+        sql += " CONNECT TO %s IDENTIFIED BY \"%s\"" % (connect_user, pwd)
 
     sql += ' USING \'%s\'' % connect_using
-    conn.execute_ddl(sql)
+    return sql
 
 
-def drop_dblink(conn, module):
-    """Drop a database link."""
+def build_drop_dblink_sql(module):
+    """Build DROP DATABASE LINK DDL."""
     link_name = module.params["link_name"]
     link_type = module.params["link_type"]
     sql = 'DROP'
     if link_type == 'public':
         sql += ' PUBLIC'
     sql += ' DATABASE LINK %s' % link_name
-    conn.execute_ddl(sql)
+    return sql
+
+
+def create_dblink(conn, module):
+    """Create a database link."""
+    conn.execute_ddl(build_create_dblink_sql(module, redact_password=False))
+
+
+def drop_dblink(conn, module):
+    """Drop a database link."""
+    conn.execute_ddl(build_drop_dblink_sql(module))
 
 
 def main():
@@ -161,6 +172,9 @@ def main():
         mutually_exclusive=[
             ('connect_user', 'current_user'),
         ],
+        required_together=[
+            ['connect_user', 'connect_password'],
+        ],
         supports_check_mode=True,
     )
     sanitize_string_params(module.params)
@@ -179,12 +193,41 @@ def main():
             module.exit_json(changed=False, msg='Database link already exists')
         if not module.params["connect_using"]:
             module.fail_json(msg='connect_using is required for state=present', changed=False)
+
+        connect_user = module.params["connect_user"]
+        connect_password = module.params["connect_password"]
+        current_user = module.params["current_user"]
+        if not current_user and not connect_user:
+            module.fail_json(
+                msg='Either connect_user (with connect_password) or current_user=true is required for state=present',
+                changed=False,
+            )
+        if connect_user and (connect_password is None or connect_password == ''):
+            module.fail_json(
+                msg='connect_password is required when connect_user is set',
+                changed=False,
+            )
+
+        if module.check_mode:
+            sql = build_create_dblink_sql(module, redact_password=True)
+            module.exit_json(
+                changed=True,
+                ddls=['--' + sql],
+                msg='Database link would be created (check mode)',
+            )
         create_dblink(conn, module)
         module.exit_json(changed=conn.changed, ddls=conn.ddls, msg='Database link created')
 
     elif state == 'absent':
         if not dblink_exists(conn, link_name, link_type):
             module.exit_json(changed=False, msg='Database link does not exist')
+        if module.check_mode:
+            sql = build_drop_dblink_sql(module)
+            module.exit_json(
+                changed=True,
+                ddls=['--' + sql],
+                msg='Database link would be dropped (check mode)',
+            )
         drop_dblink(conn, module)
         module.exit_json(changed=conn.changed, ddls=conn.ddls, msg='Database link dropped')
 
