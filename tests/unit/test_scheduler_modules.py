@@ -41,7 +41,10 @@ def _make_fake_db(fetchone_row=None):
     class _FakeOC:
         def __init__(self, module):
             self.conn = _conn
+            self.conn.autocommit = True
             self.version = _conn.version
+            self.ddls = []
+            self.changed = False
 
     return _FakeOC, _conn
 

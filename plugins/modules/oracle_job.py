@@ -216,9 +216,7 @@ import re
 try:
     import oracledb
 except ImportError:
-    oracledb_exists = False
-else:
-    oracledb_exists = True
+    oracledb = None
 
 
 
@@ -409,9 +407,6 @@ def main():
         mutually_exclusive=[['schedule_name','repeat_interval'],['program_name','job_action']]
     )
     sanitize_string_params(module.params)
-    # Check for required modules
-    if not oracledb_exists:
-        module.fail_json(msg="The oracledb module is required. 'pip install oracledb' should do the trick. If oracledb is installed, make sure ORACLE_HOME & LD_LIBRARY_PATH is set")
     # Check input parameters
     re_name = re.compile("^[A-Za-z0-9_\$#]+\.[A-Za-z0-9_\$#]+$")
     if not re_name.match(module.params['job_name']):
