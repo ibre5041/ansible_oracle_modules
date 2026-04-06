@@ -38,7 +38,17 @@ options:
             - The mode with which to connect to the database
         required: true
         default: normal
-        choices: ['normal','sysdba']
+        choices: ['normal','sysdba','sysdg','sysoper','sysasm']
+    oracle_home:
+        description:
+            - The ORACLE_HOME path
+        required: false
+        aliases: ['oh']
+    dsn:
+        description:
+            - Oracle Data Source Name (connect string or TNS alias), overrides hostname/port/service_name
+        required: false
+        aliases: ['datasource_name']
     state:
         description:
             - If present, then consumer group is created, if absent, then consumer group is removed
@@ -197,15 +207,6 @@ else:
     oracledb_exists = True
 
 
-def apply_session_container(module, conn):
-    session_container = module.params.get("session_container")
-    if not session_container:
-        return
-    if not re.match(r'^[A-Za-z][A-Za-z0-9_$#]*$', session_container):
-        module.fail_json(msg='Invalid session_container for alter session', changed=False)
-    c = conn.cursor()
-    c.execute('ALTER SESSION SET CONTAINER = %s' % session_container)
-
 def query_existing(name):
     cgname = name.upper()
     c = conn.cursor()
@@ -278,9 +279,11 @@ def main():
             hostname      = dict(default='localhost'),
             port          = dict(default=1521, type='int'),
             service_name  = dict(required=True),
+            oracle_home   = dict(required=False, aliases=['oh']),
+            dsn           = dict(required=False, aliases=['datasource_name']),
             user          = dict(required=False),
             password      = dict(required=False, no_log=True),
-            mode          = dict(default='normal', choices=["normal","sysdba"]),
+            mode          = dict(default='normal', choices=["normal", "sysdba", "sysdg", "sysoper", "sysasm"]),
             session_container = dict(required=False),
             state         = dict(default="present", choices=["present", "absent"]),
             name          = dict(required=True),
@@ -304,55 +307,15 @@ def main():
         ),
         supports_check_mode=True
     )
+    sanitize_string_params(module.params)
     # Check for required modules
     if not oracledb_exists:
         module.fail_json(msg="The oracledb module is required. 'pip install oracledb' should do the trick. If oracledb is installed, make sure ORACLE_HOME & LD_LIBRARY_PATH is set")
-    # Check input parameters
     # Connect to database
-    hostname = module.params["hostname"]
-    port = module.params["port"]
-    service_name = module.params["service_name"]
-    user = module.params["user"]
-    password = module.params["password"]
-    mode = module.params["mode"]
-    wallet_connect = '/@%s' % service_name
-    try:
-        if (not user and not password ): # If neither user or password is supplied, the use of an oracle wallet is assumed
-            if mode == 'sysdba':
-                connect = wallet_connect
-                conn = oracledb.connect(wallet_connect, mode=oracledb.SYSDBA)
-            else:
-                connect = wallet_connect
-                conn = oracledb.connect(wallet_connect)
-
-        elif (user and password ):
-            if mode == 'sysdba':
-                dsn = oracledb.makedsn(host=hostname, port=port, service_name=service_name)
-                connect = dsn
-                conn = oracledb.connect(user, password, dsn, mode=oracledb.SYSDBA)
-            else:
-                dsn = oracledb.makedsn(host=hostname, port=port, service_name=service_name)
-                connect = dsn
-                conn = oracledb.connect(user, password, dsn)
-
-        elif (not(user) or not(password)):
-            module.fail_json(msg='Missing username or password for oracledb')
-
-    except oracledb.DatabaseError as exc:
-        error, = exc.args
-        error_msg = getattr(error, 'message', str(error))
-        requires_thick = (mode == 'sysdba') or (not user and not password)
-        if 'DPI-1047' in error_msg and requires_thick:
-            msg[0] = (
-                "Oracle Client libraries cannot be loaded (DPI-1047). "
-                "Install Oracle Instant Client or use a thin-compatible connection mode."
-            )
-        else:
-            msg[0] = 'Oracle connection failed: %s' % error_msg
-        module.fail_json(msg=msg[0], changed=False)
+    oc = oracleConnection(module)
+    conn = oc.conn
     if conn.version < "11.2":
         module.fail_json(msg="Database version must be 11gR2 or greater", changed=False)
-    apply_session_container(module, conn)
     #
     result = query_existing(module.params['name'])
     if module.check_mode:
@@ -510,5 +473,18 @@ def main():
 
 
 from ansible.module_utils.basic import *
+try:
+    from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_utils import (  # noqa: E501
+        oracleConnection, sanitize_string_params,
+    )
+except ImportError:
+    def sanitize_string_params(module_params):
+        for key, value in module_params.items():
+            if isinstance(value, str):
+                module_params[key] = value.strip()
+
+    class oracleConnection:  # noqa: N801
+        def __init__(self, module):
+            module.fail_json(msg='oracle_utils is required. Ensure the collection is properly installed.', changed=False)
 if __name__ == '__main__':
     main()

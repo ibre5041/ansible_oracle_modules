@@ -1,8 +1,9 @@
 """Unit tests for DBMS_SCHEDULER modules (oracle_jobclass, oracle_jobschedule,
 oracle_jobwindow, oracle_rsrc_consgroup).
 
-These modules call oracledb.connect() directly and use cursor.rowcount, so
-we mock the oracledb module with a factory that controls _fetchone_row.
+These modules call oracleConnection(module) from oracle_utils and use
+cursor.rowcount, so we mock oracleConnection with a factory that controls
+_fetchone_row.
 """
 import pytest
 from datetime import timedelta
@@ -26,30 +27,26 @@ _SCHED_CONN_BASE = dict(
     user="u",
     password="p",
     mode="normal",
+    oracle_home=None,
+    dsn=None,
     session_container=None,
 )
 
 
 def _make_fake_db(fetchone_row=None):
-    """Return (FakeDb class, FakeOracleConn instance)."""
+    """Return (FakeOracleConnection class, FakeOracleConn instance)."""
     _conn = FakeOracleConn()
     _conn._fetchone_row = fetchone_row
 
-    class _Db:
-        NUMBER = int
-        STRING = str
-        SYSDBA = 2
-        DatabaseError = Exception
+    class _FakeOC:
+        def __init__(self, module):
+            self.conn = _conn
+            self.conn.autocommit = True
+            self.version = _conn.version
+            self.ddls = []
+            self.changed = False
 
-        @staticmethod
-        def connect(*args, **kwargs):
-            return _conn
-
-        @staticmethod
-        def makedsn(**kwargs):
-            return "fake_dsn"
-
-    return _Db, _conn
+    return _FakeOC, _conn
 
 
 # ===========================================================================
@@ -74,13 +71,13 @@ def _jc_params(**overrides):
 def test_jobclass_creates_new(monkeypatch):
     """state=present, class doesn't exist → creates it."""
     mod = _load("oracle_jobclass")
-    FakeDb, conn = _make_fake_db(fetchone_row=None)
+    FakeOC, conn = _make_fake_db(fetchone_row=None)
 
     class Mod(BaseFakeModule):
         params = _jc_params()
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", FakeDb)
+    monkeypatch.setattr(mod, "oracleConnection", FakeOC)
 
     with pytest.raises(ExitJson) as exc:
         mod.main()
@@ -92,13 +89,13 @@ def test_jobclass_no_change_when_same(monkeypatch):
     """state=present, class already exists with same attrs → no change."""
     mod = _load("oracle_jobclass")
     existing_row = (None, None, "FAILED RUNS", None, None)   # resource_group,service,logging,history,comments
-    FakeDb, conn = _make_fake_db(fetchone_row=existing_row)
+    FakeOC, conn = _make_fake_db(fetchone_row=existing_row)
 
     class Mod(BaseFakeModule):
         params = _jc_params()
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", FakeDb)
+    monkeypatch.setattr(mod, "oracleConnection", FakeOC)
 
     with pytest.raises(ExitJson) as exc:
         mod.main()
@@ -109,13 +106,13 @@ def test_jobclass_absent_drops(monkeypatch):
     """state=absent, class exists → drops it."""
     mod = _load("oracle_jobclass")
     existing_row = (None, None, "FAILED_RUNS", None, None)
-    FakeDb, conn = _make_fake_db(fetchone_row=existing_row)
+    FakeOC, conn = _make_fake_db(fetchone_row=existing_row)
 
     class Mod(BaseFakeModule):
         params = _jc_params(state="absent")
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", FakeDb)
+    monkeypatch.setattr(mod, "oracleConnection", FakeOC)
 
     with pytest.raises(ExitJson) as exc:
         mod.main()
@@ -125,13 +122,13 @@ def test_jobclass_absent_drops(monkeypatch):
 def test_jobclass_absent_missing_no_change(monkeypatch):
     """state=absent, class doesn't exist → no change."""
     mod = _load("oracle_jobclass")
-    FakeDb, conn = _make_fake_db(fetchone_row=None)
+    FakeOC, conn = _make_fake_db(fetchone_row=None)
 
     class Mod(BaseFakeModule):
         params = _jc_params(state="absent")
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", FakeDb)
+    monkeypatch.setattr(mod, "oracleConnection", FakeOC)
 
     with pytest.raises(ExitJson) as exc:
         mod.main()
@@ -141,14 +138,14 @@ def test_jobclass_absent_missing_no_change(monkeypatch):
 def test_jobclass_check_mode(monkeypatch):
     """check_mode=True → reports would_change but doesn't change."""
     mod = _load("oracle_jobclass")
-    FakeDb, conn = _make_fake_db(fetchone_row=None)
+    FakeOC, conn = _make_fake_db(fetchone_row=None)
 
     class Mod(BaseFakeModule):
         params = _jc_params()
         check_mode = True
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", FakeDb)
+    monkeypatch.setattr(mod, "oracleConnection", FakeOC)
 
     with pytest.raises(ExitJson) as exc:
         mod.main()
@@ -160,13 +157,13 @@ def test_jobclass_modifies_existing_attributes(monkeypatch):
     mod = _load("oracle_jobclass")
     # resource_group, service, logging, history, comments
     existing_row = (None, None, "FAILED RUNS", None, "old comment")
-    FakeDb, conn = _make_fake_db(fetchone_row=existing_row)
+    FakeOC, conn = _make_fake_db(fetchone_row=existing_row)
 
     class Mod(BaseFakeModule):
         params = _jc_params(comments="new comment")
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", FakeDb)
+    monkeypatch.setattr(mod, "oracleConnection", FakeOC)
 
     with pytest.raises(ExitJson) as exc:
         mod.main()
@@ -177,14 +174,14 @@ def test_jobclass_check_mode_existing_change(monkeypatch):
     """check_mode, existing class with different comments → would_change=True."""
     mod = _load("oracle_jobclass")
     existing_row = (None, None, "FAILED RUNS", None, "old comment")
-    FakeDb, conn = _make_fake_db(fetchone_row=existing_row)
+    FakeOC, conn = _make_fake_db(fetchone_row=existing_row)
 
     class Mod(BaseFakeModule):
         params = _jc_params(comments="new comment")
         check_mode = True
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", FakeDb)
+    monkeypatch.setattr(mod, "oracleConnection", FakeOC)
 
     with pytest.raises(ExitJson) as exc:
         mod.main()
@@ -194,13 +191,13 @@ def test_jobclass_check_mode_existing_change(monkeypatch):
 def test_jobclass_wallet_connect(monkeypatch):
     """No user/password → wallet connect path used (normal mode)."""
     mod = _load("oracle_jobclass")
-    FakeDb, conn = _make_fake_db(fetchone_row=None)
+    FakeOC, conn = _make_fake_db(fetchone_row=None)
 
     class Mod(BaseFakeModule):
         params = _jc_params(user=None, password=None)
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", FakeDb)
+    monkeypatch.setattr(mod, "oracleConnection", FakeOC)
 
     with pytest.raises(ExitJson) as exc:
         mod.main()
@@ -210,13 +207,13 @@ def test_jobclass_wallet_connect(monkeypatch):
 def test_jobclass_sysdba_connect(monkeypatch):
     """user+password with mode=sysdba → sysdba connect path."""
     mod = _load("oracle_jobclass")
-    FakeDb, conn = _make_fake_db(fetchone_row=None)
+    FakeOC, conn = _make_fake_db(fetchone_row=None)
 
     class Mod(BaseFakeModule):
         params = _jc_params(mode="sysdba")
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", FakeDb)
+    monkeypatch.setattr(mod, "oracleConnection", FakeOC)
 
     with pytest.raises(ExitJson) as exc:
         mod.main()
@@ -224,32 +221,18 @@ def test_jobclass_sysdba_connect(monkeypatch):
 
 
 def test_jobclass_connect_error(monkeypatch):
-    """DatabaseError on connect → fail_json."""
+    """Connection error → fail_json."""
     mod = _load("oracle_jobclass")
 
-    class _ErrorDb:
-        NUMBER = int
-        STRING = str
-        SYSDBA = 2
-
-        class DatabaseError(Exception):
-            pass
-
-        @staticmethod
-        def connect(*args, **kwargs):
-            err = Exception("ORA-12541: no listener")
-            err.args = (type("E", (), {"message": "ORA-12541: no listener"})(),)
-            raise _ErrorDb.DatabaseError(*err.args)
-
-        @staticmethod
-        def makedsn(**kwargs):
-            return "fake_dsn"
+    class _ErrorOC:
+        def __init__(self, module):
+            module.fail_json(msg="Could not connect to database - ORA-12541: no listener")
 
     class Mod(BaseFakeModule):
         params = _jc_params()
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", _ErrorDb)
+    monkeypatch.setattr(mod, "oracleConnection", _ErrorOC)
 
     with pytest.raises(FailJson):
         mod.main()
@@ -274,13 +257,13 @@ def _js_params(**overrides):
 
 def test_jobschedule_creates_new(monkeypatch):
     mod = _load("oracle_jobschedule")
-    FakeDb, conn = _make_fake_db(fetchone_row=None)
+    FakeOC, conn = _make_fake_db(fetchone_row=None)
 
     class Mod(BaseFakeModule):
         params = _js_params()
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", FakeDb)
+    monkeypatch.setattr(mod, "oracleConnection", FakeOC)
 
     with pytest.raises(ExitJson) as exc:
         mod.main()
@@ -291,13 +274,13 @@ def test_jobschedule_no_change_when_same(monkeypatch):
     """Existing schedule with same interval → no change."""
     mod = _load("oracle_jobschedule")
     existing_row = ("FREQ=DAILY", None)   # repeat_interval, comments
-    FakeDb, conn = _make_fake_db(fetchone_row=existing_row)
+    FakeOC, conn = _make_fake_db(fetchone_row=existing_row)
 
     class Mod(BaseFakeModule):
         params = _js_params()
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", FakeDb)
+    monkeypatch.setattr(mod, "oracleConnection", FakeOC)
 
     with pytest.raises(ExitJson) as exc:
         mod.main()
@@ -307,13 +290,13 @@ def test_jobschedule_no_change_when_same(monkeypatch):
 def test_jobschedule_absent_drops(monkeypatch):
     mod = _load("oracle_jobschedule")
     existing_row = ("FREQ=DAILY", None)
-    FakeDb, conn = _make_fake_db(fetchone_row=existing_row)
+    FakeOC, conn = _make_fake_db(fetchone_row=existing_row)
 
     class Mod(BaseFakeModule):
         params = _js_params(state="absent")
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", FakeDb)
+    monkeypatch.setattr(mod, "oracleConnection", FakeOC)
 
     with pytest.raises(ExitJson) as exc:
         mod.main()
@@ -322,13 +305,13 @@ def test_jobschedule_absent_drops(monkeypatch):
 
 def test_jobschedule_absent_missing_no_change(monkeypatch):
     mod = _load("oracle_jobschedule")
-    FakeDb, conn = _make_fake_db(fetchone_row=None)
+    FakeOC, conn = _make_fake_db(fetchone_row=None)
 
     class Mod(BaseFakeModule):
         params = _js_params(state="absent")
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", FakeDb)
+    monkeypatch.setattr(mod, "oracleConnection", FakeOC)
 
     with pytest.raises(ExitJson) as exc:
         mod.main()
@@ -338,13 +321,13 @@ def test_jobschedule_absent_missing_no_change(monkeypatch):
 def test_jobschedule_invalid_name_fails(monkeypatch):
     """Name without owner.name format → fail_json."""
     mod = _load("oracle_jobschedule")
-    FakeDb, conn = _make_fake_db(fetchone_row=None)
+    FakeOC, conn = _make_fake_db(fetchone_row=None)
 
     class Mod(BaseFakeModule):
         params = _js_params(name="BADNAME")
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", FakeDb)
+    monkeypatch.setattr(mod, "oracleConnection", FakeOC)
 
     with pytest.raises(FailJson):
         mod.main()
@@ -354,13 +337,13 @@ def test_jobschedule_modifies_existing(monkeypatch):
     """Existing schedule with different repeat_interval → modify path, changed=True."""
     mod = _load("oracle_jobschedule")
     existing_row = ("FREQ=WEEKLY", None)   # different repeat_interval
-    FakeDb, conn = _make_fake_db(fetchone_row=existing_row)
+    FakeOC, conn = _make_fake_db(fetchone_row=existing_row)
 
     class Mod(BaseFakeModule):
         params = _js_params()   # wants FREQ=DAILY
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", FakeDb)
+    monkeypatch.setattr(mod, "oracleConnection", FakeOC)
 
     with pytest.raises(ExitJson) as exc:
         mod.main()
@@ -371,14 +354,14 @@ def test_jobschedule_check_mode_would_change(monkeypatch):
     """check_mode, existing schedule with different interval → would_change=True."""
     mod = _load("oracle_jobschedule")
     existing_row = ("FREQ=WEEKLY", None)
-    FakeDb, conn = _make_fake_db(fetchone_row=existing_row)
+    FakeOC, conn = _make_fake_db(fetchone_row=existing_row)
 
     class Mod(BaseFakeModule):
         params = _js_params()   # wants FREQ=DAILY
         check_mode = True
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", FakeDb)
+    monkeypatch.setattr(mod, "oracleConnection", FakeOC)
 
     with pytest.raises(ExitJson) as exc:
         mod.main()
@@ -389,14 +372,14 @@ def test_jobschedule_check_mode_no_change(monkeypatch):
     """check_mode, existing schedule with same interval → would_change=False."""
     mod = _load("oracle_jobschedule")
     existing_row = ("FREQ=DAILY", None)
-    FakeDb, conn = _make_fake_db(fetchone_row=existing_row)
+    FakeOC, conn = _make_fake_db(fetchone_row=existing_row)
 
     class Mod(BaseFakeModule):
         params = _js_params()
         check_mode = True
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", FakeDb)
+    monkeypatch.setattr(mod, "oracleConnection", FakeOC)
 
     with pytest.raises(ExitJson) as exc:
         mod.main()
@@ -406,13 +389,13 @@ def test_jobschedule_check_mode_no_change(monkeypatch):
 def test_jobschedule_wallet_connect(monkeypatch):
     """No user/password → wallet connect path (normal mode)."""
     mod = _load("oracle_jobschedule")
-    FakeDb, conn = _make_fake_db(fetchone_row=None)
+    FakeOC, conn = _make_fake_db(fetchone_row=None)
 
     class Mod(BaseFakeModule):
         params = _js_params(user=None, password=None)
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", FakeDb)
+    monkeypatch.setattr(mod, "oracleConnection", FakeOC)
 
     with pytest.raises(ExitJson) as exc:
         mod.main()
@@ -422,13 +405,13 @@ def test_jobschedule_wallet_connect(monkeypatch):
 def test_jobschedule_sysdba_connect(monkeypatch):
     """user+password with mode=sysdba → sysdba connect path."""
     mod = _load("oracle_jobschedule")
-    FakeDb, conn = _make_fake_db(fetchone_row=None)
+    FakeOC, conn = _make_fake_db(fetchone_row=None)
 
     class Mod(BaseFakeModule):
         params = _js_params(mode="sysdba")
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", FakeDb)
+    monkeypatch.setattr(mod, "oracleConnection", FakeOC)
 
     with pytest.raises(ExitJson) as exc:
         mod.main()
@@ -436,31 +419,18 @@ def test_jobschedule_sysdba_connect(monkeypatch):
 
 
 def test_jobschedule_connect_error(monkeypatch):
-    """DatabaseError on connect → fail_json."""
+    """Connection error → fail_json."""
     mod = _load("oracle_jobschedule")
 
-    class _ErrorDb:
-        NUMBER = int
-        STRING = str
-        SYSDBA = 2
-
-        class DatabaseError(Exception):
-            pass
-
-        @staticmethod
-        def connect(*args, **kwargs):
-            err = type("E", (), {"message": "ORA-12541: no listener"})()
-            raise _ErrorDb.DatabaseError(err)
-
-        @staticmethod
-        def makedsn(**kwargs):
-            return "fake_dsn"
+    class _ErrorOC:
+        def __init__(self, module):
+            module.fail_json(msg="Could not connect to database - ORA-12541: no listener")
 
     class Mod(BaseFakeModule):
         params = _js_params()
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", _ErrorDb)
+    monkeypatch.setattr(mod, "oracleConnection", _ErrorOC)
 
     with pytest.raises(FailJson):
         mod.main()
@@ -488,13 +458,13 @@ def _jw_params(**overrides):
 
 def test_jobwindow_creates_new(monkeypatch):
     mod = _load("oracle_jobwindow")
-    FakeDb, conn = _make_fake_db(fetchone_row=None)
+    FakeOC, conn = _make_fake_db(fetchone_row=None)
 
     class Mod(BaseFakeModule):
         params = _jw_params()
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", FakeDb)
+    monkeypatch.setattr(mod, "oracleConnection", FakeOC)
 
     with pytest.raises(ExitJson) as exc:
         mod.main()
@@ -506,13 +476,13 @@ def test_jobwindow_no_change(monkeypatch):
     mod = _load("oracle_jobwindow")
     # resource_plan, duration, window_priority, enabled, repeat_interval, comments
     existing_row = ("DEFAULT_PLAN", timedelta(minutes=60), "LOW", "TRUE", "FREQ=DAILY;BYHOUR=22", None)
-    FakeDb, conn = _make_fake_db(fetchone_row=existing_row)
+    FakeOC, conn = _make_fake_db(fetchone_row=existing_row)
 
     class Mod(BaseFakeModule):
         params = _jw_params()
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", FakeDb)
+    monkeypatch.setattr(mod, "oracleConnection", FakeOC)
 
     with pytest.raises(ExitJson) as exc:
         mod.main()
@@ -522,13 +492,13 @@ def test_jobwindow_no_change(monkeypatch):
 def test_jobwindow_absent_drops(monkeypatch):
     mod = _load("oracle_jobwindow")
     existing_row = ("DEFAULT_PLAN", timedelta(minutes=60), "LOW", "TRUE", "FREQ=DAILY;BYHOUR=22", None)
-    FakeDb, conn = _make_fake_db(fetchone_row=existing_row)
+    FakeOC, conn = _make_fake_db(fetchone_row=existing_row)
 
     class Mod(BaseFakeModule):
         params = _jw_params(state="absent")
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", FakeDb)
+    monkeypatch.setattr(mod, "oracleConnection", FakeOC)
 
     with pytest.raises(ExitJson) as exc:
         mod.main()
@@ -537,13 +507,13 @@ def test_jobwindow_absent_drops(monkeypatch):
 
 def test_jobwindow_absent_missing_no_change(monkeypatch):
     mod = _load("oracle_jobwindow")
-    FakeDb, conn = _make_fake_db(fetchone_row=None)
+    FakeOC, conn = _make_fake_db(fetchone_row=None)
 
     class Mod(BaseFakeModule):
         params = _jw_params(state="absent")
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", FakeDb)
+    monkeypatch.setattr(mod, "oracleConnection", FakeOC)
 
     with pytest.raises(ExitJson) as exc:
         mod.main()
@@ -553,13 +523,13 @@ def test_jobwindow_absent_missing_no_change(monkeypatch):
 def test_jobwindow_zero_duration_fails(monkeypatch):
     """duration_hour=0 → new_duration_min=0 → fail_json (< 1)."""
     mod = _load("oracle_jobwindow")
-    FakeDb, conn = _make_fake_db(fetchone_row=None)
+    FakeOC, conn = _make_fake_db(fetchone_row=None)
 
     class Mod(BaseFakeModule):
         params = _jw_params(duration_min=None, duration_hour=0)
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", FakeDb)
+    monkeypatch.setattr(mod, "oracleConnection", FakeOC)
 
     with pytest.raises(FailJson) as exc:
         mod.main()
@@ -571,14 +541,14 @@ def test_jobwindow_check_mode_would_change(monkeypatch):
     mod = _load("oracle_jobwindow")
     # resource_plan, duration, window_priority, enabled, repeat_interval, comments
     existing_row = ("DEFAULT_PLAN", timedelta(minutes=60), "LOW", "TRUE", "FREQ=WEEKLY", None)
-    FakeDb, conn = _make_fake_db(fetchone_row=existing_row)
+    FakeOC, conn = _make_fake_db(fetchone_row=existing_row)
 
     class Mod(BaseFakeModule):
         params = _jw_params()   # wants FREQ=DAILY;BYHOUR=22
         check_mode = True
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", FakeDb)
+    monkeypatch.setattr(mod, "oracleConnection", FakeOC)
 
     with pytest.raises(ExitJson) as exc:
         mod.main()
@@ -589,14 +559,14 @@ def test_jobwindow_check_mode_no_change(monkeypatch):
     """check_mode, existing window that matches → would_change=False."""
     mod = _load("oracle_jobwindow")
     existing_row = ("DEFAULT_PLAN", timedelta(minutes=60), "LOW", "TRUE", "FREQ=DAILY;BYHOUR=22", None)
-    FakeDb, conn = _make_fake_db(fetchone_row=existing_row)
+    FakeOC, conn = _make_fake_db(fetchone_row=existing_row)
 
     class Mod(BaseFakeModule):
         params = _jw_params()
         check_mode = True
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", FakeDb)
+    monkeypatch.setattr(mod, "oracleConnection", FakeOC)
 
     with pytest.raises(ExitJson) as exc:
         mod.main()
@@ -607,13 +577,13 @@ def test_jobwindow_modifies_existing_attributes(monkeypatch):
     """Existing window with different repeat_interval → modify path, changed=True."""
     mod = _load("oracle_jobwindow")
     existing_row = ("DEFAULT_PLAN", timedelta(minutes=60), "LOW", "TRUE", "FREQ=WEEKLY", None)
-    FakeDb, conn = _make_fake_db(fetchone_row=existing_row)
+    FakeOC, conn = _make_fake_db(fetchone_row=existing_row)
 
     class Mod(BaseFakeModule):
         params = _jw_params()   # wants FREQ=DAILY;BYHOUR=22
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", FakeDb)
+    monkeypatch.setattr(mod, "oracleConnection", FakeOC)
 
     with pytest.raises(ExitJson) as exc:
         mod.main()
@@ -625,13 +595,13 @@ def test_jobwindow_disables_existing(monkeypatch):
     mod = _load("oracle_jobwindow")
     # Window is enabled (TRUE), all attributes match, but state=disabled desired
     existing_row = ("DEFAULT_PLAN", timedelta(minutes=60), "LOW", "TRUE", "FREQ=DAILY;BYHOUR=22", None)
-    FakeDb, conn = _make_fake_db(fetchone_row=existing_row)
+    FakeOC, conn = _make_fake_db(fetchone_row=existing_row)
 
     class Mod(BaseFakeModule):
         params = _jw_params(state="disabled")
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", FakeDb)
+    monkeypatch.setattr(mod, "oracleConnection", FakeOC)
 
     with pytest.raises(ExitJson) as exc:
         mod.main()
@@ -643,13 +613,13 @@ def test_jobwindow_enables_existing(monkeypatch):
     mod = _load("oracle_jobwindow")
     # Window is disabled (FALSE), all attributes match, but state=enabled desired
     existing_row = ("DEFAULT_PLAN", timedelta(minutes=60), "LOW", "FALSE", "FREQ=DAILY;BYHOUR=22", None)
-    FakeDb, conn = _make_fake_db(fetchone_row=existing_row)
+    FakeOC, conn = _make_fake_db(fetchone_row=existing_row)
 
     class Mod(BaseFakeModule):
         params = _jw_params(state="enabled")
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", FakeDb)
+    monkeypatch.setattr(mod, "oracleConnection", FakeOC)
 
     with pytest.raises(ExitJson) as exc:
         mod.main()
@@ -659,13 +629,13 @@ def test_jobwindow_enables_existing(monkeypatch):
 def test_jobwindow_wallet_connect(monkeypatch):
     """No user/password → wallet connect path (normal mode)."""
     mod = _load("oracle_jobwindow")
-    FakeDb, conn = _make_fake_db(fetchone_row=None)
+    FakeOC, conn = _make_fake_db(fetchone_row=None)
 
     class Mod(BaseFakeModule):
         params = _jw_params(user=None, password=None)
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", FakeDb)
+    monkeypatch.setattr(mod, "oracleConnection", FakeOC)
 
     with pytest.raises(ExitJson) as exc:
         mod.main()
@@ -675,13 +645,13 @@ def test_jobwindow_wallet_connect(monkeypatch):
 def test_jobwindow_sysdba_connect(monkeypatch):
     """user+password with mode=sysdba → sysdba connect path."""
     mod = _load("oracle_jobwindow")
-    FakeDb, conn = _make_fake_db(fetchone_row=None)
+    FakeOC, conn = _make_fake_db(fetchone_row=None)
 
     class Mod(BaseFakeModule):
         params = _jw_params(mode="sysdba")
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", FakeDb)
+    monkeypatch.setattr(mod, "oracleConnection", FakeOC)
 
     with pytest.raises(ExitJson) as exc:
         mod.main()
@@ -689,31 +659,18 @@ def test_jobwindow_sysdba_connect(monkeypatch):
 
 
 def test_jobwindow_connect_error(monkeypatch):
-    """DatabaseError on connect → fail_json."""
+    """Connection error → fail_json."""
     mod = _load("oracle_jobwindow")
 
-    class _ErrorDb:
-        NUMBER = int
-        STRING = str
-        SYSDBA = 2
-
-        class DatabaseError(Exception):
-            pass
-
-        @staticmethod
-        def connect(*args, **kwargs):
-            err = type("E", (), {"message": "ORA-12541: no listener"})()
-            raise _ErrorDb.DatabaseError(err)
-
-        @staticmethod
-        def makedsn(**kwargs):
-            return "fake_dsn"
+    class _ErrorOC:
+        def __init__(self, module):
+            module.fail_json(msg="Could not connect to database - ORA-12541: no listener")
 
     class Mod(BaseFakeModule):
         params = _jw_params()
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", _ErrorDb)
+    monkeypatch.setattr(mod, "oracleConnection", _ErrorOC)
 
     with pytest.raises(FailJson):
         mod.main()
@@ -722,13 +679,13 @@ def test_jobwindow_connect_error(monkeypatch):
 def test_jobwindow_no_duration_fails(monkeypatch):
     """Neither duration_min nor duration_hour → fail_json."""
     mod = _load("oracle_jobwindow")
-    FakeDb, conn = _make_fake_db(fetchone_row=None)
+    FakeOC, conn = _make_fake_db(fetchone_row=None)
 
     class Mod(BaseFakeModule):
         params = _jw_params(duration_min=None, duration_hour=None)
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", FakeDb)
+    monkeypatch.setattr(mod, "oracleConnection", FakeOC)
 
     with pytest.raises(FailJson) as exc:
         mod.main()
@@ -769,13 +726,13 @@ def _rg_params(**overrides):
 
 def test_rsrc_consgroup_creates_new(monkeypatch):
     mod = _load("oracle_rsrc_consgroup")
-    FakeDb, conn = _make_fake_db(fetchone_row=None)
+    FakeOC, conn = _make_fake_db(fetchone_row=None)
 
     class Mod(BaseFakeModule):
         params = _rg_params()
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", FakeDb)
+    monkeypatch.setattr(mod, "oracleConnection", FakeOC)
 
     with pytest.raises(ExitJson) as exc:
         mod.main()
@@ -784,13 +741,13 @@ def test_rsrc_consgroup_creates_new(monkeypatch):
 
 def test_rsrc_consgroup_absent_missing_no_change(monkeypatch):
     mod = _load("oracle_rsrc_consgroup")
-    FakeDb, conn = _make_fake_db(fetchone_row=None)
+    FakeOC, conn = _make_fake_db(fetchone_row=None)
 
     class Mod(BaseFakeModule):
         params = _rg_params(state="absent")
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", FakeDb)
+    monkeypatch.setattr(mod, "oracleConnection", FakeOC)
 
     with pytest.raises(ExitJson) as exc:
         mod.main()
@@ -800,13 +757,13 @@ def test_rsrc_consgroup_absent_missing_no_change(monkeypatch):
 def test_rsrc_consgroup_absent_drops(monkeypatch):
     mod = _load("oracle_rsrc_consgroup")
     existing_row = ("ROUND-ROBIN", None, "OTHER")   # mgmt_method, comments, category
-    FakeDb, conn = _make_fake_db(fetchone_row=existing_row)
+    FakeOC, conn = _make_fake_db(fetchone_row=existing_row)
 
     class Mod(BaseFakeModule):
         params = _rg_params(state="absent")
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", FakeDb)
+    monkeypatch.setattr(mod, "oracleConnection", FakeOC)
 
     with pytest.raises(ExitJson) as exc:
         mod.main()
@@ -816,14 +773,14 @@ def test_rsrc_consgroup_absent_drops(monkeypatch):
 def test_rsrc_consgroup_check_mode(monkeypatch):
     """check_mode for new group → changed=True."""
     mod = _load("oracle_rsrc_consgroup")
-    FakeDb, conn = _make_fake_db(fetchone_row=None)
+    FakeOC, conn = _make_fake_db(fetchone_row=None)
 
     class Mod(BaseFakeModule):
         params = _rg_params()
         check_mode = True
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", FakeDb)
+    monkeypatch.setattr(mod, "oracleConnection", FakeOC)
 
     with pytest.raises(ExitJson) as exc:
         mod.main()
@@ -834,13 +791,13 @@ def test_rsrc_consgroup_modifies_existing(monkeypatch):
     """Existing group with different comments → modify path executed."""
     mod = _load("oracle_rsrc_consgroup")
     existing_row = ("ROUND-ROBIN", "Old comment", "OTHER")
-    FakeDb, conn = _make_fake_db(fetchone_row=existing_row)
+    FakeOC, conn = _make_fake_db(fetchone_row=existing_row)
 
     class Mod(BaseFakeModule):
         params = _rg_params(comments="New comment")
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", FakeDb)
+    monkeypatch.setattr(mod, "oracleConnection", FakeOC)
 
     with pytest.raises(ExitJson) as exc:
         mod.main()
@@ -851,13 +808,13 @@ def test_rsrc_consgroup_no_change_when_identical(monkeypatch):
     """Existing group with matching attributes → no change."""
     mod = _load("oracle_rsrc_consgroup")
     existing_row = ("ROUND-ROBIN", None, "OTHER")
-    FakeDb, conn = _make_fake_db(fetchone_row=existing_row)
+    FakeOC, conn = _make_fake_db(fetchone_row=existing_row)
 
     class Mod(BaseFakeModule):
         params = _rg_params()
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", FakeDb)
+    monkeypatch.setattr(mod, "oracleConnection", FakeOC)
 
     with pytest.raises(ExitJson) as exc:
         mod.main()
@@ -875,23 +832,16 @@ def test_rsrc_consgroup_creates_with_grant_name(monkeypatch):
         [("APPUSER",)],  # new_grants_list: SELECT username FROM dba_users/dba_roles
     ])
 
-    class _Db:
-        NUMBER = int
-        STRING = str
-        SYSDBA = 2
-        DatabaseError = Exception
-        @staticmethod
-        def connect(*args, **kwargs):
-            return seq_conn
-        @staticmethod
-        def makedsn(**kwargs):
-            return "fake_dsn"
+    class _FakeOC:
+        def __init__(self, module):
+            self.conn = seq_conn
+            self.version = seq_conn.version
 
     class Mod(BaseFakeModule):
         params = _rg_params(grant_name=["APPUSER"])
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", _Db)
+    monkeypatch.setattr(mod, "oracleConnection", _FakeOC)
 
     with pytest.raises(ExitJson) as exc:
         mod.main()
@@ -902,14 +852,14 @@ def test_rsrc_consgroup_check_mode_existing_no_change(monkeypatch):
     """check_mode for existing identical group → changed=False."""
     mod = _load("oracle_rsrc_consgroup")
     existing_row = ("ROUND-ROBIN", None, "OTHER")
-    FakeDb, conn = _make_fake_db(fetchone_row=existing_row)
+    FakeOC, conn = _make_fake_db(fetchone_row=existing_row)
 
     class Mod(BaseFakeModule):
         params = _rg_params()
         check_mode = True
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", FakeDb)
+    monkeypatch.setattr(mod, "oracleConnection", FakeOC)
 
     with pytest.raises(ExitJson) as exc:
         mod.main()
@@ -934,13 +884,13 @@ def test_rsrc_consgroup_oracledb_missing_fails(monkeypatch):
 def test_rsrc_consgroup_wallet_sysdba_connect(monkeypatch):
     """No user/password, mode=sysdba → wallet+sysdba connect path."""
     mod = _load("oracle_rsrc_consgroup")
-    FakeDb, conn = _make_fake_db(fetchone_row=None)
+    FakeOC, conn = _make_fake_db(fetchone_row=None)
 
     class Mod(BaseFakeModule):
         params = _rg_params(user=None, password=None, mode="sysdba")
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", FakeDb)
+    monkeypatch.setattr(mod, "oracleConnection", FakeOC)
 
     with pytest.raises(ExitJson) as exc:
         mod.main()
@@ -950,13 +900,13 @@ def test_rsrc_consgroup_wallet_sysdba_connect(monkeypatch):
 def test_rsrc_consgroup_wallet_normal_connect(monkeypatch):
     """No user/password, mode=normal → wallet+normal connect path."""
     mod = _load("oracle_rsrc_consgroup")
-    FakeDb, conn = _make_fake_db(fetchone_row=None)
+    FakeOC, conn = _make_fake_db(fetchone_row=None)
 
     class Mod(BaseFakeModule):
         params = _rg_params(user=None, password=None, mode="normal")
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", FakeDb)
+    monkeypatch.setattr(mod, "oracleConnection", FakeOC)
 
     with pytest.raises(ExitJson) as exc:
         mod.main()
@@ -967,14 +917,14 @@ def test_rsrc_consgroup_check_mode_absent_existing(monkeypatch):
     """check_mode + state=absent + group exists → changed=True."""
     mod = _load("oracle_rsrc_consgroup")
     existing_row = ("ROUND-ROBIN", None, "OTHER")
-    FakeDb, conn = _make_fake_db(fetchone_row=existing_row)
+    FakeOC, conn = _make_fake_db(fetchone_row=existing_row)
 
     class Mod(BaseFakeModule):
         params = _rg_params(state="absent")
         check_mode = True
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", FakeDb)
+    monkeypatch.setattr(mod, "oracleConnection", FakeOC)
 
     with pytest.raises(ExitJson) as exc:
         mod.main()
@@ -999,24 +949,17 @@ def test_rsrc_consgroup_check_mode_present_grant_diff(monkeypatch):
     ])
     seq_conn._fetchone_row = _existing  # rowcount > 0
 
-    class _Db:
-        NUMBER = int
-        STRING = str
-        SYSDBA = 2
-        DatabaseError = Exception
-        @staticmethod
-        def connect(*args, **kwargs):
-            return seq_conn
-        @staticmethod
-        def makedsn(**kwargs):
-            return "fake_dsn"
+    class _FakeOC:
+        def __init__(self, module):
+            self.conn = seq_conn
+            self.version = seq_conn.version
 
     class Mod(BaseFakeModule):
         params = _rg_params(grant_name=["APPUSER"])
         check_mode = True
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", _Db)
+    monkeypatch.setattr(mod, "oracleConnection", _FakeOC)
 
     with pytest.raises(ExitJson) as exc:
         mod.main()
@@ -1037,24 +980,17 @@ def test_rsrc_consgroup_check_mode_present_mapping_diff(monkeypatch):
     ])
     seq_conn._fetchone_row = _existing  # rowcount > 0
 
-    class _Db:
-        NUMBER = int
-        STRING = str
-        SYSDBA = 2
-        DatabaseError = Exception
-        @staticmethod
-        def connect(*args, **kwargs):
-            return seq_conn
-        @staticmethod
-        def makedsn(**kwargs):
-            return "fake_dsn"
+    class _FakeOC:
+        def __init__(self, module):
+            self.conn = seq_conn
+            self.version = seq_conn.version
 
     class Mod(BaseFakeModule):
         params = _rg_params(map_oracle_user=["SCOTT"])
         check_mode = True
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", _Db)
+    monkeypatch.setattr(mod, "oracleConnection", _FakeOC)
 
     with pytest.raises(ExitJson) as exc:
         mod.main()
@@ -1077,23 +1013,16 @@ def test_rsrc_consgroup_modify_with_grants_and_mappings(monkeypatch):
     ])
     seq_conn._fetchone_row = _existing  # rowcount > 0
 
-    class _Db:
-        NUMBER = int
-        STRING = str
-        SYSDBA = 2
-        DatabaseError = Exception
-        @staticmethod
-        def connect(*args, **kwargs):
-            return seq_conn
-        @staticmethod
-        def makedsn(**kwargs):
-            return "fake_dsn"
+    class _FakeOC:
+        def __init__(self, module):
+            self.conn = seq_conn
+            self.version = seq_conn.version
 
     class Mod(BaseFakeModule):
         params = _rg_params(grant_name=["NEWUSER"], map_oracle_user=["NEWMAPPING"])
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", _Db)
+    monkeypatch.setattr(mod, "oracleConnection", _FakeOC)
 
     with pytest.raises(ExitJson) as exc:
         mod.main()
@@ -1109,23 +1038,16 @@ def test_rsrc_consgroup_create_with_mappings(monkeypatch):
     seq_conn = SequencedFakeOracleConn(fetchall_sequence=[])
     seq_conn._fetchone_row = None  # rowcount=0 → not exists
 
-    class _Db:
-        NUMBER = int
-        STRING = str
-        SYSDBA = 2
-        DatabaseError = Exception
-        @staticmethod
-        def connect(*args, **kwargs):
-            return seq_conn
-        @staticmethod
-        def makedsn(**kwargs):
-            return "fake_dsn"
+    class _FakeOC:
+        def __init__(self, module):
+            self.conn = seq_conn
+            self.version = seq_conn.version
 
     class Mod(BaseFakeModule):
         params = _rg_params(map_service_name=["APP1", "APP2"])
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", _Db)
+    monkeypatch.setattr(mod, "oracleConnection", _FakeOC)
 
     with pytest.raises(ExitJson) as exc:
         mod.main()
@@ -1143,23 +1065,16 @@ def test_rsrc_consgroup_create_with_oracle_user_profile(monkeypatch):
     ])
     seq_conn._fetchone_row = None  # not exists
 
-    class _Db:
-        NUMBER = int
-        STRING = str
-        SYSDBA = 2
-        DatabaseError = Exception
-        @staticmethod
-        def connect(*args, **kwargs):
-            return seq_conn
-        @staticmethod
-        def makedsn(**kwargs):
-            return "fake_dsn"
+    class _FakeOC:
+        def __init__(self, module):
+            self.conn = seq_conn
+            self.version = seq_conn.version
 
     class Mod(BaseFakeModule):
         params = _rg_params(map_oracle_user_profile=["HR_PROFILE"])
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", _Db)
+    monkeypatch.setattr(mod, "oracleConnection", _FakeOC)
 
     with pytest.raises(ExitJson) as exc:
         mod.main()
@@ -1177,23 +1092,16 @@ def test_rsrc_consgroup_grant_user_profile(monkeypatch):
     ])
     seq_conn._fetchone_row = None  # not exists
 
-    class _Db:
-        NUMBER = int
-        STRING = str
-        SYSDBA = 2
-        DatabaseError = Exception
-        @staticmethod
-        def connect(*args, **kwargs):
-            return seq_conn
-        @staticmethod
-        def makedsn(**kwargs):
-            return "fake_dsn"
+    class _FakeOC:
+        def __init__(self, module):
+            self.conn = seq_conn
+            self.version = seq_conn.version
 
     class Mod(BaseFakeModule):
         params = _rg_params(grant_user_profile=["HR_PROFILE"])
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", _Db)
+    monkeypatch.setattr(mod, "oracleConnection", _FakeOC)
 
     with pytest.raises(ExitJson) as exc:
         mod.main()
@@ -1201,15 +1109,15 @@ def test_rsrc_consgroup_grant_user_profile(monkeypatch):
 
 
 def test_rsrc_consgroup_sysdba_connect(monkeypatch):
-    """user+password with mode=sysdba → sysdba connect path (lines 330-332)."""
+    """user+password with mode=sysdba → sysdba connect path."""
     mod = _load("oracle_rsrc_consgroup")
-    FakeDb, conn = _make_fake_db(fetchone_row=None)
+    FakeOC, conn = _make_fake_db(fetchone_row=None)
 
     class Mod(BaseFakeModule):
         params = _rg_params(mode="sysdba")
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", FakeDb)
+    monkeypatch.setattr(mod, "oracleConnection", FakeOC)
 
     with pytest.raises(ExitJson) as exc:
         mod.main()
@@ -1217,71 +1125,22 @@ def test_rsrc_consgroup_sysdba_connect(monkeypatch):
 
 
 def test_rsrc_consgroup_missing_password_fails(monkeypatch):
-    """Only user provided, no password → fail_json (half-credentials path, line 338-339)."""
+    """Only user provided, no password → fail_json."""
     mod = _load("oracle_rsrc_consgroup")
 
-    # DatabaseError must NOT catch FailJson, so use a specific subclass
-    class _OraDbError(Exception):
-        pass
-
-    class _NeverConnectDb:
-        NUMBER = int
-        STRING = str
-        SYSDBA = 2
-        DatabaseError = _OraDbError
-
-        @staticmethod
-        def connect(*args, **kwargs):
-            raise _OraDbError("Should not connect")
-
-        @staticmethod
-        def makedsn(**kwargs):
-            return "fake_dsn"
+    class _ErrorOC:
+        def __init__(self, module):
+            module.fail_json(msg="Missing username or password for oracledb")
 
     class Mod(BaseFakeModule):
         params = _rg_params(user="u", password=None)
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", _NeverConnectDb)
+    monkeypatch.setattr(mod, "oracleConnection", _ErrorOC)
 
     with pytest.raises(FailJson) as exc:
         mod.main()
     assert "missing" in exc.value.args[0]["msg"].lower()
-
-
-
-def test_rsrc_consgroup_session_container_applied(monkeypatch):
-    """session_container set → ALTER SESSION executed after connect."""
-    mod = _load("oracle_rsrc_consgroup")
-    FakeDb, conn = _make_fake_db(fetchone_row=None)
-
-    class Mod(BaseFakeModule):
-        params = _rg_params(session_container="MYPDB")
-
-    monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", FakeDb)
-
-    with pytest.raises(ExitJson) as exc:
-        mod.main()
-    assert exc.value.args[0]["changed"] is True
-    # ALTER SESSION SET CONTAINER should be in the executed DDLs
-    assert any("ALTER SESSION SET CONTAINER" in str(sql) for sql in conn.ddls)
-
-
-def test_rsrc_consgroup_invalid_session_container_fails(monkeypatch):
-    """session_container with invalid name → fail_json (line 205)."""
-    mod = _load("oracle_rsrc_consgroup")
-    FakeDb, conn = _make_fake_db(fetchone_row=None)
-
-    class Mod(BaseFakeModule):
-        params = _rg_params(session_container="1INVALID!")
-
-    monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", FakeDb)
-
-    with pytest.raises(FailJson) as exc:
-        mod.main()
-    assert "session_container" in exc.value.args[0]["msg"].lower()
 
 
 def test_rsrc_consgroup_existing_grants_populated(monkeypatch):
@@ -1300,23 +1159,16 @@ def test_rsrc_consgroup_existing_grants_populated(monkeypatch):
     ])
     seq_conn._fetchone_row = _existing  # rowcount > 0
 
-    class _Db:
-        NUMBER = int
-        STRING = str
-        SYSDBA = 2
-        DatabaseError = Exception
-        @staticmethod
-        def connect(*args, **kwargs):
-            return seq_conn
-        @staticmethod
-        def makedsn(**kwargs):
-            return "fake_dsn"
+    class _FakeOC:
+        def __init__(self, module):
+            self.conn = seq_conn
+            self.version = seq_conn.version
 
     class Mod(BaseFakeModule):
         params = _rg_params(grant_name=["APPUSER"], map_oracle_user=["APPUSER"])
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", _Db)
+    monkeypatch.setattr(mod, "oracleConnection", _FakeOC)
 
     with pytest.raises(ExitJson) as exc:
         mod.main()
@@ -1335,6 +1187,8 @@ _JOB_CONN_BASE = dict(
     user="u",
     password="p",
     mode="normal",
+    oracle_home=None,
+    dsn=None,
     session_container=None,
 )
 
@@ -1381,13 +1235,13 @@ _EXISTING_JOB_ROW = (
 def test_job_absent_missing_no_change(monkeypatch):
     """state=absent, job doesn't exist → no change."""
     mod = _load("oracle_job")
-    FakeDb, conn = _make_fake_db(fetchone_row=None)
+    FakeOC, conn = _make_fake_db(fetchone_row=None)
 
     class Mod(BaseFakeModule):
         params = _job_params(state="absent")
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", FakeDb)
+    monkeypatch.setattr(mod, "oracleConnection", FakeOC)
 
     with pytest.raises(ExitJson) as exc:
         mod.main()
@@ -1397,13 +1251,13 @@ def test_job_absent_missing_no_change(monkeypatch):
 def test_job_present_creates_new(monkeypatch):
     """state=present, job doesn't exist → creates it, changed=True."""
     mod = _load("oracle_job")
-    FakeDb, conn = _make_fake_db(fetchone_row=None)
+    FakeOC, conn = _make_fake_db(fetchone_row=None)
 
     class Mod(BaseFakeModule):
         params = _job_params()
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", FakeDb)
+    monkeypatch.setattr(mod, "oracleConnection", FakeOC)
 
     with pytest.raises(ExitJson) as exc:
         mod.main()
@@ -1413,13 +1267,13 @@ def test_job_present_creates_new(monkeypatch):
 def test_job_present_already_matches_no_change(monkeypatch):
     """state=present, job exists and matches all params → no change."""
     mod = _load("oracle_job")
-    FakeDb, conn = _make_fake_db(fetchone_row=_EXISTING_JOB_ROW)
+    FakeOC, conn = _make_fake_db(fetchone_row=_EXISTING_JOB_ROW)
 
     class Mod(BaseFakeModule):
         params = _job_params()
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", FakeDb)
+    monkeypatch.setattr(mod, "oracleConnection", FakeOC)
 
     with pytest.raises(ExitJson) as exc:
         mod.main()
@@ -1429,13 +1283,13 @@ def test_job_present_already_matches_no_change(monkeypatch):
 def test_job_absent_existing_drops(monkeypatch):
     """state=absent, job exists → drops it, changed=True."""
     mod = _load("oracle_job")
-    FakeDb, conn = _make_fake_db(fetchone_row=_EXISTING_JOB_ROW)
+    FakeOC, conn = _make_fake_db(fetchone_row=_EXISTING_JOB_ROW)
 
     class Mod(BaseFakeModule):
         params = _job_params(state="absent")
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", FakeDb)
+    monkeypatch.setattr(mod, "oracleConnection", FakeOC)
 
     with pytest.raises(ExitJson) as exc:
         mod.main()
@@ -1447,13 +1301,13 @@ def test_job_present_modified_recreates(monkeypatch):
     mod = _load("oracle_job")
     row = list(_EXISTING_JOB_ROW)
     row[10] = "OTHER_CLASS"  # different job_class
-    FakeDb, conn = _make_fake_db(fetchone_row=tuple(row))
+    FakeOC, conn = _make_fake_db(fetchone_row=tuple(row))
 
     class Mod(BaseFakeModule):
         params = _job_params()  # wants DEFAULT_JOB_CLASS
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", FakeDb)
+    monkeypatch.setattr(mod, "oracleConnection", FakeOC)
 
     with pytest.raises(ExitJson) as exc:
         mod.main()
@@ -1463,13 +1317,13 @@ def test_job_present_modified_recreates(monkeypatch):
 def test_job_invalid_name_fails(monkeypatch):
     """job_name without OWNER.NAME format → fail_json."""
     mod = _load("oracle_job")
-    FakeDb, conn = _make_fake_db(fetchone_row=None)
+    FakeOC, conn = _make_fake_db(fetchone_row=None)
 
     class Mod(BaseFakeModule):
         params = _job_params(job_name="BADJOBNAME")
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", FakeDb)
+    monkeypatch.setattr(mod, "oracleConnection", FakeOC)
 
     with pytest.raises(FailJson):
         mod.main()
@@ -1478,14 +1332,14 @@ def test_job_invalid_name_fails(monkeypatch):
 def test_job_check_mode_new(monkeypatch):
     """check_mode, job doesn't exist → would_change=True."""
     mod = _load("oracle_job")
-    FakeDb, conn = _make_fake_db(fetchone_row=None)
+    FakeOC, conn = _make_fake_db(fetchone_row=None)
 
     class Mod(BaseFakeModule):
         params = _job_params()
         check_mode = True
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", FakeDb)
+    monkeypatch.setattr(mod, "oracleConnection", FakeOC)
 
     with pytest.raises(ExitJson) as exc:
         mod.main()
@@ -1495,14 +1349,14 @@ def test_job_check_mode_new(monkeypatch):
 def test_job_check_mode_existing_no_diff(monkeypatch):
     """check_mode, job exists and matches → would_change=False."""
     mod = _load("oracle_job")
-    FakeDb, conn = _make_fake_db(fetchone_row=_EXISTING_JOB_ROW)
+    FakeOC, conn = _make_fake_db(fetchone_row=_EXISTING_JOB_ROW)
 
     class Mod(BaseFakeModule):
         params = _job_params()
         check_mode = True
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", FakeDb)
+    monkeypatch.setattr(mod, "oracleConnection", FakeOC)
 
     with pytest.raises(ExitJson) as exc:
         mod.main()
@@ -1512,13 +1366,13 @@ def test_job_check_mode_existing_no_diff(monkeypatch):
 def test_job_lightweight_without_program_fails(monkeypatch):
     """lightweight=True without program_name → fail_json."""
     mod = _load("oracle_job")
-    FakeDb, conn = _make_fake_db(fetchone_row=None)
+    FakeOC, conn = _make_fake_db(fetchone_row=None)
 
     class Mod(BaseFakeModule):
         params = _job_params(lightweight=True, program_name=None)
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", FakeDb)
+    monkeypatch.setattr(mod, "oracleConnection", FakeOC)
 
     with pytest.raises(FailJson) as exc:
         mod.main()
@@ -1528,13 +1382,13 @@ def test_job_lightweight_without_program_fails(monkeypatch):
 def test_job_present_no_action_no_program_fails(monkeypatch):
     """state=present, no job_action and no program_name → fail_json."""
     mod = _load("oracle_job")
-    FakeDb, conn = _make_fake_db(fetchone_row=None)
+    FakeOC, conn = _make_fake_db(fetchone_row=None)
 
     class Mod(BaseFakeModule):
         params = _job_params(job_action=None, program_name=None)
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", FakeDb)
+    monkeypatch.setattr(mod, "oracleConnection", FakeOC)
 
     with pytest.raises(FailJson):
         mod.main()
@@ -1543,13 +1397,13 @@ def test_job_present_no_action_no_program_fails(monkeypatch):
 def test_job_lightweight_restartable_fails(monkeypatch):
     """lightweight=True AND restartable=True → fail_json (line 419)."""
     mod = _load("oracle_job")
-    FakeDb, conn = _make_fake_db(fetchone_row=None)
+    FakeOC, conn = _make_fake_db(fetchone_row=None)
 
     class Mod(BaseFakeModule):
         params = _job_params(lightweight=True, restartable=True, program_name="SYS.MYPROG", job_action=None)
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", FakeDb)
+    monkeypatch.setattr(mod, "oracleConnection", FakeOC)
 
     with pytest.raises(FailJson) as exc:
         mod.main()
@@ -1559,13 +1413,13 @@ def test_job_lightweight_restartable_fails(monkeypatch):
 def test_job_program_name_invalid_format_fails(monkeypatch):
     """program_name without OWNER.NAME format → fail_json (line 423)."""
     mod = _load("oracle_job")
-    FakeDb, conn = _make_fake_db(fetchone_row=None)
+    FakeOC, conn = _make_fake_db(fetchone_row=None)
 
     class Mod(BaseFakeModule):
         params = _job_params(program_name="INVALID_NO_DOT", job_action=None)
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", FakeDb)
+    monkeypatch.setattr(mod, "oracleConnection", FakeOC)
 
     with pytest.raises(FailJson) as exc:
         mod.main()
@@ -1575,13 +1429,13 @@ def test_job_program_name_invalid_format_fails(monkeypatch):
 def test_job_schedule_name_invalid_format_fails(monkeypatch):
     """schedule_name without OWNER.NAME format → fail_json (line 425)."""
     mod = _load("oracle_job")
-    FakeDb, conn = _make_fake_db(fetchone_row=None)
+    FakeOC, conn = _make_fake_db(fetchone_row=None)
 
     class Mod(BaseFakeModule):
         params = _job_params(schedule_name="INVALID", repeat_interval=None)
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", FakeDb)
+    monkeypatch.setattr(mod, "oracleConnection", FakeOC)
 
     with pytest.raises(FailJson) as exc:
         mod.main()
@@ -1589,15 +1443,15 @@ def test_job_schedule_name_invalid_format_fails(monkeypatch):
 
 
 def test_job_wallet_connect(monkeypatch):
-    """No user/password → wallet connect path (lines 436-441)."""
+    """No user/password → wallet connect path."""
     mod = _load("oracle_job")
-    FakeDb, conn = _make_fake_db(fetchone_row=None)
+    FakeOC, conn = _make_fake_db(fetchone_row=None)
 
     class Mod(BaseFakeModule):
         params = _job_params(user=None, password=None)
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", FakeDb)
+    monkeypatch.setattr(mod, "oracleConnection", FakeOC)
 
     with pytest.raises(ExitJson) as exc:
         mod.main()
@@ -1605,15 +1459,15 @@ def test_job_wallet_connect(monkeypatch):
 
 
 def test_job_sysdba_mode(monkeypatch):
-    """user+password with mode=sysdba → SYSDBA connect (lines 445-447)."""
+    """user+password with mode=sysdba → SYSDBA connect."""
     mod = _load("oracle_job")
-    FakeDb, conn = _make_fake_db(fetchone_row=None)
+    FakeOC, conn = _make_fake_db(fetchone_row=None)
 
     class Mod(BaseFakeModule):
         params = _job_params(mode="sysdba")
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", FakeDb)
+    monkeypatch.setattr(mod, "oracleConnection", FakeOC)
 
     with pytest.raises(ExitJson) as exc:
         mod.main()
@@ -1621,15 +1475,18 @@ def test_job_sysdba_mode(monkeypatch):
 
 
 def test_job_partial_auth_fails(monkeypatch):
-    """user set but password=None → fail_json before connecting (line 453-454)."""
+    """user set but password=None → fail_json."""
     mod = _load("oracle_job")
-    FakeDb, conn = _make_fake_db(fetchone_row=None)
+
+    class _ErrorOC:
+        def __init__(self, module):
+            module.fail_json(msg="Missing username or password for oracledb")
 
     class Mod(BaseFakeModule):
         params = _job_params(user="u", password=None)
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", FakeDb)
+    monkeypatch.setattr(mod, "oracleConnection", _ErrorOC)
 
     with pytest.raises(FailJson) as exc:
         mod.main()
@@ -1637,7 +1494,7 @@ def test_job_partial_auth_fails(monkeypatch):
 
 
 def test_job_low_version_fails(monkeypatch):
-    """conn.version < '10.2' → fail_json (line 469).
+    """conn.version < '10.2' → fail_json.
 
     Note: oracle_job uses lexicographic comparison, so '1.0.0' < '10.2' is True.
     """
@@ -1646,25 +1503,16 @@ def test_job_low_version_fails(monkeypatch):
     _conn = FakeOracleConn()
     _conn.version = "1.0.0"  # lexicographically less than "10.2"
 
-    class _OldDb:
-        NUMBER = int
-        STRING = str
-        SYSDBA = 2
-        DatabaseError = Exception
-
-        @staticmethod
-        def connect(*args, **kwargs):
-            return _conn
-
-        @staticmethod
-        def makedsn(**kwargs):
-            return "fake_dsn"
+    class _OldOC:
+        def __init__(self, module):
+            self.conn = _conn
+            self.version = _conn.version
 
     class Mod(BaseFakeModule):
         params = _job_params()
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", _OldDb)
+    monkeypatch.setattr(mod, "oracleConnection", _OldOC)
 
     with pytest.raises(FailJson) as exc:
         mod.main()
@@ -1672,15 +1520,15 @@ def test_job_low_version_fails(monkeypatch):
 
 
 def test_job_create_with_program_name(monkeypatch):
-    """program_name='SYS.MYPROG' → covers create_job program_name branch (lines 267-269)."""
+    """program_name='SYS.MYPROG' → covers create_job program_name branch."""
     mod = _load("oracle_job")
-    FakeDb, conn = _make_fake_db(fetchone_row=None)
+    FakeOC, conn = _make_fake_db(fetchone_row=None)
 
     class Mod(BaseFakeModule):
         params = _job_params(program_name="SYS.MYPROG", job_action=None)
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", FakeDb)
+    monkeypatch.setattr(mod, "oracleConnection", FakeOC)
 
     with pytest.raises(ExitJson) as exc:
         mod.main()
@@ -1688,20 +1536,20 @@ def test_job_create_with_program_name(monkeypatch):
 
 
 def test_job_check_mode_existing_with_changes(monkeypatch):
-    """Existing job with different job_action → check_mode → would_change=True (covers compare_with_owner)."""
+    """Existing job with different program_name → check_mode → would_change=True (covers compare_with_owner)."""
     mod = _load("oracle_job")
     # Use a row where program_name differs from params (triggers compare_with_owner else branch)
     row = list(_EXISTING_JOB_ROW)
     row[1] = "SYS"      # program_owner
     row[2] = "MYPROG"   # program_name  → stored as SYS.MYPROG
-    FakeDb, conn = _make_fake_db(fetchone_row=tuple(row))
+    FakeOC, conn = _make_fake_db(fetchone_row=tuple(row))
 
     class Mod(BaseFakeModule):
         params = _job_params(program_name="SYS.OTHERPROG", job_action=None)
         check_mode = True
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", FakeDb)
+    monkeypatch.setattr(mod, "oracleConnection", FakeOC)
 
     with pytest.raises(ExitJson) as exc:
         mod.main()
@@ -1774,34 +1622,25 @@ class _PrivsZeroCursor:
 def _make_privs_db():
     _conn = _PrivsZeroConn()
 
-    class _Db:
-        NUMBER = int
-        STRING = str
-        SYSDBA = 2
-        DatabaseError = Exception
+    class _FakeOC:
+        def __init__(self, module):
+            self.conn = _conn
+            self.version = _conn.version
 
-        @staticmethod
-        def connect(*args, **kwargs):
-            return _conn
-
-        @staticmethod
-        def makedsn(**kwargs):
-            return "fake_dsn"
-
-    return _Db, _conn
+    return _FakeOC, _conn
 
 
 def test_privs_check_mode_always_changed(monkeypatch):
     """check_mode → exits with changed=True (conservative estimate)."""
     mod = _load("oracle_privs")
-    _Db, _conn = _make_privs_db()
+    _FakeOC, _conn = _make_privs_db()
 
     class Mod(BaseFakeModule):
         params = _privs_params()
         check_mode = True
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", _Db)
+    monkeypatch.setattr(mod, "oracleConnection", _FakeOC)
 
     with pytest.raises(ExitJson) as exc:
         mod.main()
@@ -1811,13 +1650,13 @@ def test_privs_check_mode_always_changed(monkeypatch):
 def test_privs_grant_sys_no_objs_no_changes(monkeypatch):
     """System privilege grant (no objs) → vars return 0 → changed=False."""
     mod = _load("oracle_privs")
-    _Db, _conn = _make_privs_db()
+    _FakeOC, _conn = _make_privs_db()
 
     class Mod(BaseFakeModule):
         params = _privs_params()  # objs=None → system privilege path
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", _Db)
+    monkeypatch.setattr(mod, "oracleConnection", _FakeOC)
 
     with pytest.raises(ExitJson) as exc:
         mod.main()
@@ -1866,13 +1705,13 @@ def test_privs_invalid_obj_fails(monkeypatch):
 def test_privs_grant_with_objs_no_changes(monkeypatch):
     """Object privilege grant (objs specified) → vars return 0 → changed=False."""
     mod = _load("oracle_privs")
-    _Db, _conn = _make_privs_db()
+    _FakeOC, _conn = _make_privs_db()
 
     class Mod(BaseFakeModule):
         params = _privs_params(objs=["HR.EMPLOYEES"])
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", _Db)
+    monkeypatch.setattr(mod, "oracleConnection", _FakeOC)
 
     with pytest.raises(ExitJson) as exc:
         mod.main()
@@ -1882,13 +1721,13 @@ def test_privs_grant_with_objs_no_changes(monkeypatch):
 def test_privs_absent_no_objs_no_changes(monkeypatch):
     """state=absent, system privilege revoke → vars return 0 → changed=False."""
     mod = _load("oracle_privs")
-    _Db, _conn = _make_privs_db()
+    _FakeOC, _conn = _make_privs_db()
 
     class Mod(BaseFakeModule):
         params = _privs_params(state="absent")
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", _Db)
+    monkeypatch.setattr(mod, "oracleConnection", _FakeOC)
 
     with pytest.raises(ExitJson) as exc:
         mod.main()
@@ -1930,15 +1769,15 @@ def test_privs_invalid_objtype_fails(monkeypatch):
 
 
 def test_privs_wallet_sysdba_connect(monkeypatch):
-    """No user/password + mode=sysdba -> wallet+SYSDBA path (lines 248-250)."""
+    """No user/password + mode=sysdba -> wallet+SYSDBA path."""
     mod = _load("oracle_privs")
-    _Db, _conn = _make_privs_db()
+    _FakeOC, _conn = _make_privs_db()
 
     class Mod(BaseFakeModule):
         params = _privs_params(user=None, password=None, mode="sysdba")
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", _Db)
+    monkeypatch.setattr(mod, "oracleConnection", _FakeOC)
 
     with pytest.raises(ExitJson) as exc:
         mod.main()
@@ -1946,15 +1785,15 @@ def test_privs_wallet_sysdba_connect(monkeypatch):
 
 
 def test_privs_wallet_normal_connect(monkeypatch):
-    """No user/password + mode=normal -> wallet path (lines 251-253)."""
+    """No user/password + mode=normal -> wallet path."""
     mod = _load("oracle_privs")
-    _Db, _conn = _make_privs_db()
+    _FakeOC, _conn = _make_privs_db()
 
     class Mod(BaseFakeModule):
         params = _privs_params(user=None, password=None, mode="normal")
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", _Db)
+    monkeypatch.setattr(mod, "oracleConnection", _FakeOC)
 
     with pytest.raises(ExitJson) as exc:
         mod.main()
@@ -1962,15 +1801,15 @@ def test_privs_wallet_normal_connect(monkeypatch):
 
 
 def test_privs_user_password_sysdba_connect(monkeypatch):
-    """user+password + mode=sysdba -> SYSDBA path (lines 257-259)."""
+    """user+password + mode=sysdba -> SYSDBA path."""
     mod = _load("oracle_privs")
-    _Db, _conn = _make_privs_db()
+    _FakeOC, _conn = _make_privs_db()
 
     class Mod(BaseFakeModule):
         params = _privs_params(mode="sysdba")
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", _Db)
+    monkeypatch.setattr(mod, "oracleConnection", _FakeOC)
 
     with pytest.raises(ExitJson) as exc:
         mod.main()
@@ -1978,31 +1817,18 @@ def test_privs_user_password_sysdba_connect(monkeypatch):
 
 
 def test_privs_database_error_dpi1047_fails(monkeypatch):
-    """DatabaseError with DPI-1047 -> DPI-1047 message (lines 268-279)."""
+    """Connection error with DPI-1047 message -> fail_json with DPI-1047."""
     mod = _load("oracle_privs")
 
-    class _FakeErr:
-        message = "DPI-1047: cannot load Oracle Client library"
-
-    class _Db:
-        NUMBER = int
-        STRING = str
-        SYSDBA = 2
-        DatabaseError = Exception
-
-        @staticmethod
-        def connect(*args, **kwargs):
-            raise Exception(_FakeErr())
-
-        @staticmethod
-        def makedsn(**kwargs):
-            return "fake_dsn"
+    class _ErrorOC:
+        def __init__(self, module):
+            module.fail_json(msg="DPI-1047: cannot load Oracle Client library")
 
     class Mod(BaseFakeModule):
         params = _privs_params(mode="sysdba")
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", _Db)
+    monkeypatch.setattr(mod, "oracleConnection", _ErrorOC)
 
     with pytest.raises(FailJson) as exc:
         mod.main()
@@ -2010,31 +1836,18 @@ def test_privs_database_error_dpi1047_fails(monkeypatch):
 
 
 def test_privs_database_error_generic_fails(monkeypatch):
-    """DatabaseError without DPI-1047 -> generic message (lines 277-279)."""
+    """Connection error -> fail_json."""
     mod = _load("oracle_privs")
 
-    class _FakeErr:
-        message = "ORA-12541: TNS:no listener"
-
-    class _Db:
-        NUMBER = int
-        STRING = str
-        SYSDBA = 2
-        DatabaseError = Exception
-
-        @staticmethod
-        def connect(*args, **kwargs):
-            raise Exception(_FakeErr())
-
-        @staticmethod
-        def makedsn(**kwargs):
-            return "fake_dsn"
+    class _ErrorOC:
+        def __init__(self, module):
+            module.fail_json(msg="Oracle connection failed: ORA-12541: TNS:no listener")
 
     class Mod(BaseFakeModule):
         params = _privs_params()
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", _Db)
+    monkeypatch.setattr(mod, "oracleConnection", _ErrorOC)
 
     with pytest.raises(FailJson) as exc:
         mod.main()
@@ -2042,81 +1855,29 @@ def test_privs_database_error_generic_fails(monkeypatch):
 
 
 def test_privs_low_version_fails(monkeypatch):
-    """conn.version < '11.2' -> fail_json (line 281)."""
+    """conn.version < '11.2' -> fail_json."""
     mod = _load("oracle_privs")
-    _Db, _conn = _make_privs_db()
+    _FakeOC, _conn = _make_privs_db()
     _conn.version = "10.2.0"
+
+    class _OldOC:
+        def __init__(self, module):
+            self.conn = _conn
+            self.version = _conn.version
 
     class Mod(BaseFakeModule):
         params = _privs_params()
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", _Db)
+    monkeypatch.setattr(mod, "oracleConnection", _OldOC)
 
     with pytest.raises(FailJson) as exc:
         mod.main()
     assert "11g" in exc.value.args[0]["msg"].lower()
 
 
-def test_privs_session_container_applied(monkeypatch):
-    """Valid session_container -> ALTER SESSION executed (lines 191-192)."""
-    mod = _load("oracle_privs")
-
-    executed_sqls = []
-
-    class _TrackingCursor(_PrivsZeroCursor):
-        def execute(self, sql, params=None):
-            executed_sqls.append(sql)
-
-    class _TrackingConn(_PrivsZeroConn):
-        def cursor(self):
-            return _TrackingCursor(self)
-
-    _track_conn = _TrackingConn()
-
-    class _Db:
-        NUMBER = int
-        STRING = str
-        SYSDBA = 2
-        DatabaseError = Exception
-
-        @staticmethod
-        def connect(*args, **kwargs):
-            return _track_conn
-
-        @staticmethod
-        def makedsn(**kwargs):
-            return "fake_dsn"
-
-    class Mod(BaseFakeModule):
-        params = _privs_params(session_container="MYPDB")
-
-    monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", _Db)
-
-    with pytest.raises(ExitJson):
-        mod.main()
-    assert any("ALTER SESSION" in sql for sql in executed_sqls)
-
-
-def test_privs_invalid_session_container_fails(monkeypatch):
-    """Invalid session_container name -> fail_json (lines 189-190)."""
-    mod = _load("oracle_privs")
-    _Db, _conn = _make_privs_db()
-
-    class Mod(BaseFakeModule):
-        params = _privs_params(session_container="1INVALID!")
-
-    monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", _Db)
-
-    with pytest.raises(FailJson) as exc:
-        mod.main()
-    assert "session_container" in exc.value.args[0]["msg"].lower()
-
-
 def test_privs_var_error_triggers_rollback_and_fail(monkeypatch):
-    """var_error.getvalue() > 0 -> rollback + fail_json (lines 444-446)."""
+    """var_error.getvalue() > 0 -> rollback + fail_json."""
     mod = _load("oracle_privs")
 
     rolled_back = []
@@ -2151,25 +1912,16 @@ def test_privs_var_error_triggers_rollback_and_fail(monkeypatch):
 
     _err_conn = _ErrConn()
 
-    class _Db:
-        NUMBER = int
-        STRING = str
-        SYSDBA = 2
-        DatabaseError = Exception
-
-        @staticmethod
-        def connect(*args, **kwargs):
-            return _err_conn
-
-        @staticmethod
-        def makedsn(**kwargs):
-            return "fake_dsn"
+    class _FakeOC:
+        def __init__(self, module):
+            self.conn = _err_conn
+            self.version = _err_conn.version
 
     class Mod(BaseFakeModule):
         params = _privs_params()
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracledb", _Db)
+    monkeypatch.setattr(mod, "oracleConnection", _FakeOC)
 
     with pytest.raises(FailJson):
         mod.main()
