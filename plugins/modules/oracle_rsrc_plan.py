@@ -87,7 +87,7 @@ EXAMPLES = '''
 
 def get_plan(conn, plan_name):
     """Query DBA_RSRC_PLANS for a resource plan."""
-    sql = """SELECT PLAN, NUM_PLAN_DIRECTIVES, CPU_METHOD,
+    sql = """SELECT PLAN, COMMENTS, NUM_PLAN_DIRECTIVES, CPU_METHOD,
                     MGMT_METHOD, STATUS, MANDATORY
              FROM DBA_RSRC_PLANS
              WHERE PLAN = UPPER(:name)"""
@@ -118,19 +118,161 @@ def get_active_plan(conn):
     return '' if val is None else val
 
 
-def create_plan(conn, module):
-    """Create a resource plan with directives."""
-    plan = module.params["plan"]
-    comment = module.params["comment"] or ''
-    directives = module.params["directives"] or []
+_DIRECTIVE_COMPARE_KEYS = (
+    'cpu_p1',
+    'parallel_degree_limit_p1',
+    'active_sess_pool_p1',
+    'max_idle_time',
+    'max_idle_blocker_time',
+    'max_iops',
+    'max_mbps',
+)
 
-    # Reset any stale pending area, then open a new one
+
+def _row_keys_lower(row):
+    return {(k or '').lower(): v for k, v in row.items()}
+
+
+def _norm_scalar(val):
+    if val is None:
+        return None
+    try:
+        return int(val)
+    except (TypeError, ValueError):
+        try:
+            return int(float(val))
+        except (TypeError, ValueError):
+            return val
+
+
+def _open_pending_area(conn):
     conn.execute_ddl(
         "BEGIN "
         "DBMS_RESOURCE_MANAGER.CLEAR_PENDING_AREA(); "
         "DBMS_RESOURCE_MANAGER.CREATE_PENDING_AREA(); "
         "END;"
     )
+
+
+def _merge_directives_for_plan(module):
+    directives = module.params['directives'] or []
+    default_max_iops = module.params.get('max_iops')
+    default_max_mbps = module.params.get('max_mbps')
+    out = []
+    for d in directives:
+        merged = dict(d)
+        if default_max_iops is not None and merged.get('max_iops') is None:
+            merged['max_iops'] = default_max_iops
+        if default_max_mbps is not None and merged.get('max_mbps') is None:
+            merged['max_mbps'] = default_max_mbps
+        out.append(merged)
+    return out
+
+
+def _consumer_group_directives_from_db(rows):
+    out = []
+    if not rows:
+        return out
+    for r in rows:
+        rd = _row_keys_lower(r)
+        if (rd.get('type') or '').upper() == 'SUBPLAN':
+            continue
+        g = rd.get('group_or_subplan')
+        if not g:
+            continue
+        d = {'group': g}
+        for k in _DIRECTIVE_COMPARE_KEYS:
+            d[k] = rd.get(k)
+        out.append(d)
+    return out
+
+
+def _directive_compare_map(directive):
+    return {k: _norm_scalar(directive.get(k)) for k in _DIRECTIVE_COMPARE_KEYS}
+
+
+def _directive_values_equal(live_d, want_d):
+    return _directive_compare_map(live_d) == _directive_compare_map(want_d)
+
+
+def resource_plan_has_drift(module, live_plan_row, live_directive_rows):
+    """Return (needs_update, detail_message_or_None)."""
+    notes = []
+    if module.params.get('comment') is not None:
+        want_c = (module.params.get('comment') or '').strip()
+        live_raw = live_plan_row.get('comments') or live_plan_row.get('COMMENTS')
+        live_c = (live_raw or '').strip()
+        if want_c != live_c:
+            notes.append('comment (desired=%r, live=%r)' % (want_c, live_c))
+    if module.params.get('directives') is not None:
+        want_dirs = _merge_directives_for_plan(module)
+        live_dirs = _consumer_group_directives_from_db(live_directive_rows)
+        live_by = {x['group'].upper(): x for x in live_dirs}
+        want_by = {x['group'].upper(): x for x in want_dirs}
+        if set(live_by) != set(want_by):
+            notes.append(
+                'directive consumer groups differ (desired=%s, live=%s)'
+                % (sorted(want_by), sorted(live_by))
+            )
+        else:
+            for g in sorted(want_by):
+                if not _directive_values_equal(live_by[g], want_by[g]):
+                    notes.append(
+                        'directive %s differs (desired=%s, live=%s)'
+                        % (g, _directive_compare_map(want_by[g]),
+                           _directive_compare_map(live_by[g]))
+                    )
+    if not notes:
+        return False, None
+    return True, '; '.join(notes)
+
+
+def update_resource_plan(conn, module):
+    """Apply comment and/or directive changes (pending area)."""
+    plan = module.params['plan']
+    live_rows = get_plan(conn, plan)
+    live_plan_row = live_rows[0]
+    live_directive_rows = get_plan_directives(conn, plan)
+    _open_pending_area(conn)
+    if module.params.get('comment') is not None:
+        want_c = (module.params.get('comment') or '').strip()
+        live_raw = live_plan_row.get('comments') or live_plan_row.get('COMMENTS')
+        live_c = (live_raw or '').strip()
+        if want_c != live_c:
+            conn.execute_ddl(
+                "BEGIN DBMS_RESOURCE_MANAGER.UPDATE_PLAN("
+                "plan => :plan, new_comment => :comment); END;",
+                {'plan': plan, 'comment': want_c},
+            )
+    if module.params.get('directives') is not None:
+        want_by = {x['group'].upper(): x for x in _merge_directives_for_plan(module)}
+        live_by = {x['group'].upper(): x for x in _consumer_group_directives_from_db(live_directive_rows)}
+        for g in sorted(set(live_by) - set(want_by)):
+            conn.execute_ddl(
+                "BEGIN DBMS_RESOURCE_MANAGER.DELETE_PLAN_DIRECTIVE("
+                "plan => :plan, group_or_subplan => :group); END;",
+                {'plan': plan, 'group': g},
+            )
+        for g in sorted(want_by):
+            spec = want_by[g]
+            if g not in live_by:
+                _create_directive(conn, plan, spec)
+            elif not _directive_values_equal(live_by[g], spec):
+                conn.execute_ddl(
+                    "BEGIN DBMS_RESOURCE_MANAGER.DELETE_PLAN_DIRECTIVE("
+                    "plan => :plan, group_or_subplan => :group); END;",
+                    {'plan': plan, 'group': g},
+                )
+                _create_directive(conn, plan, spec)
+    conn.execute_ddl("BEGIN DBMS_RESOURCE_MANAGER.SUBMIT_PENDING_AREA(); END;")
+
+
+def create_plan(conn, module):
+    """Create a resource plan with directives."""
+    plan = module.params["plan"]
+    comment = module.params["comment"] or ''
+
+    _open_pending_area(conn)
 
     # Create plan
     conn.execute_ddl(
@@ -139,17 +281,8 @@ def create_plan(conn, module):
         {'plan': plan, 'comment': comment},
     )
 
-    default_max_iops = module.params.get('max_iops')
-    default_max_mbps = module.params.get('max_mbps')
-
-    # Create directives
-    for d in directives:
-        merged = dict(d)
-        if default_max_iops is not None and merged.get('max_iops') is None:
-            merged['max_iops'] = default_max_iops
-        if default_max_mbps is not None and merged.get('max_mbps') is None:
-            merged['max_mbps'] = default_max_mbps
-        _create_directive(conn, plan, merged)
+    for d in _merge_directives_for_plan(module):
+        _create_directive(conn, plan, d)
 
     # Submit pending area
     conn.execute_ddl("BEGIN DBMS_RESOURCE_MANAGER.SUBMIT_PENDING_AREA(); END;")
@@ -181,12 +314,7 @@ def _create_directive(conn, plan, directive):
 def drop_plan(conn, module):
     """Drop a resource plan."""
     plan = module.params["plan"]
-    conn.execute_ddl(
-        "BEGIN "
-        "DBMS_RESOURCE_MANAGER.CLEAR_PENDING_AREA(); "
-        "DBMS_RESOURCE_MANAGER.CREATE_PENDING_AREA(); "
-        "END;"
-    )
+    _open_pending_area(conn)
     conn.execute_ddl(
         "BEGIN DBMS_RESOURCE_MANAGER.DELETE_PLAN_CASCADE(plan => :plan); END;",
         {'plan': plan},
@@ -247,19 +375,46 @@ def main():
         )
 
     elif state == 'present':
-        if plan_exists(conn, plan_name):
-            module.exit_json(changed=False, msg='Resource plan already exists')
-        create_plan(conn, module)
+        plan_rows = get_plan(conn, plan_name)
+        if not plan_rows:
+            if module.check_mode:
+                module.exit_json(
+                    changed=True,
+                    msg='Resource plan would be created (check mode)',
+                )
+            create_plan(conn, module)
+            module.exit_json(
+                changed=conn.changed, ddls=conn.ddls,
+                msg='Resource plan created',
+            )
+        drift, drift_detail = resource_plan_has_drift(
+            module, plan_rows[0], get_plan_directives(conn, plan_name),
+        )
+        if not drift:
+            module.exit_json(
+                changed=False,
+                msg='Resource plan already matches desired state',
+            )
+        if module.check_mode:
+            module.exit_json(
+                changed=True,
+                msg='Resource plan would be updated (check mode): %s' % drift_detail,
+            )
+        update_resource_plan(conn, module)
         module.exit_json(
             changed=conn.changed, ddls=conn.ddls,
-            msg='Resource plan created',
+            msg='Resource plan updated: %s' % drift_detail,
         )
 
     elif state == 'absent':
         if not plan_exists(conn, plan_name):
             module.exit_json(changed=False, msg='Resource plan does not exist')
-        # Deactivate if active
         active = get_active_plan(conn)
+        if module.check_mode:
+            module.exit_json(
+                changed=True,
+                msg='Resource plan would be dropped (check mode)',
+            )
         if active and active.upper() == plan_name.upper():
             conn.execute_ddl("ALTER SYSTEM SET RESOURCE_MANAGER_PLAN = ''")
         drop_plan(conn, module)
@@ -274,6 +429,11 @@ def main():
         active = get_active_plan(conn)
         if active and active.upper() == plan_name.upper():
             module.exit_json(changed=False, msg='Plan already active')
+        if module.check_mode:
+            module.exit_json(
+                changed=True,
+                msg='Resource plan would be activated (check mode)',
+            )
         activate_plan(conn, module)
         module.exit_json(
             changed=conn.changed, ddls=conn.ddls,

@@ -60,6 +60,7 @@ class _PlanConn(BaseFakeConn):
 
 _PLAN_ROW = {
     'plan': 'TEST_PLAN',
+    'comments': '',
     'num_plan_directives': 2,
     'cpu_method': 'EMPHASIS',
     'mgmt_method': 'EMPHASIS',
@@ -250,7 +251,114 @@ def test_plan_create_idempotent(monkeypatch):
         mod.main()
     result = exc.value.args[0]
     assert result['changed'] is False
-    assert 'already exists' in result['msg']
+    assert 'matches' in result['msg'].lower()
+    assert conn.ddls == []
+
+
+def test_plan_present_no_drift_with_comment_and_directives(monkeypatch):
+    mod = _load()
+    plan_row = dict(_PLAN_ROW, comments='My plan')
+    directives = [{'group': 'OTHER_GROUPS', 'cpu_p1': 100}]
+
+    class Mod(BaseFakeModule):
+        params = _plan_params(comment='My plan', directives=directives)
+
+    conn = _PlanConn(
+        Mod(),
+        plan_rows=[plan_row],
+        directive_rows=[_DIRECTIVE_ROW],
+    )
+    monkeypatch.setattr(mod, 'AnsibleModule', Mod)
+    monkeypatch.setattr(mod, 'oracleConnection', lambda m: conn, raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    result = exc.value.args[0]
+    assert result['changed'] is False
+    assert conn.ddls == []
+
+
+def test_plan_present_updates_comment(monkeypatch):
+    mod = _load()
+    plan_row = dict(_PLAN_ROW, comments='old')
+
+    class Mod(BaseFakeModule):
+        params = _plan_params(comment='new')
+
+    conn = _PlanConn(Mod(), plan_rows=[plan_row], directive_rows=[_DIRECTIVE_ROW])
+    monkeypatch.setattr(mod, 'AnsibleModule', Mod)
+    monkeypatch.setattr(mod, 'oracleConnection', lambda m: conn, raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    result = exc.value.args[0]
+    assert result['changed'] is True
+    assert 'updated' in result['msg'].lower()
+    assert any('UPDATE_PLAN' in d for d in conn.ddls)
+    upd = next(p for s, p in conn.ddl_with_params if p and 'UPDATE_PLAN' in s)
+    assert upd == {'plan': 'TEST_PLAN', 'comment': 'new'}
+    assert any('SUBMIT_PENDING_AREA' in d for d in conn.ddls)
+
+
+def test_plan_present_updates_directive(monkeypatch):
+    mod = _load()
+    directives = [{'group': 'OTHER_GROUPS', 'cpu_p1': 50}]
+
+    class Mod(BaseFakeModule):
+        params = _plan_params(directives=directives)
+
+    conn = _PlanConn(Mod(), plan_rows=[_PLAN_ROW], directive_rows=[_DIRECTIVE_ROW])
+    monkeypatch.setattr(mod, 'AnsibleModule', Mod)
+    monkeypatch.setattr(mod, 'oracleConnection', lambda m: conn, raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    result = exc.value.args[0]
+    assert result['changed'] is True
+    assert any('DELETE_PLAN_DIRECTIVE' in d for d in conn.ddls)
+    create_params = [
+        p for s, p in conn.ddl_with_params
+        if p and 'CREATE_PLAN_DIRECTIVE' in s and p.get('group_or_subplan') == 'OTHER_GROUPS'
+    ]
+    assert create_params and create_params[-1]['cpu_p1'] == 50
+
+
+def test_plan_present_check_mode_update(monkeypatch):
+    mod = _load()
+    plan_row = dict(_PLAN_ROW, comments='old')
+
+    class Mod(BaseFakeModule):
+        params = _plan_params(comment='new')
+        check_mode = True
+
+    conn = _PlanConn(Mod(), plan_rows=[plan_row], directive_rows=[_DIRECTIVE_ROW])
+    monkeypatch.setattr(mod, 'AnsibleModule', Mod)
+    monkeypatch.setattr(mod, 'oracleConnection', lambda m: conn, raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    result = exc.value.args[0]
+    assert result['changed'] is True
+    assert 'check mode' in result['msg']
+    assert conn.ddls == []
+
+
+def test_plan_create_check_mode(monkeypatch):
+    mod = _load()
+
+    class Mod(BaseFakeModule):
+        params = _plan_params(state='present')
+        check_mode = True
+
+    conn = _PlanConn(Mod(), plan_rows=[], directive_rows=[])
+    monkeypatch.setattr(mod, 'AnsibleModule', Mod)
+    monkeypatch.setattr(mod, 'oracleConnection', lambda m: conn, raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    result = exc.value.args[0]
+    assert result['changed'] is True
+    assert 'check mode' in result['msg']
     assert conn.ddls == []
 
 
@@ -327,6 +435,26 @@ def test_plan_drop_idempotent(monkeypatch):
     assert conn.ddls == []
 
 
+def test_plan_drop_check_mode(monkeypatch):
+    mod = _load()
+
+    class Mod(BaseFakeModule):
+        params = _plan_params(state='absent')
+        check_mode = True
+
+    conn = _PlanConn(Mod(), plan_rows=[_PLAN_ROW], directive_rows=[_DIRECTIVE_ROW],
+                     active_plan='TEST_PLAN')
+    monkeypatch.setattr(mod, 'AnsibleModule', Mod)
+    monkeypatch.setattr(mod, 'oracleConnection', lambda m: conn, raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    result = exc.value.args[0]
+    assert result['changed'] is True
+    assert 'check mode' in result['msg']
+    assert conn.ddls == []
+
+
 # ===========================================================================
 # Tests: state=active (activate)
 # ===========================================================================
@@ -357,6 +485,46 @@ def test_plan_activate_idempotent(monkeypatch):
 
     class Mod(BaseFakeModule):
         params = _plan_params(state='active')
+
+    conn = _PlanConn(Mod(), plan_rows=[_PLAN_ROW], directive_rows=[_DIRECTIVE_ROW],
+                     active_plan='TEST_PLAN')
+    monkeypatch.setattr(mod, 'AnsibleModule', Mod)
+    monkeypatch.setattr(mod, 'oracleConnection', lambda m: conn, raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    result = exc.value.args[0]
+    assert result['changed'] is False
+    assert 'already active' in result['msg']
+    assert conn.ddls == []
+
+
+def test_plan_activate_check_mode(monkeypatch):
+    mod = _load()
+
+    class Mod(BaseFakeModule):
+        params = _plan_params(state='active')
+        check_mode = True
+
+    conn = _PlanConn(Mod(), plan_rows=[_PLAN_ROW], directive_rows=[_DIRECTIVE_ROW],
+                     active_plan='OTHER_PLAN')
+    monkeypatch.setattr(mod, 'AnsibleModule', Mod)
+    monkeypatch.setattr(mod, 'oracleConnection', lambda m: conn, raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    result = exc.value.args[0]
+    assert result['changed'] is True
+    assert 'check mode' in result['msg']
+    assert conn.ddls == []
+
+
+def test_plan_activate_check_mode_idempotent(monkeypatch):
+    mod = _load()
+
+    class Mod(BaseFakeModule):
+        params = _plan_params(state='active')
+        check_mode = True
 
     conn = _PlanConn(Mod(), plan_rows=[_PLAN_ROW], directive_rows=[_DIRECTIVE_ROW],
                      active_plan='TEST_PLAN')
