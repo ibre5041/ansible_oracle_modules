@@ -164,8 +164,8 @@ def ace_exists(conn, module):
     return False
 
 
-def _append_host_ace_sql_params(module):
-    """Return PL/SQL and binds for APPEND_HOST_ACE."""
+def _host_ace_mutate_sql_params(module, procedure):
+    """Return PL/SQL and binds for APPEND_HOST_ACE or REMOVE_HOST_ACE."""
     host = module.params["host"]
     lower_port = module.params["lower_port"]
     upper_port = module.params["upper_port"]
@@ -173,7 +173,7 @@ def _append_host_ace_sql_params(module):
     privilege = module.params["privilege"]
     is_grant = module.params["is_grant"]
     sql = """BEGIN
-  DBMS_NETWORK_ACL_ADMIN.APPEND_HOST_ACE(
+  DBMS_NETWORK_ACL_ADMIN.%s(
     host => :host,
     lower_port => :lower_port,
     upper_port => :upper_port,
@@ -184,39 +184,7 @@ def _append_host_ace_sql_params(module):
       is_grant => :is_grant
     )
   );
-END;"""
-    params = {
-        "host": host,
-        "lower_port": lower_port,
-        "upper_port": upper_port,
-        "privilege": privilege,
-        "principal": principal,
-        "is_grant": is_grant,
-    }
-    return sql, params
-
-
-def _remove_host_ace_sql_params(module):
-    """Return PL/SQL and binds for REMOVE_HOST_ACE."""
-    host = module.params["host"]
-    lower_port = module.params["lower_port"]
-    upper_port = module.params["upper_port"]
-    privilege = module.params["privilege"]
-    principal = module.params["principal"]
-    is_grant = module.params["is_grant"]
-    sql = """BEGIN
-  DBMS_NETWORK_ACL_ADMIN.REMOVE_HOST_ACE(
-    host => :host,
-    lower_port => :lower_port,
-    upper_port => :upper_port,
-    ace => xs$ace_type(
-      privilege_list => xs$name_list(:privilege),
-      principal_name => :principal,
-      principal_type => xs_acl.ptype_db,
-      is_grant => :is_grant
-    )
-  );
-END;"""
+END;""" % (procedure,)
     params = {
         "host": host,
         "lower_port": lower_port,
@@ -230,13 +198,13 @@ END;"""
 
 def create_ace(conn, module):
     """Add a network ACL entry using DBMS_NETWORK_ACL_ADMIN.APPEND_HOST_ACE."""
-    sql, params = _append_host_ace_sql_params(module)
+    sql, params = _host_ace_mutate_sql_params(module, 'APPEND_HOST_ACE')
     conn.execute_ddl(sql, params=params)
 
 
 def remove_ace(conn, module):
     """Remove network ACL entries for a host."""
-    sql, params = _remove_host_ace_sql_params(module)
+    sql, params = _host_ace_mutate_sql_params(module, 'REMOVE_HOST_ACE')
     conn.execute_ddl(sql, params=params)
 
 
@@ -288,7 +256,7 @@ def main():
         if ace_exists(conn, module):
             module.exit_json(changed=False, msg='ACE already exists')
         if module.check_mode:
-            sql, _ = _append_host_ace_sql_params(module)
+            sql, _ = _host_ace_mutate_sql_params(module, 'APPEND_HOST_ACE')
             module.exit_json(
                 changed=True,
                 ddls=['--' + sql],
@@ -301,7 +269,7 @@ def main():
         if not ace_exists(conn, module):
             module.exit_json(changed=False, msg='ACE does not exist')
         if module.check_mode:
-            sql, _ = _remove_host_ace_sql_params(module)
+            sql, _ = _host_ace_mutate_sql_params(module, 'REMOVE_HOST_ACE')
             module.exit_json(
                 changed=True,
                 ddls=['--' + sql],
