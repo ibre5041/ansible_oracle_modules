@@ -396,10 +396,12 @@ def enable_policy(conn, module):
 
     sql = 'AUDIT POLICY %s' % policy_name
 
-    if enabled_users:
-        sql += ' BY %s' % ', '.join(enabled_users)
-    elif enabled_except_users:
-        sql += ' EXCEPT %s' % ', '.join(enabled_except_users)
+    scope_kind, scope_names = desired_enable_scope(enabled_users, enabled_except_users)
+    if scope_kind == 'by':
+        sql += ' BY %s' % ', '.join(sorted(scope_names))
+    elif scope_kind == 'except':
+        sql += ' EXCEPT %s' % ', '.join(sorted(scope_names))
+    # scope_kind == 'all': omit BY/EXCEPT (all users)
 
     conn.execute_ddl(sql)
 

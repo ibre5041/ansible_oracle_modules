@@ -395,6 +395,26 @@ def test_audit_enable_users(monkeypatch):
     assert 'BY HR, SCOTT' in ddl
 
 
+def test_audit_enable_users_all_special_value(monkeypatch):
+    """enabled_users ALL must not emit invalid BY ALL; use plain AUDIT POLICY (all users)."""
+    mod = _load()
+
+    class Mod(BaseFakeModule):
+        params = _audit_params(state='enabled', enabled_users=['ALL'])
+
+    conn = _AuditConn(Mod(), policy_rows=[_POLICY_ROW], enabled_rows=[])
+    monkeypatch.setattr(mod, 'AnsibleModule', Mod)
+    monkeypatch.setattr(mod, 'oracleConnection', lambda m: conn, raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    result = exc.value.args[0]
+    assert result['changed'] is True
+    ddl = conn.ddls[0]
+    assert ddl.strip() == 'AUDIT POLICY TEST_AUDIT_POL'
+    assert 'BY' not in ddl
+
+
 def test_audit_enable_except_users(monkeypatch):
     mod = _load()
 
