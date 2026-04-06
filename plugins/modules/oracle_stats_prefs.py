@@ -37,7 +37,7 @@ options:
             - The mode with which to connect to the database
         required: true
         default: normal
-        choices: ['normal','sysdba']
+        choices: ['normal','sysdba','sysdg','sysoper','sysasm']
     preference_name:
         description:
             - DBMS_STATS preference name

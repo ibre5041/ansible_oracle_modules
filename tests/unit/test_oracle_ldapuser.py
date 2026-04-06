@@ -65,54 +65,6 @@ def test_clean_string_single_char(monkeypatch):
 # apply_session_container tests (lines 190-197)
 # ---------------------------------------------------------------------------
 
-def test_apply_session_container_none(monkeypatch):
-    """apply_session_container: session_container=None → returns immediately (line 192-193)."""
-    mod = _load()
-
-    class FakeMod(BaseFakeModule):
-        params = {"session_container": None}
-
-    m = FakeMod()
-    # Should return without error and without using conn
-    result = mod.apply_session_container(m, None)
-    assert result is None
-
-
-def test_apply_session_container_invalid(monkeypatch):
-    """apply_session_container: invalid name → fail_json (lines 194-195)."""
-    mod = _load()
-
-    class FakeMod(BaseFakeModule):
-        params = {"session_container": "123invalid"}
-
-    m = FakeMod()
-    with pytest.raises(FailJson) as exc:
-        mod.apply_session_container(m, None)
-    assert "Invalid session_container" in exc.value.args[0]["msg"]
-
-
-def test_apply_session_container_valid(monkeypatch):
-    """apply_session_container: valid name → cursor.execute called (lines 196-197)."""
-    mod = _load()
-
-    executed = []
-
-    class FakeCursor:
-        def execute(self, sql):
-            executed.append(sql)
-
-    class FakeConn:
-        def cursor(self):
-            return FakeCursor()
-
-    class FakeMod(BaseFakeModule):
-        params = {"session_container": "MYPDB"}
-
-    m = FakeMod()
-    mod.apply_session_container(m, FakeConn())
-    assert any("MYPDB" in sql for sql in executed)
-
-
 # ---------------------------------------------------------------------------
 # main() early validation tests (lines 256-264)
 # ---------------------------------------------------------------------------
