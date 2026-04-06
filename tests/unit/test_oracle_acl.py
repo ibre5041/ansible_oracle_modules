@@ -34,7 +34,26 @@ class _AclConn(BaseFakeConn):
         self.ddl_binds = []
 
     def execute_select_to_dict(self, sql, params=None, fetchone=False, fail_on_error=True):
-        return self._ace_rows
+        """Narrow sample rows by host/port clauses (mirrors DBA_HOST_ACES queries)."""
+        rows = list(self._ace_rows)
+        p = dict(params or {})
+        sql_norm = ' '.join(sql.split()).upper()
+
+        h = p.get('host')
+        if h is not None:
+            rows = [r for r in rows if r.get('host') == h]
+
+        if 'LOWER_PORT IS NULL' in sql_norm:
+            rows = [r for r in rows if r.get('lower_port') is None]
+        elif 'LOWER_PORT = :LOWER_PORT' in sql_norm and p.get('lower_port') is not None:
+            rows = [r for r in rows if r.get('lower_port') == p['lower_port']]
+
+        if 'UPPER_PORT IS NULL' in sql_norm:
+            rows = [r for r in rows if r.get('upper_port') is None]
+        elif 'UPPER_PORT = :UPPER_PORT' in sql_norm and p.get('upper_port') is not None:
+            rows = [r for r in rows if r.get('upper_port') == p['upper_port']]
+
+        return rows
 
     def execute_ddl(self, sql, params=None, ignore_errors=None):
         self.ddls.append(sql)
@@ -162,6 +181,65 @@ def test_acl_create_ace_with_ports(monkeypatch):
     assert 'upper_port => :upper_port' in ddl
     assert binds['lower_port'] == 25
     assert binds['upper_port'] == 25
+
+
+def test_acl_present_creates_when_only_port_scoped_ace_exists(monkeypatch):
+    """Host-wide present must not treat a port-scoped ACE as the same entry."""
+    mod = _load()
+    row_25 = {**_ACE_ROW, 'lower_port': 25, 'upper_port': 25}
+
+    class Mod(BaseFakeModule):
+        params = _acl_params(state='present')
+
+    conn = _AclConn(Mod(), ace_rows=[row_25])
+    monkeypatch.setattr(mod, 'AnsibleModule', Mod)
+    monkeypatch.setattr(mod, 'oracleConnection', lambda m: conn, raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    result = exc.value.args[0]
+    assert result['changed'] is True
+    assert 'ACE created' in result['msg']
+
+
+def test_acl_present_idempotent_host_wide_ignores_other_port_ace(monkeypatch):
+    """Host-wide idempotent match must ignore a different port-scoped ACE."""
+    mod = _load()
+    row_25 = {**_ACE_ROW, 'lower_port': 25, 'upper_port': 25}
+    row_wide = dict(_ACE_ROW)
+
+    class Mod(BaseFakeModule):
+        params = _acl_params(state='present')
+
+    conn = _AclConn(Mod(), ace_rows=[row_25, row_wide])
+    monkeypatch.setattr(mod, 'AnsibleModule', Mod)
+    monkeypatch.setattr(mod, 'oracleConnection', lambda m: conn, raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    result = exc.value.args[0]
+    assert result['changed'] is False
+    assert 'already exists' in result['msg']
+
+
+def test_acl_absent_host_wide_noop_when_only_port_scoped_ace(monkeypatch):
+    """state=absent host-wide must not match a port-only ACE."""
+    mod = _load()
+    row_25 = {**_ACE_ROW, 'lower_port': 25, 'upper_port': 25}
+
+    class Mod(BaseFakeModule):
+        params = _acl_params(state='absent')
+
+    conn = _AclConn(Mod(), ace_rows=[row_25])
+    monkeypatch.setattr(mod, 'AnsibleModule', Mod)
+    monkeypatch.setattr(mod, 'oracleConnection', lambda m: conn, raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    result = exc.value.args[0]
+    assert result['changed'] is False
+    assert 'does not exist' in result['msg']
+    assert conn.ddls == []
 
 
 def test_acl_create_ace_deny(monkeypatch):

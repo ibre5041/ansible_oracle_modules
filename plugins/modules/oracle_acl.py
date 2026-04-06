@@ -106,19 +106,38 @@ EXAMPLES = '''
 '''
 
 
-def get_acl(conn, host, lower_port, upper_port):
-    """Query DBA_HOST_ACES for existing ACL entries."""
+def get_acl(conn, host, lower_port, upper_port, strict_port_match=False):
+    """Query DBA_HOST_ACES for existing ACL entries.
+
+    strict_port_match:
+        If True (used for ace_exists), require exact port scope: unspecified
+        ports match only rows where that bound is NULL in the dictionary
+        (host-wide ACE), not port-specific rows. If False (e.g. state=status),
+        omitted ports do not filter — all ACEs for the host are returned.
+    """
     sql = """SELECT HOST, LOWER_PORT, UPPER_PORT, ACE_ORDER,
                     PRINCIPAL, PRINCIPAL_TYPE, GRANT_TYPE, PRIVILEGE
              FROM DBA_HOST_ACES
              WHERE HOST = :host"""
     params = {'host': host}
-    if lower_port is not None:
-        sql += ' AND LOWER_PORT = :lower_port'
-        params['lower_port'] = lower_port
-    if upper_port is not None:
-        sql += ' AND UPPER_PORT = :upper_port'
-        params['upper_port'] = upper_port
+    if strict_port_match:
+        if lower_port is not None:
+            sql += ' AND LOWER_PORT = :lower_port'
+            params['lower_port'] = lower_port
+        else:
+            sql += ' AND LOWER_PORT IS NULL'
+        if upper_port is not None:
+            sql += ' AND UPPER_PORT = :upper_port'
+            params['upper_port'] = upper_port
+        else:
+            sql += ' AND UPPER_PORT IS NULL'
+    else:
+        if lower_port is not None:
+            sql += ' AND LOWER_PORT = :lower_port'
+            params['lower_port'] = lower_port
+        if upper_port is not None:
+            sql += ' AND UPPER_PORT = :upper_port'
+            params['upper_port'] = upper_port
     return conn.execute_select_to_dict(sql, params)
 
 
@@ -129,8 +148,13 @@ def ace_exists(conn, module):
     privilege = module.params["privilege"]
     is_grant = module.params["is_grant"]
     desired_grant_type = 'GRANT' if is_grant else 'DENY'
-    rows = get_acl(conn, host, module.params["lower_port"],
-                   module.params["upper_port"])
+    rows = get_acl(
+        conn,
+        host,
+        module.params["lower_port"],
+        module.params["upper_port"],
+        strict_port_match=True,
+    )
     for row in rows:
         row_grant_type = str(row.get('grant_type', '')).strip().upper()
         if (row.get('principal', '').upper() == principal.upper()
