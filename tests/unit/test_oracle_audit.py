@@ -611,3 +611,55 @@ def test_audit_disable_idempotent(monkeypatch):
     assert result['changed'] is False
     assert 'already disabled' in result['msg']
     assert conn.ddls == []
+
+
+def test_audit_disable_policy_not_exists(monkeypatch):
+    mod = _load()
+
+    class Mod(BaseFakeModule):
+        params = _audit_params(state='disabled')
+
+    conn = _AuditConn(Mod(), policy_rows=[], enabled_rows=[])
+    monkeypatch.setattr(mod, 'AnsibleModule', Mod)
+    monkeypatch.setattr(mod, 'oracleConnection', lambda m: conn, raising=False)
+
+    with pytest.raises(FailJson) as exc:
+        mod.main()
+    result = exc.value.args[0]
+    assert result['changed'] is False
+    assert 'does not exist' in result['msg']
+    assert 'cannot disable' in result['msg']
+
+
+def test_audit_reject_invalid_policy_name(monkeypatch):
+    mod = _load()
+
+    class Mod(BaseFakeModule):
+        params = _audit_params(state='status', policy_name='X; INJECTION')
+
+    conn = _AuditConn(Mod(), policy_rows=[], enabled_rows=[])
+    monkeypatch.setattr(mod, 'AnsibleModule', Mod)
+    monkeypatch.setattr(mod, 'oracleConnection', lambda m: conn, raising=False)
+
+    with pytest.raises(FailJson) as exc:
+        mod.main()
+    msg = exc.value.args[0]['msg'].lower()
+    assert 'identifier' in msg
+
+
+def test_audit_reject_clause_sql_metacharacters(monkeypatch):
+    mod = _load()
+
+    class Mod(BaseFakeModule):
+        params = _audit_params(
+            state='present',
+            audit_privileges=["CREATE TABLE; DROP USER X --"],
+        )
+
+    conn = _AuditConn(Mod(), policy_rows=[], enabled_rows=[])
+    monkeypatch.setattr(mod, 'AnsibleModule', Mod)
+    monkeypatch.setattr(mod, 'oracleConnection', lambda m: conn, raising=False)
+
+    with pytest.raises(FailJson) as exc:
+        mod.main()
+    assert 'audit_privileges' in exc.value.args[0]['msg'].lower()

@@ -1,5 +1,6 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
+import re
 
 DOCUMENTATION = '''
 ---
@@ -160,6 +161,82 @@ EXAMPLES = '''
     state: status
   register: audit_info
 '''
+
+# Unquoted Oracle identifiers: letter/$/#/_, then alphanumerics / _ / $ / #, max 128 chars.
+_ORACLE_UNQUOTED_IDENT_RE = re.compile(r'^[A-Za-z#$][A-Za-z0-9_$#]{0,127}$')
+
+
+def _fail_invalid_identifier(module, label, value):
+    module.fail_json(
+        msg='%s must be a valid Oracle non-quoted identifier (letters, digits, _, $, #; '
+            'max 128 characters): %r' % (label, value),
+        changed=False,
+    )
+
+
+def validate_policy_name(module, policy_name):
+    """Ensure policy_name is safe to embed in DDL as an identifier."""
+    if policy_name is None or not str(policy_name).strip():
+        _fail_invalid_identifier(module, 'policy_name', policy_name)
+    name = str(policy_name).strip()
+    if not _ORACLE_UNQUOTED_IDENT_RE.match(name):
+        _fail_invalid_identifier(module, 'policy_name', policy_name)
+    return name
+
+
+def validate_user_identifiers(module, users, label):
+    """Validate each entry in enabled_users / enabled_except_users (plus ALL)."""
+    if not users:
+        return
+    for u in users:
+        if u is None or not str(u).strip():
+            module.fail_json(msg='%s entries must be non-empty strings' % label, changed=False)
+        s = str(u).strip()
+        if s.upper() == 'ALL':
+            continue
+        if not _ORACLE_UNQUOTED_IDENT_RE.match(s):
+            _fail_invalid_identifier(module, label, u)
+
+
+def _validate_audit_clause_item(module, param_label, item):
+    """
+    Audit ACTIONS/PRIVILEGES/ROLES fragments are not single identifiers (e.g. CREATE TABLE,
+    SELECT ON hr.employees). Reject SQL metacharacters that could alter the statement.
+    """
+    if item is None or not str(item).strip():
+        module.fail_json(
+            msg='%s entries must be non-empty strings' % param_label,
+            changed=False,
+        )
+    s = str(item).strip()
+    if len(s) > 4000:
+        module.fail_json(msg='%s entry exceeds maximum length (4000)' % param_label, changed=False)
+    if any(ch in s for ch in ';\'\"'):
+        module.fail_json(
+            msg='%s must not contain semicolon or quote characters: %r' % (param_label, item),
+            changed=False,
+        )
+    if '\n' in s or '\r' in s:
+        module.fail_json(msg='%s must be a single line: %r' % (param_label, item), changed=False)
+    if '--' in s or '/*' in s or '*/' in s:
+        module.fail_json(
+            msg='%s must not contain SQL comment markers (--, /*, */): %r' % (param_label, item),
+            changed=False,
+        )
+    return s
+
+
+def validate_audit_clause_lists(module):
+    """Validate audit_actions, audit_privileges, audit_roles when building CREATE AUDIT POLICY."""
+    for param, label in (
+        ('audit_actions', 'audit_actions'),
+        ('audit_privileges', 'audit_privileges'),
+        ('audit_roles', 'audit_roles'),
+    ):
+        items = module.params.get(param) or []
+        if not items:
+            continue
+        module.params[param] = [_validate_audit_clause_item(module, label, x) for x in items]
 
 
 def get_policy(conn, policy_name):
@@ -365,9 +442,16 @@ def main():
         supports_check_mode=True,
     )
     sanitize_string_params(module.params)
+    module.params['policy_name'] = validate_policy_name(module, module.params['policy_name'])
 
     state = module.params["state"]
     policy_name = module.params["policy_name"]
+    if state == 'present':
+        validate_audit_clause_lists(module)
+    if state == 'enabled':
+        validate_user_identifiers(module, module.params['enabled_users'], 'enabled_users')
+        validate_user_identifiers(module, module.params['enabled_except_users'], 'enabled_except_users')
+
     conn = oracleConnection(module)
 
     if state == 'status':
@@ -424,6 +508,11 @@ def main():
         )
 
     elif state == 'disabled':
+        if not policy_exists(conn, policy_name):
+            module.fail_json(
+                msg='Policy %s does not exist; cannot disable' % policy_name,
+                changed=False,
+            )
         if not policy_is_enabled(conn, policy_name):
             module.exit_json(changed=False, msg='Policy already disabled')
         disable_policy(conn, module)
@@ -433,15 +522,18 @@ def main():
         )
 
 
-from ansible.module_utils.basic import *  # noqa: F403
+from ansible.module_utils.basic import AnsibleModule
 
 try:
     from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_utils import (  # noqa: E501
-        oracleConnection, sanitize_string_params,
+        oracleConnection,
+        sanitize_string_params,
     )
-except ImportError:
-    def sanitize_string_params(_params):
-        pass
+except ImportError as _oracle_audit_import_err:  # pragma: no cover
+    raise ImportError(
+        'oracle_audit requires ansible_collections.ibre5041.ansible_oracle_modules '
+        'plugins.module_utils.oracle_utils (install the collection and invoke the module by FQCN).'
+    ) from _oracle_audit_import_err
 
 if __name__ == '__main__':
     main()
