@@ -192,6 +192,79 @@ def policy_is_enabled(conn, policy_name):
     return bool(rows)
 
 
+def _audit_ident(s):
+    """Normalize an Oracle identifier string from the catalog or task params."""
+    if s is None:
+        return ''
+    return str(s).strip().upper()
+
+
+def _sql_single_quoted_literal(value):
+    """Escape *value* for use inside a single-quoted Oracle SQL string literal."""
+    if value is None:
+        return ''
+    return str(value).replace("'", "''")
+
+
+def desired_enable_scope(enabled_users, enabled_except_users):
+    """Return scope tuple: ('all', frozenset()) | ('by', frozenset(names)) | ('except', frozenset(names))."""
+    eu = enabled_users or []
+    ee = enabled_except_users or []
+    if ee:
+        names = frozenset(_audit_ident(x) for x in ee if _audit_ident(x))
+        return ('except', names)
+    if not eu:
+        return ('all', frozenset())
+    names = frozenset(_audit_ident(x) for x in eu if _audit_ident(x))
+    if not names or names == frozenset(['ALL']):
+        return ('all', frozenset())
+    return ('by', names)
+
+
+def actual_enable_scope_user_rows(user_rows):
+    """Derive scope from AUDIT_UNIFIED_ENABLED_POLICIES rows with ENTITY_TYPE = USER."""
+    if not user_rows:
+        return None
+    opts = frozenset(_audit_ident(r.get('enabled_option')) for r in user_rows)
+    entities = [_audit_ident(r.get('entity_name')) for r in user_rows]
+    entities = [e for e in entities if e]
+
+    if not entities:
+        return None
+
+    if len(user_rows) == 1 and entities[0] == 'ALL USERS':
+        return ('all', frozenset())
+
+    if any(e == 'ALL USERS' for e in entities):
+        if all(e == 'ALL USERS' for e in entities):
+            return ('all', frozenset())
+        return None
+
+    if 'EXCEPT USER' in opts:
+        if opts != frozenset(['EXCEPT USER']):
+            return None
+        return ('except', frozenset(entities))
+
+    if 'BY USER' in opts:
+        if opts != frozenset(['BY USER']):
+            return None
+        return ('by', frozenset(entities))
+
+    return None
+
+
+def enable_scope_matches(desired, all_enabled_rows):
+    """True if the policy is already enabled exactly for the requested user scope."""
+    user_rows = [
+        r for r in all_enabled_rows
+        if _audit_ident(r.get('entity_type')) == 'USER'
+    ]
+    actual = actual_enable_scope_user_rows(user_rows)
+    if actual is None:
+        return False
+    return desired == actual
+
+
 def create_policy(conn, module):
     """Create a Unified Audit policy."""
     policy_name = module.params["policy_name"]
@@ -222,7 +295,7 @@ def create_policy(conn, module):
     sql = 'CREATE AUDIT POLICY %s %s' % (policy_name, ' '.join(clauses))
 
     if audit_condition:
-        sql += " CONDITION '%s'" % audit_condition
+        sql += " CONDITION '%s'" % _sql_single_quoted_literal(audit_condition)
         if evaluate_per:
             sql += ' EVALUATE PER %s' % evaluate_per.upper()
 
@@ -332,8 +405,18 @@ def main():
     elif state == 'enabled':
         if not policy_exists(conn, policy_name):
             module.fail_json(msg='Policy %s does not exist' % policy_name, changed=False)
-        if policy_is_enabled(conn, policy_name):
-            module.exit_json(changed=False, msg='Policy already enabled')
+        enabled_rows = get_policy_enabled(conn, policy_name)
+        desired = desired_enable_scope(
+            module.params['enabled_users'],
+            module.params['enabled_except_users'],
+        )
+        if enabled_rows and enable_scope_matches(desired, enabled_rows):
+            module.exit_json(
+                changed=False,
+                msg='Policy already enabled with requested scope',
+            )
+        if enabled_rows:
+            disable_policy(conn, module)
         enable_policy(conn, module)
         module.exit_json(
             changed=conn.changed, ddls=conn.ddls,

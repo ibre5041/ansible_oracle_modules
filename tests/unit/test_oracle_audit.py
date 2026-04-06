@@ -212,7 +212,29 @@ def test_audit_create_combined(monkeypatch):
     assert 'PRIVILEGES CREATE TABLE' in ddl
     assert 'ACTIONS SELECT' in ddl
     assert 'CONDITION' in ddl
+    # Inner single quotes must be doubled for valid Oracle syntax
+    assert "SYS_CONTEXT(''USERENV'',''IP_ADDRESS'') != ''10.0.0.1''" in ddl
     assert 'EVALUATE PER SESSION' in ddl
+
+
+def test_audit_create_condition_escapes_single_quotes(monkeypatch):
+    mod = _load()
+
+    class Mod(BaseFakeModule):
+        params = _audit_params(
+            state='present',
+            audit_privileges=['CREATE TABLE'],
+            audit_condition="FOO = 'bar'",
+        )
+
+    conn = _AuditConn(Mod(), policy_rows=[], enabled_rows=[])
+    monkeypatch.setattr(mod, 'AnsibleModule', Mod)
+    monkeypatch.setattr(mod, 'oracleConnection', lambda m: conn, raising=False)
+
+    with pytest.raises(ExitJson):
+        mod.main()
+    ddl = conn.ddls[0]
+    assert "CONDITION 'FOO = ''bar'''" in ddl
 
 
 def test_audit_create_idempotent(monkeypatch):
@@ -408,6 +430,128 @@ def test_audit_enable_idempotent(monkeypatch):
     assert result['changed'] is False
     assert 'already enabled' in result['msg']
     assert conn.ddls == []
+
+
+def test_audit_enable_idempotent_by_users_order(monkeypatch):
+    """Same BY set in different order must be idempotent (set comparison)."""
+    mod = _load()
+
+    class Mod(BaseFakeModule):
+        params = _audit_params(state='enabled', enabled_users=['HR', 'SCOTT'])
+
+    enabled = [
+        {
+            'policy_name': 'TEST_AUDIT_POL',
+            'enabled_option': 'BY USER',
+            'entity_name': 'SCOTT',
+            'entity_type': 'USER',
+            'success': 'YES',
+            'failure': 'YES',
+        },
+        {
+            'policy_name': 'TEST_AUDIT_POL',
+            'enabled_option': 'BY USER',
+            'entity_name': 'HR',
+            'entity_type': 'USER',
+            'success': 'YES',
+            'failure': 'YES',
+        },
+    ]
+    conn = _AuditConn(Mod(), policy_rows=[_POLICY_ROW], enabled_rows=enabled)
+    monkeypatch.setattr(mod, 'AnsibleModule', Mod)
+    monkeypatch.setattr(mod, 'oracleConnection', lambda m: conn, raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    result = exc.value.args[0]
+    assert result['changed'] is False
+    assert conn.ddls == []
+
+
+def test_audit_enable_scope_mismatch_all_to_by(monkeypatch):
+    """Enabled for all users but task requests BY must re-apply (NOAUDIT then AUDIT)."""
+    mod = _load()
+
+    class Mod(BaseFakeModule):
+        params = _audit_params(state='enabled', enabled_users=['HR'])
+
+    conn = _AuditConn(Mod(), policy_rows=[_POLICY_ROW], enabled_rows=[_ENABLED_ROW])
+    monkeypatch.setattr(mod, 'AnsibleModule', Mod)
+    monkeypatch.setattr(mod, 'oracleConnection', lambda m: conn, raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    result = exc.value.args[0]
+    assert result['changed'] is True
+    assert len(conn.ddls) == 2
+    assert 'NOAUDIT POLICY' in conn.ddls[0]
+    assert 'AUDIT POLICY' in conn.ddls[1]
+    assert 'BY HR' in conn.ddls[1]
+
+
+def test_audit_enable_idempotent_except(monkeypatch):
+    mod = _load()
+
+    class Mod(BaseFakeModule):
+        params = _audit_params(state='enabled', enabled_except_users=['SYS', 'SYSTEM'])
+
+    enabled = [
+        {
+            'policy_name': 'TEST_AUDIT_POL',
+            'enabled_option': 'EXCEPT USER',
+            'entity_name': 'SYSTEM',
+            'entity_type': 'USER',
+            'success': 'YES',
+            'failure': 'YES',
+        },
+        {
+            'policy_name': 'TEST_AUDIT_POL',
+            'enabled_option': 'EXCEPT USER',
+            'entity_name': 'SYS',
+            'entity_type': 'USER',
+            'success': 'YES',
+            'failure': 'YES',
+        },
+    ]
+    conn = _AuditConn(Mod(), policy_rows=[_POLICY_ROW], enabled_rows=enabled)
+    monkeypatch.setattr(mod, 'AnsibleModule', Mod)
+    monkeypatch.setattr(mod, 'oracleConnection', lambda m: conn, raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    result = exc.value.args[0]
+    assert result['changed'] is False
+    assert conn.ddls == []
+
+
+def test_audit_enable_scope_mismatch_by_to_all(monkeypatch):
+    """Enabled BY specific users but task requests all users must re-apply."""
+    mod = _load()
+
+    by_hr = {
+        'policy_name': 'TEST_AUDIT_POL',
+        'enabled_option': 'BY USER',
+        'entity_name': 'HR',
+        'entity_type': 'USER',
+        'success': 'YES',
+        'failure': 'YES',
+    }
+
+    class Mod(BaseFakeModule):
+        params = _audit_params(state='enabled')
+
+    conn = _AuditConn(Mod(), policy_rows=[_POLICY_ROW], enabled_rows=[by_hr])
+    monkeypatch.setattr(mod, 'AnsibleModule', Mod)
+    monkeypatch.setattr(mod, 'oracleConnection', lambda m: conn, raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    result = exc.value.args[0]
+    assert result['changed'] is True
+    assert len(conn.ddls) == 2
+    assert 'NOAUDIT POLICY' in conn.ddls[0]
+    assert conn.ddls[1].startswith('AUDIT POLICY')
+    assert 'BY' not in conn.ddls[1]
 
 
 def test_audit_enable_not_exists(monkeypatch):
