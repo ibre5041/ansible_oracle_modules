@@ -14,7 +14,6 @@ def _acl_params(**overrides):
     base = {
         **BASE_CONN_PARAMS,
         "state": "present",
-        "acl_name": "test_acl",
         "host": "dbserver.example.com",
         "lower_port": None,
         "upper_port": None,
@@ -32,9 +31,15 @@ class _AclConn(BaseFakeConn):
     def __init__(self, module, ace_rows=None):
         super().__init__(module)
         self._ace_rows = ace_rows if ace_rows is not None else []
+        self.ddl_binds = []
 
     def execute_select_to_dict(self, sql, params=None, fetchone=False, fail_on_error=True):
         return self._ace_rows
+
+    def execute_ddl(self, sql, params=None, ignore_errors=None):
+        self.ddls.append(sql)
+        self.ddl_binds.append(dict(params) if params else {})
+        self.changed = True
 
 
 # ---------------------------------------------------------------------------
@@ -121,11 +126,18 @@ def test_acl_create_ace(monkeypatch):
     assert 'ACE created' in result['msg']
     assert len(conn.ddls) == 1
     ddl = conn.ddls[0]
+    binds = conn.ddl_binds[0]
     assert 'DBMS_NETWORK_ACL_ADMIN.APPEND_HOST_ACE' in ddl
-    assert "host => 'dbserver.example.com'" in ddl
-    assert "xs$name_list('connect')" in ddl
-    assert "principal_name => 'HR'" in ddl
-    assert 'is_grant => TRUE' in ddl
+    assert 'host => :host' in ddl
+    assert 'xs$name_list(:privilege)' in ddl
+    assert 'principal_name => :principal' in ddl
+    assert 'is_grant => :is_grant' in ddl
+    assert binds['host'] == 'dbserver.example.com'
+    assert binds['privilege'] == 'connect'
+    assert binds['principal'] == 'HR'
+    assert binds['is_grant'] is True
+    assert binds['lower_port'] is None
+    assert binds['upper_port'] is None
 
 
 def test_acl_create_ace_with_ports(monkeypatch):
@@ -144,9 +156,12 @@ def test_acl_create_ace_with_ports(monkeypatch):
     result = exc.value.args[0]
     assert result['changed'] is True
     ddl = conn.ddls[0]
+    binds = conn.ddl_binds[0]
     assert 'DBMS_NETWORK_ACL_ADMIN.APPEND_HOST_ACE' in ddl
-    assert 'lower_port => 25' in ddl
-    assert 'upper_port => 25' in ddl
+    assert 'lower_port => :lower_port' in ddl
+    assert 'upper_port => :upper_port' in ddl
+    assert binds['lower_port'] == 25
+    assert binds['upper_port'] == 25
 
 
 def test_acl_create_ace_deny(monkeypatch):
@@ -166,7 +181,8 @@ def test_acl_create_ace_deny(monkeypatch):
     assert result['changed'] is True
     ddl = conn.ddls[0]
     assert 'DBMS_NETWORK_ACL_ADMIN.APPEND_HOST_ACE' in ddl
-    assert 'is_grant => FALSE' in ddl
+    assert 'is_grant => :is_grant' in ddl
+    assert conn.ddl_binds[0]['is_grant'] is False
 
 
 def test_acl_create_ace_resolve(monkeypatch):
@@ -186,7 +202,8 @@ def test_acl_create_ace_resolve(monkeypatch):
     assert result['changed'] is True
     ddl = conn.ddls[0]
     assert 'DBMS_NETWORK_ACL_ADMIN.APPEND_HOST_ACE' in ddl
-    assert "xs$name_list('resolve')" in ddl
+    assert 'xs$name_list(:privilege)' in ddl
+    assert conn.ddl_binds[0]['privilege'] == 'resolve'
 
 
 def test_acl_create_idempotent(monkeypatch):
@@ -205,6 +222,135 @@ def test_acl_create_idempotent(monkeypatch):
     result = exc.value.args[0]
     assert result['changed'] is False
     assert 'already exists' in result['msg']
+    assert conn.ddls == []
+
+
+def test_acl_create_when_grant_exists_but_deny_requested(monkeypatch):
+    """state=present with is_grant=False is not idempotent on a GRANT-only row."""
+    mod = _load()
+
+    class Mod(BaseFakeModule):
+        params = _acl_params(state='present', is_grant=False)
+
+    conn = _AclConn(Mod(), ace_rows=[_ACE_ROW])
+    monkeypatch.setattr(mod, 'AnsibleModule', Mod)
+    monkeypatch.setattr(mod, 'oracleConnection', lambda m: conn, raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    result = exc.value.args[0]
+    assert result['changed'] is True
+    assert 'ACE created' in result['msg']
+    assert conn.ddl_binds[0]['is_grant'] is False
+
+
+def test_acl_create_idempotent_deny(monkeypatch):
+    """state=present with is_grant=False matches DENY grant_type from DBA_HOST_ACES."""
+    mod = _load()
+
+    deny_row = {**_ACE_ROW, 'grant_type': 'DENY'}
+
+    class Mod(BaseFakeModule):
+        params = _acl_params(state='present', is_grant=False)
+
+    conn = _AclConn(Mod(), ace_rows=[deny_row])
+    monkeypatch.setattr(mod, 'AnsibleModule', Mod)
+    monkeypatch.setattr(mod, 'oracleConnection', lambda m: conn, raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    result = exc.value.args[0]
+    assert result['changed'] is False
+    assert 'already exists' in result['msg']
+    assert conn.ddls == []
+
+
+# ===========================================================================
+# Tests: check mode (no DDL via create_ace / remove_ace)
+# ===========================================================================
+
+def test_acl_present_check_mode_would_create(monkeypatch):
+    """state=present in check mode reports planned APPEND_HOST_ACE without execute_ddl."""
+    mod = _load()
+
+    class Mod(BaseFakeModule):
+        params = _acl_params(state='present')
+        check_mode = True
+
+    conn = _AclConn(Mod(), ace_rows=[])
+    monkeypatch.setattr(mod, 'AnsibleModule', Mod)
+    monkeypatch.setattr(mod, 'oracleConnection', lambda m: conn, raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    result = exc.value.args[0]
+    assert result['changed'] is True
+    assert 'check mode' in result['msg']
+    assert conn.ddls == []
+    assert len(result['ddls']) == 1
+    assert result['ddls'][0].startswith('--')
+    assert 'DBMS_NETWORK_ACL_ADMIN.APPEND_HOST_ACE' in result['ddls'][0]
+
+
+def test_acl_present_check_mode_idempotent(monkeypatch):
+    """state=present in check mode is unchanged when ACE already exists."""
+    mod = _load()
+
+    class Mod(BaseFakeModule):
+        params = _acl_params(state='present')
+        check_mode = True
+
+    conn = _AclConn(Mod(), ace_rows=[_ACE_ROW])
+    monkeypatch.setattr(mod, 'AnsibleModule', Mod)
+    monkeypatch.setattr(mod, 'oracleConnection', lambda m: conn, raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    result = exc.value.args[0]
+    assert result['changed'] is False
+    assert 'already exists' in result['msg']
+    assert conn.ddls == []
+
+
+def test_acl_absent_check_mode_would_remove(monkeypatch):
+    """state=absent in check mode reports planned REMOVE_HOST_ACE without execute_ddl."""
+    mod = _load()
+
+    class Mod(BaseFakeModule):
+        params = _acl_params(state='absent')
+        check_mode = True
+
+    conn = _AclConn(Mod(), ace_rows=[_ACE_ROW])
+    monkeypatch.setattr(mod, 'AnsibleModule', Mod)
+    monkeypatch.setattr(mod, 'oracleConnection', lambda m: conn, raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    result = exc.value.args[0]
+    assert result['changed'] is True
+    assert 'check mode' in result['msg']
+    assert conn.ddls == []
+    assert result['ddls'][0].startswith('--')
+    assert 'DBMS_NETWORK_ACL_ADMIN.REMOVE_HOST_ACE' in result['ddls'][0]
+
+
+def test_acl_absent_check_mode_idempotent(monkeypatch):
+    """state=absent in check mode is unchanged when ACE does not exist."""
+    mod = _load()
+
+    class Mod(BaseFakeModule):
+        params = _acl_params(state='absent')
+        check_mode = True
+
+    conn = _AclConn(Mod(), ace_rows=[])
+    monkeypatch.setattr(mod, 'AnsibleModule', Mod)
+    monkeypatch.setattr(mod, 'oracleConnection', lambda m: conn, raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    result = exc.value.args[0]
+    assert result['changed'] is False
+    assert 'does not exist' in result['msg']
     assert conn.ddls == []
 
 
@@ -230,10 +376,14 @@ def test_acl_remove_ace(monkeypatch):
     assert 'ACE removed' in result['msg']
     assert len(conn.ddls) == 1
     ddl = conn.ddls[0]
+    binds = conn.ddl_binds[0]
     assert 'DBMS_NETWORK_ACL_ADMIN.REMOVE_HOST_ACE' in ddl
-    assert "host => 'dbserver.example.com'" in ddl
-    assert "xs$name_list('connect')" in ddl
-    assert "principal_name => 'HR'" in ddl
+    assert 'host => :host' in ddl
+    assert 'xs$name_list(:privilege)' in ddl
+    assert 'principal_name => :principal' in ddl
+    assert binds['host'] == 'dbserver.example.com'
+    assert binds['privilege'] == 'connect'
+    assert binds['principal'] == 'HR'
 
 
 def test_acl_remove_ace_with_ports(monkeypatch):
@@ -254,9 +404,12 @@ def test_acl_remove_ace_with_ports(monkeypatch):
     result = exc.value.args[0]
     assert result['changed'] is True
     ddl = conn.ddls[0]
+    binds = conn.ddl_binds[0]
     assert 'DBMS_NETWORK_ACL_ADMIN.REMOVE_HOST_ACE' in ddl
-    assert 'lower_port => 25' in ddl
-    assert 'upper_port => 25' in ddl
+    assert 'lower_port => :lower_port' in ddl
+    assert 'upper_port => :upper_port' in ddl
+    assert binds['lower_port'] == 25
+    assert binds['upper_port'] == 25
 
 
 def test_acl_remove_idempotent(monkeypatch):

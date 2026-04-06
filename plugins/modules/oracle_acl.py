@@ -16,9 +16,6 @@ options:
     description: The intended state of the ACL entry
     default: present
     choices: ['present', 'absent', 'status']
-  acl_name:
-    description: Name of the ACL
-    required: true
   host:
     description:
       - Network host or wildcard pattern
@@ -56,7 +53,6 @@ EXAMPLES = '''
 - name: Grant connect privilege for a host
   oracle_acl:
     mode: sysdba
-    acl_name: my_acl
     host: "*.example.com"
     principal: APP_USER
     privilege: connect
@@ -65,7 +61,6 @@ EXAMPLES = '''
 - name: Grant connect privilege with port range
   oracle_acl:
     mode: sysdba
-    acl_name: smtp_acl
     host: mail.example.com
     lower_port: 25
     upper_port: 25
@@ -76,7 +71,6 @@ EXAMPLES = '''
 - name: Deny connect privilege for a host
   oracle_acl:
     mode: sysdba
-    acl_name: deny_acl
     host: "10.0.0.0/24"
     principal: UNTRUSTED_USER
     privilege: connect
@@ -86,7 +80,6 @@ EXAMPLES = '''
 - name: Remove a specific ACE
   oracle_acl:
     mode: sysdba
-    acl_name: my_acl
     host: "*.example.com"
     principal: APP_USER
     privilege: connect
@@ -95,7 +88,6 @@ EXAMPLES = '''
 - name: Get ACL status for a host
   oracle_acl:
     mode: sysdba
-    acl_name: my_acl
     host: "*.example.com"
     state: status
   register: acl_info
@@ -103,7 +95,6 @@ EXAMPLES = '''
 - name: Get all ACL entries
   oracle_acl:
     mode: sysdba
-    acl_name: all_acls
     state: status
   register: all_acl_info
 '''
@@ -130,72 +121,90 @@ def ace_exists(conn, module):
     host = module.params["host"]
     principal = module.params["principal"]
     privilege = module.params["privilege"]
+    is_grant = module.params["is_grant"]
+    desired_grant_type = 'GRANT' if is_grant else 'DENY'
     rows = get_acl(conn, host, module.params["lower_port"],
                    module.params["upper_port"])
     for row in rows:
+        row_grant_type = str(row.get('grant_type', '')).strip().upper()
         if (row.get('principal', '').upper() == principal.upper()
-                and row.get('privilege', '').upper() == privilege.upper()):
+                and row.get('privilege', '').upper() == privilege.upper()
+                and row_grant_type == desired_grant_type):
             return True
     return False
 
 
-def create_ace(conn, module):
-    """Add a network ACL entry using DBMS_NETWORK_ACL_ADMIN.APPEND_HOST_ACE."""
+def _append_host_ace_sql_params(module):
+    """Return PL/SQL and binds for APPEND_HOST_ACE."""
     host = module.params["host"]
     lower_port = module.params["lower_port"]
     upper_port = module.params["upper_port"]
     principal = module.params["principal"]
     privilege = module.params["privilege"]
     is_grant = module.params["is_grant"]
-
-    grant_type = 'TRUE' if is_grant else 'FALSE'
-
-    # Build port parameters
-    port_clause = ''
-    if lower_port is not None:
-        port_clause += ', lower_port => %d' % lower_port
-    if upper_port is not None:
-        port_clause += ', upper_port => %d' % upper_port
-
     sql = """BEGIN
   DBMS_NETWORK_ACL_ADMIN.APPEND_HOST_ACE(
-    host => '%s'%s,
+    host => :host,
+    lower_port => :lower_port,
+    upper_port => :upper_port,
     ace => xs$ace_type(
-      privilege_list => xs$name_list('%s'),
-      principal_name => '%s',
+      privilege_list => xs$name_list(:privilege),
+      principal_name => :principal,
       principal_type => xs_acl.ptype_db,
-      is_grant => %s
+      is_grant => :is_grant
     )
   );
-END;""" % (host, port_clause, privilege, principal, grant_type)
+END;"""
+    params = {
+        "host": host,
+        "lower_port": lower_port,
+        "upper_port": upper_port,
+        "privilege": privilege,
+        "principal": principal,
+        "is_grant": is_grant,
+    }
+    return sql, params
 
-    conn.execute_ddl(sql)
+
+def _remove_host_ace_sql_params(module):
+    """Return PL/SQL and binds for REMOVE_HOST_ACE."""
+    host = module.params["host"]
+    lower_port = module.params["lower_port"]
+    upper_port = module.params["upper_port"]
+    privilege = module.params["privilege"]
+    principal = module.params["principal"]
+    sql = """BEGIN
+  DBMS_NETWORK_ACL_ADMIN.REMOVE_HOST_ACE(
+    host => :host,
+    lower_port => :lower_port,
+    upper_port => :upper_port,
+    ace => xs$ace_type(
+      privilege_list => xs$name_list(:privilege),
+      principal_name => :principal,
+      principal_type => xs_acl.ptype_db
+    )
+  );
+END;"""
+    params = {
+        "host": host,
+        "lower_port": lower_port,
+        "upper_port": upper_port,
+        "privilege": privilege,
+        "principal": principal,
+    }
+    return sql, params
+
+
+def create_ace(conn, module):
+    """Add a network ACL entry using DBMS_NETWORK_ACL_ADMIN.APPEND_HOST_ACE."""
+    sql, params = _append_host_ace_sql_params(module)
+    conn.execute_ddl(sql, params=params)
 
 
 def remove_ace(conn, module):
     """Remove network ACL entries for a host."""
-    host = module.params["host"]
-    lower_port = module.params["lower_port"]
-    upper_port = module.params["upper_port"]
-
-    port_clause = ''
-    if lower_port is not None:
-        port_clause += ', lower_port => %d' % lower_port
-    if upper_port is not None:
-        port_clause += ', upper_port => %d' % upper_port
-
-    sql = """BEGIN
-  DBMS_NETWORK_ACL_ADMIN.REMOVE_HOST_ACE(
-    host => '%s'%s,
-    ace => xs$ace_type(
-      privilege_list => xs$name_list('%s'),
-      principal_name => '%s',
-      principal_type => xs_acl.ptype_db
-    )
-  );
-END;""" % (host, port_clause, module.params["privilege"], module.params["principal"])
-
-    conn.execute_ddl(sql)
+    sql, params = _remove_host_ace_sql_params(module)
+    conn.execute_ddl(sql, params=params)
 
 
 def main():
@@ -212,7 +221,6 @@ def main():
             session_container=dict(required=False),
 
             state=dict(default='present', choices=['present', 'absent', 'status']),
-            acl_name=dict(required=True),
             host=dict(required=False),
             lower_port=dict(required=False, type='int'),
             upper_port=dict(required=False, type='int'),
@@ -246,12 +254,26 @@ def main():
     elif state == 'present':
         if ace_exists(conn, module):
             module.exit_json(changed=False, msg='ACE already exists')
+        if module.check_mode:
+            sql, _ = _append_host_ace_sql_params(module)
+            module.exit_json(
+                changed=True,
+                ddls=['--' + sql],
+                msg='ACE would be created (check mode)',
+            )
         create_ace(conn, module)
         module.exit_json(changed=conn.changed, ddls=conn.ddls, msg='ACE created')
 
     elif state == 'absent':
         if not ace_exists(conn, module):
             module.exit_json(changed=False, msg='ACE does not exist')
+        if module.check_mode:
+            sql, _ = _remove_host_ace_sql_params(module)
+            module.exit_json(
+                changed=True,
+                ddls=['--' + sql],
+                msg='ACE would be removed (check mode)',
+            )
         remove_ace(conn, module)
         module.exit_json(changed=conn.changed, ddls=conn.ddls, msg='ACE removed')
 
