@@ -130,9 +130,15 @@ class _GiRunningDb(FakeOracleHomes):
         self.facts_item = {
             "TESTDB": {
                 "running": True,
-                "crsname": "TESTDB",
+                "crsname": "ora.testdb.db",
+                "DB_UNIQUE_NAME": "TESTDB_AT_LOC1",
                 "ORACLE_HOME": "/fake/oracle",
+                "ORACLE_SID": "TESTDB",
                 "israc": False,
+                "status": [
+                    "OPEN",
+                    "READ WRITE"
+                ]
             }
         }
 
