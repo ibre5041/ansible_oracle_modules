@@ -16,7 +16,7 @@ options:
     description: The schema that should get grant added/removed
     required: false
     default: null
-  grant:
+  grants:
     description: The privileges granted to the new schema. Can be a string or a list
     required: false
     default: null
@@ -376,7 +376,7 @@ def main():
 
             grantee       = dict(required=True, type='str', aliases=['name', 'schema_name', 'role', 'role_name']),
 
-            grants        = dict(default=None, type="list", aliases=['privileges']),
+            grants        = dict(default=None, type="list", aliases=['privileges', 'grant']),
             object_privs  = dict(default=None, type="list", aliases=['objprivs', 'objects_privileges']),
             directory_privs = dict(default=None, type="list", aliases=['dirprivs', 'directory_privileges']),
             grant_mode    = dict(default="append", choices=["append", "exact"], aliases=['privs_mode']),

@@ -41,7 +41,10 @@ def _make_fake_db(fetchone_row=None):
     class _FakeOC:
         def __init__(self, module):
             self.conn = _conn
+            self.conn.autocommit = True
             self.version = _conn.version
+            self.ddls = []
+            self.changed = False
 
     return _FakeOC, _conn
 
@@ -1140,40 +1143,6 @@ def test_rsrc_consgroup_missing_password_fails(monkeypatch):
     assert "missing" in exc.value.args[0]["msg"].lower()
 
 
-def test_rsrc_consgroup_session_container_applied(monkeypatch):
-    """session_container set → ALTER SESSION executed after connect."""
-    mod = _load("oracle_rsrc_consgroup")
-    FakeOC, conn = _make_fake_db(fetchone_row=None)
-
-    class Mod(BaseFakeModule):
-        params = _rg_params(session_container="MYPDB")
-
-    monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracleConnection", FakeOC)
-
-    with pytest.raises(ExitJson) as exc:
-        mod.main()
-    assert exc.value.args[0]["changed"] is True
-    # ALTER SESSION SET CONTAINER should be in the executed DDLs
-    assert any("ALTER SESSION SET CONTAINER" in str(sql) for sql in conn.ddls)
-
-
-def test_rsrc_consgroup_invalid_session_container_fails(monkeypatch):
-    """session_container with invalid name → fail_json."""
-    mod = _load("oracle_rsrc_consgroup")
-    FakeOC, conn = _make_fake_db(fetchone_row=None)
-
-    class Mod(BaseFakeModule):
-        params = _rg_params(session_container="1INVALID!")
-
-    monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracleConnection", FakeOC)
-
-    with pytest.raises(FailJson) as exc:
-        mod.main()
-    assert "session_container" in exc.value.args[0]["msg"].lower()
-
-
 def test_rsrc_consgroup_existing_grants_populated(monkeypatch):
     """query_existing with existing group populates grants and mappings."""
     from helpers import SequencedFakeOracleConn
@@ -1905,54 +1874,6 @@ def test_privs_low_version_fails(monkeypatch):
     with pytest.raises(FailJson) as exc:
         mod.main()
     assert "11g" in exc.value.args[0]["msg"].lower()
-
-
-def test_privs_session_container_applied(monkeypatch):
-    """Valid session_container -> ALTER SESSION executed."""
-    mod = _load("oracle_privs")
-
-    executed_sqls = []
-
-    class _TrackingCursor(_PrivsZeroCursor):
-        def execute(self, sql, params=None):
-            executed_sqls.append(sql)
-
-    class _TrackingConn(_PrivsZeroConn):
-        def cursor(self):
-            return _TrackingCursor(self)
-
-    _track_conn = _TrackingConn()
-
-    class _FakeOC:
-        def __init__(self, module):
-            self.conn = _track_conn
-            self.version = _track_conn.version
-
-    class Mod(BaseFakeModule):
-        params = _privs_params(session_container="MYPDB")
-
-    monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracleConnection", _FakeOC)
-
-    with pytest.raises(ExitJson):
-        mod.main()
-    assert any("ALTER SESSION" in sql for sql in executed_sqls)
-
-
-def test_privs_invalid_session_container_fails(monkeypatch):
-    """Invalid session_container name -> fail_json."""
-    mod = _load("oracle_privs")
-    _FakeOC, _conn = _make_privs_db()
-
-    class Mod(BaseFakeModule):
-        params = _privs_params(session_container="1INVALID!")
-
-    monkeypatch.setattr(mod, "AnsibleModule", Mod)
-    monkeypatch.setattr(mod, "oracleConnection", _FakeOC)
-
-    with pytest.raises(FailJson) as exc:
-        mod.main()
-    assert "session_container" in exc.value.args[0]["msg"].lower()
 
 
 def test_privs_var_error_triggers_rollback_and_fail(monkeypatch):

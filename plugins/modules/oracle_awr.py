@@ -40,7 +40,7 @@ options:
     description: The mode with which to connect to the database
     required: False
     default: normal
-    choices: ['normal','sysdba']
+    choices: ['normal','sysdba','sysdg','sysoper','sysasm']
   snapshot_interval_min:
     description: AWR snapshot interval in minutes; 0 disables
     default: 60

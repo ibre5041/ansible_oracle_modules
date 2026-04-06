@@ -40,6 +40,19 @@ options:
         choices:
             - normal
             - sysdba
+            - sysdg
+            - sysoper
+            - sysasm
+    oracle_home:
+        description:
+            - The ORACLE_HOME path
+        required: false
+        aliases: ['oh']
+    dsn:
+        description:
+            - Oracle Data Source Name (connect string or TNS alias), overrides hostname/port/service_name
+        required: false
+        aliases: ['datasource_name']
     state:
         description:
             - If present, then job is created, if absent then job is dropped
@@ -203,19 +216,9 @@ import re
 try:
     import oracledb
 except ImportError:
-    oracledb_exists = False
-else:
-    oracledb_exists = True
+    oracledb = None
 
 
-def apply_session_container(module, conn):
-    session_container = module.params.get("session_container")
-    if not session_container:
-        return
-    if not re.match(r'^[A-Za-z][A-Za-z0-9_$#]*$', session_container):
-        module.fail_json(msg='Invalid session_container for alter session', changed=False)
-    c = conn.cursor()
-    c.execute('ALTER SESSION SET CONTAINER = %s' % session_container)
 
 def query_existing(job_owner, job_name):
     c = conn.cursor()
@@ -404,9 +407,6 @@ def main():
         mutually_exclusive=[['schedule_name','repeat_interval'],['program_name','job_action']]
     )
     sanitize_string_params(module.params)
-    # Check for required modules
-    if not oracledb_exists:
-        module.fail_json(msg="The oracledb module is required. 'pip install oracledb' should do the trick. If oracledb is installed, make sure ORACLE_HOME & LD_LIBRARY_PATH is set")
     # Check input parameters
     re_name = re.compile("^[A-Za-z0-9_\$#]+\.[A-Za-z0-9_\$#]+$")
     if not re_name.match(module.params['job_name']):
@@ -431,7 +431,6 @@ def main():
     conn = oc.conn
     if conn.version < "10.2":
         module.fail_json(msg="Database version must be 10gR2 or greater", changed=False)
-    apply_session_container(module, conn)
     #
     result = query_existing(job_owner, job_name)
     desired_logging = module.params['logging_level'].upper() if module.params['logging_level'] else None
@@ -503,8 +502,14 @@ try:
         oracleConnection, sanitize_string_params,
     )
 except ImportError:
-    def sanitize_string_params(_params):
-        pass
+    def sanitize_string_params(module_params):
+        for key, value in module_params.items():
+            if isinstance(value, str):
+                module_params[key] = value.strip()
+
+    class oracleConnection:  # noqa: N801
+        def __init__(self, module):
+            module.fail_json(msg='oracle_utils is required. Ensure the collection is properly installed.', changed=False)
 
 if __name__ == '__main__':
     main()
