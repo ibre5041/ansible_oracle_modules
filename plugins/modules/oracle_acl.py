@@ -18,9 +18,14 @@ options:
     choices: ['present', 'absent', 'status']
   host:
     description:
-      - Network host or wildcard pattern
+      - ACL network host or wildcard pattern (not the database I(hostname))
       - "Examples: '*.example.com', '10.0.0.0/24', 'db.internal'"
     required: false
+  hostname:
+    description:
+      - Host name of the Oracle listener.
+      - The task key C(host) is reserved for the ACL network pattern; use I(hostname) for the database server (unlike most C(oracle_*) modules, C(host) is not an alias for I(hostname) here).
+    default: localhost
   lower_port:
     description: Lower bound of the port range
     type: int
@@ -44,6 +49,7 @@ notes:
   - Requires DBA or EXECUTE privilege on DBMS_NETWORK_ACL_ADMIN
   - oracledb Python module is required
   - Uses DBMS_NETWORK_ACL_ADMIN.APPEND_HOST_ACE / REMOVE_HOST_ACE (Oracle 12c+)
+  - Use I(hostname) for the database listener; C(host) is only the ACL network pattern (not an alias for I(hostname)).
 requirements: [ "oracledb" ]
 author:
   - Cyrille Modiano
@@ -213,7 +219,7 @@ def main():
             user=dict(required=False, aliases=['un', 'username']),
             password=dict(required=False, no_log=True, aliases=['pw']),
             mode=dict(default='normal', choices=["normal", "sysdba", "sysdg", "sysoper", "sysasm"]),
-            hostname=dict(required=False, default='localhost', aliases=['host']),
+            hostname=dict(required=False, default='localhost'),
             port=dict(required=False, default=1521, type='int'),
             service_name=dict(required=False, aliases=['sn']),
             dsn=dict(required=False, aliases=['datasource_name']),
