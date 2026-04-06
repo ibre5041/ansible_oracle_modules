@@ -167,8 +167,8 @@ def oracle_connect(module):
         if not user and not password:  # OS authentication or wallet
             _ensure_oracle_client(module, oracle_home=oracle_home, required=True)
             if auth_mode:
-                connect = '/'
-                conn = oracledb.connect(mode=auth_mode)
+                connect = wallet_connect
+                conn = oracledb.connect(wallet_connect, mode=auth_mode)
             else:
                 connect = wallet_connect
                 conn = oracledb.connect(wallet_connect)
@@ -239,8 +239,8 @@ class oracleConnection:
         try:
             if not user and not password:  # OS authentication or wallet
                 if auth_mode:
-                    connect = '/'
-                    conn = oracledb.connect(mode=auth_mode)
+                    connect = wallet_connect
+                    conn = oracledb.connect(wallet_connect, mode=auth_mode)
                 else:
                     connect = wallet_connect
                     conn = oracledb.connect(wallet_connect)
