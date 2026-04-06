@@ -179,6 +179,7 @@ def _remove_host_ace_sql_params(module):
     upper_port = module.params["upper_port"]
     privilege = module.params["privilege"]
     principal = module.params["principal"]
+    is_grant = module.params["is_grant"]
     sql = """BEGIN
   DBMS_NETWORK_ACL_ADMIN.REMOVE_HOST_ACE(
     host => :host,
@@ -187,7 +188,8 @@ def _remove_host_ace_sql_params(module):
     ace => xs$ace_type(
       privilege_list => xs$name_list(:privilege),
       principal_name => :principal,
-      principal_type => xs_acl.ptype_db
+      principal_type => xs_acl.ptype_db,
+      is_grant => :is_grant
     )
   );
 END;"""
@@ -197,6 +199,7 @@ END;"""
         "upper_port": upper_port,
         "privilege": privilege,
         "principal": principal,
+        "is_grant": is_grant,
     }
     return sql, params
 

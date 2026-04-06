@@ -381,9 +381,31 @@ def test_acl_remove_ace(monkeypatch):
     assert 'host => :host' in ddl
     assert 'xs$name_list(:privilege)' in ddl
     assert 'principal_name => :principal' in ddl
+    assert 'is_grant => :is_grant' in ddl
     assert binds['host'] == 'dbserver.example.com'
     assert binds['privilege'] == 'connect'
     assert binds['principal'] == 'HR'
+    assert binds['is_grant'] is True
+
+
+def test_acl_remove_ace_deny(monkeypatch):
+    """state=absent with is_grant=False removes a DENY ACE (bind matches grant type)."""
+    mod = _load()
+
+    deny_row = {**_ACE_ROW, 'grant_type': 'DENY'}
+
+    class Mod(BaseFakeModule):
+        params = _acl_params(state='absent', is_grant=False)
+
+    conn = _AclConn(Mod(), ace_rows=[deny_row])
+    monkeypatch.setattr(mod, 'AnsibleModule', Mod)
+    monkeypatch.setattr(mod, 'oracleConnection', lambda m: conn, raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    result = exc.value.args[0]
+    assert result['changed'] is True
+    assert conn.ddl_binds[0]['is_grant'] is False
 
 
 def test_acl_remove_ace_with_ports(monkeypatch):
@@ -410,6 +432,7 @@ def test_acl_remove_ace_with_ports(monkeypatch):
     assert 'upper_port => :upper_port' in ddl
     assert binds['lower_port'] == 25
     assert binds['upper_port'] == 25
+    assert binds['is_grant'] is True
 
 
 def test_acl_remove_idempotent(monkeypatch):
