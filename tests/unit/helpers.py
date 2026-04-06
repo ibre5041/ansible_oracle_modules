@@ -213,6 +213,7 @@ class FakeOracleConn:
         self._fetchone_row = None
         self._fetchall_rows = []
         self.outputtypehandler = None
+        self.autocommit = True
 
     def cursor(self):
         return _FakeCursor(self)

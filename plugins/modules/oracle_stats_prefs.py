@@ -37,7 +37,7 @@ options:
             - The mode with which to connect to the database
         required: true
         default: normal
-        choices: ['normal','sysdba']
+        choices: ['normal','sysdba','sysdg','sysoper','sysasm']
     preference_name:
         description:
             - DBMS_STATS preference name
@@ -104,7 +104,7 @@ def main():
             service_name  = dict(required=False),
             user          = dict(required=False),
             password      = dict(required=False, no_log=True),
-            mode          = dict(default='normal', choices=["normal","sysdba"]),
+            mode          = dict(default='normal', choices=["normal", "sysdba", "sysdg", "sysoper", "sysasm"]),
             preference_name  = dict(required=True, aliases=['pname']),
             preference_value = dict(aliases=['pvalue']),
             state         = dict(default='present', choices=["present","absent"])
