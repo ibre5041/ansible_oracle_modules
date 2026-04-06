@@ -287,8 +287,10 @@ def export_keys(conn, module):
 
     force = build_force_clause(force_keystore)
 
+    safe_secret = export_secret.replace("'", "''")
+    safe_file = export_file.replace("'", "''")
     sql = "ADMINISTER KEY MANAGEMENT %sEXPORT KEYS WITH SECRET '%s' TO '%s' IDENTIFIED BY \"%s\"" % (
-        force, export_secret, export_file, keystore_password
+        force, safe_secret, safe_file, keystore_password
     )
     conn.execute_ddl(sql)
 
@@ -310,8 +312,10 @@ def import_keys(conn, module):
 
     force = build_force_clause(force_keystore)
 
+    safe_secret = export_secret.replace("'", "''")
+    safe_file = export_file.replace("'", "''")
     sql = "ADMINISTER KEY MANAGEMENT %sIMPORT KEYS WITH SECRET '%s' FROM '%s' IDENTIFIED BY \"%s\"%s" % (
-        force, export_secret, export_file, keystore_password, build_backup_clause()
+        force, safe_secret, safe_file, keystore_password, build_backup_clause()
     )
     conn.execute_ddl(sql)
 
@@ -485,7 +489,10 @@ def main():
             encrypted_tablespaces=encrypted_ts,
         )
 
-    elif state == 'present':
+    if module.check_mode:
+        module.exit_json(changed=False, msg='Check mode: no TDE operations executed')
+
+    if state == 'present':
         # Handle encryption policy parameter
         if tablespace_encryption_policy:
             set_encryption_parameter(conn, module)
@@ -544,8 +551,10 @@ try:
         build_backup_clause, build_container_clause, build_force_clause,
     )
 except ImportError:
-    def sanitize_string_params(_params):
-        pass
+    def sanitize_string_params(module_params):
+        for key, value in module_params.items():
+            if isinstance(value, str):
+                module_params[key] = value.strip()
 
 if __name__ == '__main__':
     main()
