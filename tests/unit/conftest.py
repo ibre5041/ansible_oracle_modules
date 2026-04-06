@@ -49,6 +49,25 @@ def _ensure_fake_ansible_basic():
         _fake_oracledb.makedsn = lambda **kw: "fake_dsn"
         sys.modules["oracledb"] = _fake_oracledb
 
+    # Inject a minimal fake oracle_utils so modules that do
+    #   from ansible_collections...oracle_utils import oracleConnection
+    # get a stub oracleConnection.  Individual tests monkeypatch mod.oracleConnection
+    # to control behaviour.
+    _ou_path = "ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_utils"
+    if _ou_path not in sys.modules:
+        class _StubOracleConnection:
+            """Stub that raises RuntimeError — tests must monkeypatch mod.oracleConnection."""
+            def __init__(self, module):
+                raise RuntimeError(
+                    "oracleConnection called without monkeypatching — "
+                    "set monkeypatch.setattr(mod, 'oracleConnection', FakeOC) in the test."
+                )
+
+        _ou_mod = types.ModuleType(_ou_path)
+        _ou_mod.oracleConnection = _StubOracleConnection
+        _ou_mod.sanitize_string_params = lambda _params: None
+        sys.modules[_ou_path] = _ou_mod
+
     ansible_mod = types.ModuleType("ansible")
     module_utils_mod = types.ModuleType("ansible.module_utils")
     basic_mod = types.ModuleType("ansible.module_utils.basic")
