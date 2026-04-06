@@ -168,6 +168,20 @@ EXAMPLES = '''
 '''
 
 
+import re as _re
+
+
+def _redact_ddls(ddls):
+    """Redact passwords and secrets from DDL statements before returning to user."""
+    redacted = []
+    for ddl in ddls:
+        s = _re.sub(r'(IDENTIFIED\s+BY\s+)"[^"]*"', r'\1"***"', ddl, flags=_re.IGNORECASE)
+        s = _re.sub(r"(SECRET\s+)'[^']*'", r"\1'***'", s, flags=_re.IGNORECASE)
+        s = _re.sub(r"(USING\s+)'[^']*'", r"\1'***'", s, flags=_re.IGNORECASE)
+        redacted.append(s)
+    return redacted
+
+
 def get_wallet_status(conn):
     """Check keystore status - prerequisite for TDE operations."""
     sql = "SELECT STATUS, WALLET_TYPE, KEYSTORE_MODE FROM V$ENCRYPTION_WALLET WHERE ROWNUM = 1"
@@ -204,7 +218,14 @@ def is_tablespace_encrypted(conn, tablespace_name):
 
 
 def check_prerequisites(conn, module):
-    """Verify that keystore is open before TDE operations."""
+    """Verify that keystore is open before TDE operations.
+
+    When force_keystore is True, skip the check — the FORCE KEYSTORE clause
+    tells Oracle to use the password-based keystore even when an auto-login
+    keystore is active, so the password keystore may appear CLOSED.
+    """
+    if module.params.get("force_keystore"):
+        return get_wallet_status(conn)
     status = get_wallet_status(conn)
     if not status or status.get('status') not in ('OPEN', 'OPEN_NO_MASTER_KEY'):
         module.fail_json(
@@ -520,26 +541,26 @@ def main():
         encrypted_ts = get_encrypted_tablespaces(conn)
         module.exit_json(
             changed=conn.changed,
-            ddls=conn.ddls,
+            ddls=_redact_ddls(conn.ddls),
             msg='TDE operations completed successfully',
             master_key=master_key,
             encrypted_tablespaces=encrypted_ts,
         )
 
     elif state == 'absent':
-        # Decrypt tablespace if specified
-        if tablespace_state == 'decrypted' or module.params["tablespace"]:
-            decrypt_tablespace(conn, module)
-            encrypted_ts = get_encrypted_tablespaces(conn)
-            module.exit_json(
-                changed=conn.changed,
-                ddls=conn.ddls,
-                msg='Tablespace decryption completed',
-                encrypted_tablespaces=encrypted_ts,
+        # Decrypt tablespace — requires tablespace parameter
+        if not module.params["tablespace"]:
+            module.fail_json(
+                msg='state=absent requires a tablespace to decrypt',
+                changed=False,
             )
-        module.fail_json(
-            msg='state=absent requires a tablespace to decrypt',
-            changed=False,
+        decrypt_tablespace(conn, module)
+        encrypted_ts = get_encrypted_tablespaces(conn)
+        module.exit_json(
+            changed=conn.changed,
+            ddls=_redact_ddls(conn.ddls),
+            msg='Tablespace decryption completed',
+            encrypted_tablespaces=encrypted_ts,
         )
 
 
