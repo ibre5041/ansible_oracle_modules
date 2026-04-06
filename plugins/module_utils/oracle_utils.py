@@ -17,13 +17,17 @@ else:
 
 # Mapping from module 'mode' parameter to oracledb auth-mode constants.
 # 'normal' is omitted — it means "no special mode flag".
+# Entries whose constant is None (unsupported by the installed oracledb) are
+# excluded so that _AUTH_MODES.get(mode) returns None only for 'normal'.
 _AUTH_MODES = {}
 if oracledb_exists:
     _AUTH_MODES = {
-        'sysdba': oracledb.SYSDBA,
-        'sysdg': getattr(oracledb, 'SYSDG', getattr(oracledb, 'AUTH_MODE_SYSDG', None)),
-        'sysoper': getattr(oracledb, 'SYSOPER', getattr(oracledb, 'AUTH_MODE_SYSOPER', None)),
-        'sysasm': getattr(oracledb, 'SYSASM', getattr(oracledb, 'AUTH_MODE_SYSASM', None)),
+        k: v for k, v in {
+            'sysdba': oracledb.SYSDBA,
+            'sysdg': getattr(oracledb, 'SYSDG', getattr(oracledb, 'AUTH_MODE_SYSDG', None)),
+            'sysoper': getattr(oracledb, 'SYSOPER', getattr(oracledb, 'AUTH_MODE_SYSOPER', None)),
+            'sysasm': getattr(oracledb, 'SYSASM', getattr(oracledb, 'AUTH_MODE_SYSASM', None)),
+        }.items() if v is not None
     }
 
 
@@ -155,6 +159,8 @@ def oracle_connect(module):
     wallet_connect = '/@%s' % service_name
 
     auth_mode = _AUTH_MODES.get(mode)
+    if mode != 'normal' and auth_mode is None:
+        module.fail_json(msg="Auth mode '%s' is not supported by the installed oracledb driver" % mode, changed=False)
 
     try:
         if not user and not password:  # OS authentication or wallet
@@ -225,6 +231,8 @@ class oracleConnection:
         _ensure_oracle_client(module, oracle_home=self.oracle_home, required=requires_thick)
 
         auth_mode = _AUTH_MODES.get(mode)
+        if mode != 'normal' and auth_mode is None:
+            module.fail_json(msg="Auth mode '%s' is not supported by the installed oracledb driver" % mode, changed=False)
 
         connect = '<unresolved>'
         try:
