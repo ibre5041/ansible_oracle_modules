@@ -97,12 +97,13 @@ from ansible.module_utils.basic import AnsibleModule
 
 # In thise we do import from collections
 try:
-    from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_utils import oracleConnection
-except:
-    pass
+    from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_utils import oracleConnection, sanitize_string_params
+except ImportError:
+    sanitize_string_params = lambda p: None
 
 
 output_lines = []
+LOCAL_HOSTS = {'localhost', '127.0.0.1', '::1'}
 
 
 def execute_statements(conn, script):
@@ -135,6 +136,8 @@ def main():
             service_name  = dict(required=False, aliases=['sn']),
             dsn           = dict(required=False, aliases=['datasource_name']),
             oracle_home   = dict(required=False, aliases=['oh']),
+            pdb_name      = dict(required=False),
+            session_container = dict(required=False),
 
             sql=dict(required=False),
             script=dict(required=False),            
@@ -145,11 +148,17 @@ def main():
         required_together=[('username', 'password')],
         supports_check_mode=True
     )
+    sanitize_string_params(module.params)
+
 
     script = module.params["script"]
     sql = module.params["sql"]
+    pdb_name = module.params["pdb_name"]
+    session_container = module.params.get("session_container")
     
     conn = oracleConnection(module)
+    if (not session_container) and pdb_name and module.params["hostname"] in LOCAL_HOSTS:
+        conn.set_container(pdb_name)
 
     # Single SELECT or DML, ALTER, DROP, ... statement
     if sql:
@@ -158,18 +167,18 @@ def main():
             module.exit_json(msg='Select statement executed.', changed=False, data=result)
         else:
             conn.execute_ddl(sql.rstrip().rstrip(';'))
-            module.exit_json(msg='SQL executed: %s' % (sql), changed=True, ddls=conn.ddls)
+            module.exit_json(msg='SQL statement processed.', changed=conn.changed, ddls=conn.ddls)
     # SQL script embeded in .yaml playbook
     elif script and not script.startswith('@'):
         execute_statements(conn, script)
-        module.exit_json(msg='DML or DDL statements executed.', changed=True, ddls=conn.ddls, output_lines=output_lines)
+        module.exit_json(msg='DML or DDL statements executed.', changed=conn.changed, ddls=conn.ddls, output_lines=output_lines)
     # SQL file
     else:
         try:
             file_name = script.lstrip('@')
             with open(file_name, 'r') as f:
                 execute_statements(conn, f.read())
-            module.exit_json(msg='DML or DDL statements executed.', changed=True, ddls=conn.ddls, output_lines=output_lines)
+            module.exit_json(msg='DML or DDL statements executed.', changed=conn.changed, ddls=conn.ddls, output_lines=output_lines)
         except IOError as e:
             module.fail_json(msg=str(e), changed=False)
 

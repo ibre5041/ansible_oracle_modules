@@ -38,6 +38,12 @@ options:
     required: False
     default: normal
     choices: ['normal','sysdba']
+  session_container:
+    description:
+      - Target PDB name for ALTER SESSION SET CONTAINER when using local SYSDBA connections.
+      - When set, the module issues ALTER SESSION SET CONTAINER=<value> before executing.
+      - Useful for local BEQ/SYSDBA connections where you connect to CDB but need to operate in a specific PDB.
+    required: false
 notes:
     - Returns information from v$instance
     - All other modules use the same parameters to connect to the database
@@ -89,11 +95,14 @@ def main():
             port          = dict(required=False, default=1521, type='int'),
             service_name  = dict(required=False, aliases=['sn']),
             dsn           = dict(required=False, aliases=['datasource_name']),
-            oracle_home   = dict(required=False, aliases=['oh'])
+            oracle_home   = dict(required=False, aliases=['oh']),
+            session_container = dict(required=False),
         ),
         required_together=[['user', 'password']],
         supports_check_mode=True
     )
+    sanitize_string_params(module.params)
+
 
     oc = oracleConnection(module)
     r = check_connection(oc)
@@ -112,9 +121,9 @@ from ansible.module_utils.basic import *
 
 # In these we do import from collections
 try:
-    from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_utils import oracleConnection
-except:
-    pass
+    from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_utils import oracleConnection, sanitize_string_params
+except ImportError:
+    sanitize_string_params = lambda p: None
 
 
 if __name__ == '__main__':

@@ -4,6 +4,7 @@
     oracle_crs_priv_iface: "{{ hostvars[inventory_hostname]['ansible_' + item]['device'] }}"
     oracle_crs_priv_net:   "{{ hostvars[inventory_hostname]['ansible_' + item]['ipv4']['network'] }}"
   when:
+    - oracle_crs_priv_iface is not defined
     - hostvars[inventory_hostname]['ansible_' + item].ipv4 is defined
     - hostvars[inventory_hostname]['ansible_' + item].device != 'lo'
     - hostvars[inventory_hostname]['ansible_' + item].device != oracle_crs_public_iface

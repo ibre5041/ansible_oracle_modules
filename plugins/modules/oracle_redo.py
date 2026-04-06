@@ -452,7 +452,7 @@ from ansible.module_utils.basic import *
 # In thise we do import from collections
 try:
     from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_utils import oracle_connect
-except:
+except ImportError:
     pass
 
 

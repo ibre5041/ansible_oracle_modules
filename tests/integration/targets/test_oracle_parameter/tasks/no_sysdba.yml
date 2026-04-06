@@ -1,12 +1,13 @@
 ---
 
 - name: "define pdb connection parameters"
+  no_log: true
   set_fact:
     connection_parameters: &pdb_con_param
-      service_name: "{{ oracle_pdb_service_name }}"
-      username: "{{ oracle_pdb_username }}"
-      password: "{{ oracle_pdb_password }}"
-      mode: "normal"
+      service_name: "{{ oracle_normal_service_name | default(oracle_pdb_service_name) }}"
+      username: "{{ oracle_normal_username | default(oracle_pdb_username) }}"
+      password: "{{ oracle_normal_password | default(oracle_pdb_password) }}"
+      mode: "{{ oracle_normal_mode | default('normal') }}"
       port: "{{ oracle_port }}"
       host: "{{ oracle_hostname }}"
       
@@ -25,4 +26,5 @@
     <<: *pdb_con_param
     name: "open_cursors"
     state: "reset"
+  ignore_errors: yes
 ...

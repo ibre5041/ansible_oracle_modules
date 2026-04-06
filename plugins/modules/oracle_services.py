@@ -277,9 +277,10 @@ def ensure_service_state(oc, module, msg):
             module.exit_json(msg="Service %s (%s) successfully created" % (name, database_name), changed=True)
         else:
             msg = "Service %s (%s) is in the intended state" % (name, database_name)
+            change = False
             if configchange:
                 msg += 'after configchanges had been applied'
-                change=True
+                change = True
             module.exit_json(msg=msg, changed=change)
 
     if state == 'started':
@@ -441,7 +442,7 @@ def stop_service(oc, module, msg, name, database_name):
         (rc, stdout, stderr) = module.run_command(command)
 
         if rc != 0:
-            if 'PRCR-1005' in stdout or 'CRS-2500' or 'PRCD-1316' in stdout: # Already stopped
+            if ('PRCR-1005' in stdout) or ('CRS-2500' in stdout) or ('PRCD-1316' in stdout): # Already stopped
                 return False
             elif 'PRCR-1001' in stdout or 'PRCD-1132' in stdout:
                 msg = 'Service %s doesn\'t exist in database %s' % (name, database_name)
@@ -503,6 +504,7 @@ def main():
     global configchange
     configchange = False
     newservice = False
+    msg = ""
     module = AnsibleModule(
         argument_spec = dict(
             user               = dict(required=False, aliases=['un', 'username']),
@@ -512,6 +514,7 @@ def main():
             port               = dict(required=False, default=1521, type='int'),
             service_name       = dict(required=False, aliases=['sn']),
             oracle_home        = dict(required=False, aliases=['oh']),
+            session_container  = dict(required=False),
 
             name                = dict(required=True, aliases=['service']),
             database_name       = dict(required=True, aliases=['db']),
@@ -525,6 +528,8 @@ def main():
             force               = dict(default=False, type='bool')
         ),
     )
+    sanitize_string_params(module.params)
+
 
     name                = module.params["name"]
     oracle_home         = module.params["oracle_home"]
@@ -571,11 +576,11 @@ def main():
         if not check_service_exists(oc, module, msg, name, database_name):
             if create_service(oc, module, msg):
                 newservice = True
-                ensure_service_state(oc, module, msg, name, database_name, state, preferred_instances,available_instances, pdb, role, clbgoal, rlbgoal)
+                ensure_service_state(oc, module, msg)
             else:
                 module.fail_json(msg=msg, changed=False)
         else:
-            ensure_service_state(oc, module, msg, name, database_name, state, preferred_instances,available_instances, pdb, role, clbgoal, rlbgoal)
+            ensure_service_state(oc, module, msg)
             # msg = 'Service %s already exists in database %s' % (name, database_name)
             # module.exit_json(msg=msg, changed=False)
 
@@ -608,7 +613,7 @@ def main():
 
     elif state == 'restarted':
         if stop_service(oc, module, msg, name, database_name):
-            if start_service(oc, module, msg, name, database_name):
+            if start_service(oc, module, msg, name, database_name, configchange):
                 msg = "Service %s restarted in database %s" % (name, database_name)
                 module.exit_json(msg=msg, changed=True)
             else:
@@ -643,10 +648,10 @@ from ansible.module_utils.basic import *
 
 # In these we do import from collections
 try:
-    from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_utils import oracleConnection
+    from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_utils import oracleConnection, sanitize_string_params
     from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_homes import OracleHomes
-except:
-    pass
+except ImportError:
+    sanitize_string_params = lambda p: None
 
 
 if __name__ == '__main__':

@@ -90,6 +90,7 @@ def main():
             service_name  = dict(required=False, aliases=['sn']),
             dsn           = dict(required=False, aliases=['datasource_name']),
             oracle_home   = dict(required=False, aliases=['oh']),
+            session_container = dict(required=False),
             
             directory_name = dict(default=None),
             directory_path = dict(default=None),
@@ -99,6 +100,8 @@ def main():
         required_if=[('state', 'present', ('directory_name', 'directory_path'))],
         supports_check_mode=True
     )
+    sanitize_string_params(module.params)
+
 
     directory_name = module.params["directory_name"]
     state = module.params["state"]
@@ -130,9 +133,9 @@ from ansible.module_utils.basic import *
 
 # In these we do import from collections
 try:
-    from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_utils import oracleConnection
-except:
-    pass
+    from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_utils import oracleConnection, sanitize_string_params
+except ImportError:
+    sanitize_string_params = lambda p: None
 
 
 if __name__ == '__main__':

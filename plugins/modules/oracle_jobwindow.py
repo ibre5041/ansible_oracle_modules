@@ -117,6 +117,7 @@ EXAMPLES = '''
 '''
 
 from datetime import timedelta
+import re
 
 try:
     import oracledb
@@ -124,6 +125,16 @@ except ImportError:
     oracledb_exists = False
 else:
     oracledb_exists = True
+
+
+def apply_session_container(module, conn):
+    session_container = module.params.get("session_container")
+    if not session_container:
+        return
+    if not re.match(r'^[A-Za-z][A-Za-z0-9_$#]*$', session_container):
+        module.fail_json(msg='Invalid session_container for alter session', changed=False)
+    c = conn.cursor()
+    c.execute('ALTER SESSION SET CONTAINER = %s' % session_container)
 
 def query_existing(name):
     c = conn.cursor()
@@ -146,8 +157,9 @@ def main():
             port          = dict(default=1521, type='int'),
             service_name  = dict(required=True),
             user          = dict(required=False),
-            password      = dict(required=False),
+            password      = dict(required=False, no_log=True),
             mode          = dict(default='normal', choices=["normal","sysdba"]),
+            session_container = dict(required=False),
             state         = dict(default="enabled", choices=["absent","enabled","disabled"]),
             name          = dict(required=True, aliases=["window_name"]),
             resource_plan = dict(required=False),
@@ -203,17 +215,42 @@ def main():
 
     except oracledb.DatabaseError as exc:
         error, = exc.args
-        msg[0] = 'Could not connect to database - %s, connect descriptor: %s' % (error.message, connect)
+        error_msg = getattr(error, 'message', str(error))
+        requires_thick = (mode == 'sysdba') or (not user and not password)
+        if 'DPI-1047' in error_msg and requires_thick:
+            msg[0] = (
+                "Oracle Client libraries cannot be loaded (DPI-1047). "
+                "Install Oracle Instant Client or use a thin-compatible connection mode."
+            )
+        else:
+            msg[0] = 'Oracle connection failed: %s' % error_msg
         module.fail_json(msg=msg[0], changed=False)
     if conn.version < "10.2":
         module.fail_json(msg="Database version must be 10gR2 or greater", changed=False)
+    apply_session_container(module, conn)
     #
+    result = query_existing(job_fullname)
     if module.check_mode:
-        module.exit_json(changed=False)
+        desired_plan = module.params['resource_plan'].upper() if module.params['resource_plan'] else None
+        would_change = (
+            (result['exists'] and module.params['state'] == "absent") or
+            (not result['exists'] and module.params['state'] != "absent") or
+            (result['exists'] and result['enabled'] and module.params['state'] == "disabled") or
+            (result['exists'] and not result['enabled'] and module.params['state'] == "enabled") or
+            (
+                result['exists'] and module.params['state'] != "absent" and (
+                    (result['comments'] != module.params['comments']) or
+                    (result['repeat_interval'] != module.params['repeat_interval']) or
+                    (result['resource_plan'] != desired_plan) or
+                    (result['window_priority'] != module.params['window_priority'].upper()) or
+                    (result['duration'] != new_duration)
+                )
+            )
+        )
+        module.exit_json(changed=would_change, msg='Check mode: no change executed')
     #
     #c = conn.cursor()
     result_changed = False
-    result = query_existing(job_fullname)
     if (result['exists'] and module.params['state'] != "absent" and (
             (result['comments'] != module.params['comments']) or
             (result['repeat_interval'] != module.params['repeat_interval']) or

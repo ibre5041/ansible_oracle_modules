@@ -344,7 +344,7 @@ oracle.install.crs.config.ipmi.bmcPassword=
 #-------------------------------------------------------------------------------
 # Password for SYS user of Oracle ASM
 #-------------------------------------------------------------------------------
-oracle.install.asm.SYSASMPassword=Si0_qCklmbcbbbFmOXL9DFe9zmD1c
+oracle.install.asm.SYSASMPassword={{ oracle_password }}
 
 #-------------------------------------------------------------------------------
 # The ASM DiskGroup
@@ -436,7 +436,7 @@ oracle.install.asm.diskGroup.diskDiscoveryString=/dev/asmshared*p1
 # Password for ASMSNMP account
 # ASMSNMP account is used by Oracle Enterprise Manager to monitor Oracle ASM instances
 #-------------------------------------------------------------------------------
-oracle.install.asm.monitorPassword=Si0_qCklmbcbbbFmOXL9DFe9zmD1c
+oracle.install.asm.monitorPassword={{ oracle_password }}
 
 #-------------------------------------------------------------------------------
 # GIMR Storage data ASM DiskGroup

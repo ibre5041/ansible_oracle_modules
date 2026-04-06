@@ -181,6 +181,7 @@ def main():
             service_name  = dict(required=False, aliases=['sn']),
             dsn           = dict(required=False, aliases=['datasource_name']),
             oracle_home   = dict(required=False, aliases=['oh']),
+            session_container = dict(required=False),
 
             parameter_name=dict(default=None, aliases=['parameter', 'name']),
             value=dict(default=None),
@@ -194,6 +195,8 @@ def main():
         required_together=[['user', 'password']],
         supports_check_mode=True
     )
+    sanitize_string_params(module.params)
+
 
     parameter_name = module.params["parameter_name"]
     value = module.params["value"]
@@ -238,9 +241,9 @@ from ansible.module_utils.basic import *
 
 # In this case we do import from collections
 try:
-    from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_utils import oracleConnection
-except:
-    pass
+    from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_utils import oracleConnection, sanitize_string_params
+except ImportError:
+    sanitize_string_params = lambda p: None
 
 if __name__ == '__main__':
     main()

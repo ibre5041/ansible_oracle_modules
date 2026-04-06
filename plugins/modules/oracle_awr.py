@@ -126,6 +126,7 @@ def main():
             service_name  = dict(required=False, aliases=['sn']),
             dsn           = dict(required=False, aliases=['datasource_name']),
             oracle_home   = dict(required=False, aliases=['oh']),
+            session_container = dict(required=False),
             snapshot_interval_min = dict(default=None, type='int', aliases=['interval']), # Oracle default: 60 min
             snapshot_retention_days = dict(default=None, type='int', aliases=['retention']) # Oracle default 8 days
         ),
@@ -133,18 +134,20 @@ def main():
         #required_one_of=[('snapshot_interval_min', 'snapshot_retention_days')],
         supports_check_mode=True
     )
+    sanitize_string_params(module.params)
+
 
     # Check input parameters
     snapshot_interval_min = module.params['snapshot_interval_min']
     snapshot_retention_days = module.params['snapshot_retention_days']
 
     if snapshot_interval_min is not None and 0 < snapshot_interval_min <= 10:
-        module.fail_json(msg="Snapshot interval must be >= 10 or 0", changed=conn.changed, ddls=conn.ddls)
+        module.fail_json(msg="Snapshot interval must be >= 10 or 0", changed=False, ddls=[])
     if snapshot_interval_min is not None and snapshot_interval_min > 1000:
-        module.fail_json(msg="You probably entered incorrect snapshot interval time", changed=conn.changed, ddls=conn.ddls)
+        module.fail_json(msg="You probably entered incorrect snapshot interval time", changed=False, ddls=[])
 
     if snapshot_retention_days and snapshot_retention_days < 0:
-        module.fail_json(msg="Snapshot retention must be >= 0", changed=conn.changed, ddls=conn.ddls)
+        module.fail_json(msg="Snapshot retention must be >= 0", changed=False, ddls=[])
 
     # Connect to database
     conn = oracleConnection(module)
@@ -194,9 +197,9 @@ from ansible.module_utils.basic import *
 
 # In thise we do import from collections
 try:
-    from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_utils import oracleConnection    
-except:
-    pass
+    from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_utils import oracleConnection, sanitize_string_params
+except ImportError:
+    sanitize_string_params = lambda p: None
 
 
 if __name__ == '__main__':

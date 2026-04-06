@@ -186,6 +186,16 @@ def clean_string(s):
         raise
     return supper
 
+
+def apply_session_container(module, conn):
+    session_container = module.params.get("session_container")
+    if not session_container:
+        return
+    if not re.match(r'^[A-Za-z][A-Za-z0-9_$#]*$', session_container):
+        module.fail_json(msg='Invalid session_container for alter session', changed=False)
+    c = conn.cursor()
+    c.execute('ALTER SESSION SET CONTAINER = %s' % session_container)
+
 # Module code
 
 def query_ldap_users():
@@ -204,7 +214,7 @@ def query_ldap_users():
                 if module.params['group_role_map'] is not None:
                     userinfo['memberOf'] = user['memberOf']
                 users.append(userinfo)
-            except:
+            except Exception:
                 pass
     except ldap.LDAPError as e:
         module.fail_json(msg="Error querying LDAP: %s" % e, changed=False)
@@ -220,17 +230,18 @@ def main():
             port          = dict(default=1521, type='int'),
             service_name  = dict(required=True),
             user          = dict(required=False),
-            password      = dict(required=False),
+            password      = dict(required=False, no_log=True),
+            session_container = dict(required=False),
             mode          = dict(default='normal', choices=["normal","sysdba"]),
             user_default_tablespace = dict(default='USERS'),
             user_quota_on_default_tbs_mb = dict(default=None, type='int'), # None is unlimited
             user_temp_tablespace = dict(default='TEMP'),
             user_profile  = dict(default='LDAP_USER'),
-            user_default_password = dict(default=None), # None means EXTERNAL
+            user_default_password = dict(default=None, no_log=True), # None means EXTERNAL
             user_grants   = dict(default=['create session'], type='list'),
             ldap_connect  = dict(required=True),
             ldap_binddn   = dict(required=True),
-            ldap_bindpassword = dict(required=True),
+            ldap_bindpassword = dict(required=True, no_log=True),
             ldap_user_basedn  = dict(required=True),
             ldap_user_subtree = dict(default=True, type='bool'),
             ldap_user_filter  = dict(default='(objectClass=user)'),
@@ -296,11 +307,23 @@ def main():
 
     except oracledb.DatabaseError as exc:
         error, = exc.args
-        msg[0] = 'Could not connect to database - %s, connect descriptor: %s' % (error.message, connect)
+        error_msg = getattr(error, 'message', str(error))
+        requires_thick = (mode == 'sysdba') or (not user and not password)
+        if 'DPI-1047' in error_msg and requires_thick:
+            msg[0] = (
+                "Oracle Client libraries cannot be loaded (DPI-1047). "
+                "Install Oracle Instant Client or use a thin-compatible connection mode."
+            )
+        else:
+            msg[0] = 'Oracle connection failed: %s' % error_msg
         module.fail_json(msg=msg[0], changed=False)
+    apply_session_container(module, conn)
     #
     if module.check_mode:
-        module.exit_json(changed=False)
+        module.exit_json(
+            changed=True,
+            msg='Check mode: synchronisation LDAP potentiellement mutative (estimation conservative)'
+        )
     #
     users = query_ldap_users()
     lconn.unbind()
@@ -317,7 +340,7 @@ def main():
                 if gr['dn'] in user['memberOf']:
                     try:
                         mgroups.append("%s" % clean_string(gr['group']))
-                    except:
+                    except Exception:
                         pass
             g = ",".join(mgroups)
         else:

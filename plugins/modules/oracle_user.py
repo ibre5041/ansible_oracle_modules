@@ -228,7 +228,7 @@ def create_user(conn, module):
 
     if container_data:
         alter_sql = 'alter user %s set container_data=%s container=current' % (schema, container)
-        conn.execute_ddl(module, alter_sql)
+        conn.execute_ddl(alter_sql)
 
     msg = 'The schema %s has been created successfully' % schema
     module.exit_json(msg=msg, changed=conn.changed, ddls=conn.ddls)
@@ -279,7 +279,7 @@ def password_matches_hash(password, password_hash):
             t.update(key_64bytes)
             t.update(AUTH_VFR_DATA)
             return h_sh.upper() == t.hexdigest().upper()
-    except:
+    except ImportError:
         pass
     # no supported hashes found
     return False
@@ -410,7 +410,7 @@ def modify_user(conn, module, user):
 
     if container_data:
         alter_sql = 'alter user %s set container_data=%s container=current' % (schema, container)
-        conn.execute_ddl(module, alter_sql)
+        conn.execute_ddl(alter_sql)
 
     # wanted list is subset of current settings, do not do anything
     if not changes and not container_data:
@@ -443,6 +443,7 @@ def main():
             service_name  = dict(required=False, aliases=['sn']),
             dsn           = dict(required=False, aliases=['datasource_name']),
             oracle_home   = dict(required=False, aliases=['oh']),
+            session_container = dict(required=False),
 
             schema        = dict(required=True, type='str', aliases=['name', 'schema_name']),
             schema_password = dict(default=None, no_log=True),
@@ -461,6 +462,8 @@ def main():
         mutually_exclusive=[['schema_password', 'schema_password_hash']],
         supports_check_mode=True,
     )
+    sanitize_string_params(module.params)
+
 
     schema = module.params["schema"]
     state = module.params["state"]
@@ -495,9 +498,9 @@ from ansible.module_utils.basic import *
 
 # In these we do import from collections
 try:
-    from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_utils import oracleConnection
-except:
-    pass
+    from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_utils import oracleConnection, sanitize_string_params
+except ImportError:
+    sanitize_string_params = lambda p: None
 
 
 if __name__ == '__main__':

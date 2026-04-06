@@ -207,6 +207,16 @@ except ImportError:
 else:
     oracledb_exists = True
 
+
+def apply_session_container(module, conn):
+    session_container = module.params.get("session_container")
+    if not session_container:
+        return
+    if not re.match(r'^[A-Za-z][A-Za-z0-9_$#]*$', session_container):
+        module.fail_json(msg='Invalid session_container for alter session', changed=False)
+    c = conn.cursor()
+    c.execute('ALTER SESSION SET CONTAINER = %s' % session_container)
+
 def query_existing(job_owner, job_name):
     c = conn.cursor()
     c.execute("""SELECT job_style, program_owner, program_name, job_type, job_action, number_of_arguments, schedule_owner, schedule_name, schedule_type,
@@ -366,8 +376,9 @@ def main():
             port          = dict(default=1521, type='int'),
             service_name  = dict(required=True),
             user          = dict(required=False),
-            password      = dict(required=False),
+            password      = dict(required=False, no_log=True),
             mode          = dict(default='normal', choices=["normal","sysdba"]),
+            session_container = dict(required=False),
             state         = dict(default="present", choices=["present", "absent"]),
             enabled       = dict(default=True, type='bool'),
             job_name      = dict(required=True, aliases=["name"]),
@@ -444,15 +455,48 @@ def main():
 
     except oracledb.DatabaseError as exc:
         error, = exc.args
-        msg[0] = 'Could not connect to database - %s, connect descriptor: %s' % (error.message, connect)
+        error_msg = getattr(error, 'message', str(error))
+        requires_thick = (mode == 'sysdba') or (not user and not password)
+        if 'DPI-1047' in error_msg and requires_thick:
+            msg[0] = (
+                "Oracle Client libraries cannot be loaded (DPI-1047). "
+                "Install Oracle Instant Client or use a thin-compatible connection mode."
+            )
+        else:
+            msg[0] = 'Oracle connection failed: %s' % error_msg
         module.fail_json(msg=msg[0], changed=False)
     if conn.version < "10.2":
         module.fail_json(msg="Database version must be 10gR2 or greater", changed=False)
-    #
-    if module.check_mode:
-        module.exit_json(changed=False)
+    apply_session_container(module, conn)
     #
     result = query_existing(job_owner, job_name)
+    desired_logging = module.params['logging_level'].upper() if module.params['logging_level'] else None
+    if module.check_mode:
+        would_change = (
+            (not result['exists'] and module.params['state'] == 'present') or
+            (result['exists'] and module.params['state'] == 'absent') or
+            (
+                result['exists'] and module.params['state'] == 'present' and (
+                    result['job_class'] != module.params['job_class'] or
+                    result['job_type'] != module.params['job_type'].upper() or
+                    result['job_action'] != module.params['job_action'] or
+                    result['repeat_interval'] != module.params['repeat_interval'] or
+                    result['restartable'] != module.params['restartable'] or
+                    (desired_logging is not None and result['logging_level'] != desired_logging) or
+                    result['comments'] != module.params['comments'] or
+                    result['auto_drop'] != module.params['auto_drop'] or
+                    result['job_arguments'] != (module.params['job_arguments'] or []) or
+                    result['lightweight'] != module.params['lightweight'] or
+                    result['enabled'] != module.params['enabled'] or
+                    compare_with_owner(result['destination'], module.params['destination'], job_owner) or
+                    compare_with_owner(result['program_name'], module.params['program_name'], job_owner) or
+                    compare_with_owner(result['schedule_name'], module.params['schedule_name'], job_owner) or
+                    compare_with_owner(result['credential'], module.params['credential'], job_owner)
+                )
+            )
+        )
+        module.exit_json(changed=would_change, msg='Check mode: no change executed')
+    #
     #
     changed = False
     if not result['exists'] and module.params['state'] == 'present':
@@ -470,7 +514,7 @@ def main():
                 result['job_action'] != module.params['job_action'] or
                 result['repeat_interval'] != module.params['repeat_interval'] or
                 result['restartable'] != module.params['restartable'] or
-                result['logging_level'] != module.params['logging_level'].upper() or
+                (desired_logging is not None and result['logging_level'] != desired_logging) or
                 result['comments'] != module.params['comments'] or
                 result['auto_drop'] != module.params['auto_drop'] or
                 result['job_arguments'] != (module.params['job_arguments'] or []) or

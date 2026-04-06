@@ -71,7 +71,7 @@
     msg: "Install oraInventory exists: {{ crs_set_up }} "
 
 - name: setup.grid.yml
-  include: setup.grid.yml
+  include_tasks: setup.grid.yml
   when: crs_set_up.stat.exists != True and oracle_ohasd_service.status.LoadState == "not-found"
   
 - name: orainstRoot.sh
@@ -103,6 +103,19 @@
 
 - name: "Execute Config Tools gridSetup.sh (part II)"
   block:
+    - name: Check GI response file exists
+      stat:
+        path: "{{ oracle_install_dir_temp }}/{{ oracle_gi_response_file }}"
+      register: gi_response_file
+
+    - name: Render GI response file when missing
+      template:
+        src: "{{ oracle_gi_response_file }}"
+        dest: "{{ oracle_install_dir_temp }}/{{ oracle_gi_response_file }}"
+        owner: "{{ oracle_os_user }}"
+        mode: "0600"
+      when: not gi_response_file.stat.exists
+
     - name: Grid Setup ASM
       shell: "./gridSetup.sh -executeConfigTools -responseFile {{ oracle_install_dir_temp}}/{{ oracle_gi_response_file }} -silent"
       args:
@@ -143,7 +156,7 @@
 - name: Create ~oracle/.crsbuild
   block:
     - name: Create ~oracle/.crsbuild
-      copy: content="{{ ansible_date_time.iso8601 }}" dest="/home/oracle/.crsbuild"
+      copy: content="{{ ansible_date_time.iso8601 }}" dest="/home/{{ oracle_os_user }}/.crsbuild"
   become: yes
   become_user: "{{ oracle_os_user }}"
   when: crsbuild_present.stat.exists != True

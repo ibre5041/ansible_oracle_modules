@@ -866,6 +866,7 @@ def main():
             oracle_home         = dict(default=None, aliases=['oh']),
             sid                 = dict(required=False, aliases=['oracle_sid']),
             db_name             = dict(required=True, aliases=['db', 'database_name', 'name']),
+            session_container   = dict(required=False),
             db_unique_name      = dict(required=False, aliases=['dbunqn', 'unique_name']),
             sys_password        = dict(required=False, no_log=True, aliases=['syspw', 'sysdbapassword', 'sysdbapw']),
             system_password     = dict(required=False, no_log=True, aliases=['systempw']),
@@ -908,6 +909,8 @@ def main():
             ["state", "absent", ["sys_password"]]
         ]
     )
+    sanitize_string_params(module.params)
+
 
     oracle_home         = module.params["oracle_home"]
     db_name             = module.params["db_name"]
@@ -1023,10 +1026,10 @@ from ansible.module_utils.basic import *
 
 # In these we do import from collections
 try:
-    from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_utils import oracleConnection
+    from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_utils import oracleConnection, sanitize_string_params
     from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_homes import OracleHomes
-except:
-    pass
+except ImportError:
+    sanitize_string_params = lambda p: None
     
 
 if __name__ == '__main__':

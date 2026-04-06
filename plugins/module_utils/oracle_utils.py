@@ -2,6 +2,8 @@ from __future__ import absolute_import, division, print_function
 
 __metaclass__ = type
 
+import re
+
 from ansible.module_utils.basic import os
 from ansible.module_utils.basic import *
 
@@ -12,7 +14,70 @@ except ImportError:
 else:
     oracledb_exists = True
 
-from ansible.module_utils.basic import *
+
+def _is_dpi_1047(error_obj):
+    msg = str(getattr(error_obj, "message", error_obj))
+    return "DPI-1047" in msg
+
+
+def _ensure_oracle_client(module, oracle_home=None, required=False):
+    """
+    Initialize python-oracledb thick mode only when needed.
+
+    Returns True when client is initialized (or already initialized), False if skipped.
+    Fails only when required=True and initialization cannot be completed.
+    """
+    if not oracledb_exists:
+        if required:
+            module.fail_json(msg="The oracledb module is required. Install it with 'pip install oracledb'.", changed=False)
+        return False
+
+    init_errors = []
+    candidates = []
+    if oracle_home:
+        candidates.append({"lib_dir": os.path.join(oracle_home.rstrip("/"), "lib")})  # Full DB install
+        candidates.append({"lib_dir": oracle_home.rstrip("/")})  # Instant Client
+    candidates.append({})  # System default (LD_LIBRARY_PATH, ORACLE_HOME env, etc.)
+
+    for kwargs in candidates:
+        try:
+            oracledb.init_oracle_client(**kwargs)
+            return True
+        except oracledb.ProgrammingError:
+            # Oracle client has already been initialized in this Python process.
+            return True
+        except oracledb.DatabaseError as exc:
+            error = exc.args[0] if exc.args else exc
+            init_errors.append(error)
+            # Continue to next candidate regardless of error type.
+
+    # All candidates exhausted.
+    if not required:
+        return False
+    has_dpi_1047 = any(_is_dpi_1047(e) for e in init_errors)
+    if has_dpi_1047:
+        module.fail_json(
+            msg=(
+                "Oracle Client libraries are required for this operation but cannot be loaded "
+                "(DPI-1047). Install Oracle Instant Client or set LD_LIBRARY_PATH to include "
+                "$ORACLE_HOME/lib."
+            ),
+            changed=False,
+        )
+    detail = str(init_errors[-1]) if init_errors else "unknown error"
+    module.fail_json(msg="Unable to initialize Oracle Client: %s" % detail, changed=False)
+    return False
+
+def sanitize_string_params(module_params):
+    """Strip leading/trailing whitespace from every string value in module.params.
+
+    Mutates the dict in place so all downstream reads of module.params are
+    automatically cleaned without changing any call site. Non-string values
+    (None, int, bool, list, dict) are left untouched.
+    """
+    for key, value in module_params.items():
+        if isinstance(value, str):
+            module_params[key] = value.strip()
 
 
 def oracle_connect(module):
@@ -51,9 +116,7 @@ def oracle_connect(module):
 
     try:
         if (not user and not password ): # If neither user or password is supplied, the use of an oracle wallet is assumed
-            # oracledb module operates in Thin Mode by default
-            # Switch to Thick mode
-            oracledb.init_oracle_client()
+            _ensure_oracle_client(module, oracle_home=oracle_home, required=True)
             if mode == 'sysdba':
                 connect = '/'
                 conn = oracledb.connect(mode=oracledb.SYSDBA)
@@ -90,7 +153,6 @@ class oracleConnection:
 
     def __init__(self, module):
         self.module = module
-        self.chaged = False
 
         if not oracledb_exists:
             module.fail_json(msg="The oracledb module is required. 'pip install oracledb' should do the trick.")
@@ -102,24 +164,6 @@ class oracleConnection:
             self.oracle_home = os.environ['ORACLE_HOME']
         else:
             self.oracle_home = None
-
-        if self.oracle_home:
-            # oracledb module operates in Thin Mode by default
-            # Switch to Thick mode
-            try:
-                oracledb.init_oracle_client(lib_dir=self.oracle_home)
-            except oracledb.DatabaseError as exc:
-                error, = exc.args
-                module.warn(str(error))
-            try:
-                oracledb.init_oracle_client()
-            except oracledb.ProgrammingError as exc:
-                # Ignore: Oracle Client library has already been initialized
-                pass
-            except oracledb.DatabaseError as exc:
-                error, = exc.args
-                #module.warn(str(error))
-
 
         hostname = module.params["hostname"]
         port = module.params["port"]
@@ -134,7 +178,12 @@ class oracleConnection:
             dsn = None
 
         wallet_connect = '/@%s' % service_name
+        # Thick mode is only required for OS-authenticated connections (no user/password).
+        # SYSDBA over TCP with explicit credentials works in python-oracledb thin mode (2.x+).
+        requires_thick = not user and not password
+        _ensure_oracle_client(module, oracle_home=self.oracle_home, required=requires_thick)
 
+        connect = '<unresolved>'
         try:
             if not user and not password: # If neither user or password is supplied, the use of an oracle connect internal or wallet is assumed
                 if mode == 'sysdba':
@@ -162,6 +211,9 @@ class oracleConnection:
         self.version = self.conn.version
         self.ddls = []
         self.changed = False
+        session_container = module.params.get("session_container")
+        if session_container:
+            self.set_container(session_container)
 
 
     def execute_select(self, sql, params=None, fetchone=False, fail_on_error=True):
@@ -180,7 +232,7 @@ class oracleConnection:
         except oracledb.DatabaseError as e:
             error = e.args[0]
             if fail_on_error:
-                self.module.fail_json(msg=error.message, code=error.code, request=sql, params=params, ddls=self.ddls, changed=self.changed)
+                self.module.fail_json(msg=error.message, code=error.code, ddls=self.ddls, changed=self.changed)
             else:
                 self.module.warn(error.message)
 
@@ -207,16 +259,18 @@ class oracleConnection:
         except oracledb.DatabaseError as e:
             error = e.args[0]
             if fail_on_error:
-                self.module.fail_json(msg=error.message, code=error.code, request=sql, params=params, ddls=self.ddls, changed=self.changed)
+                self.module.fail_json(msg=error.message, code=error.code, ddls=self.ddls, changed=self.changed)
             else:
                 self.module.warn(error.message)
 
 
-    def execute_ddl(self, request, params=None, no_change=False, ignore_errors = []):
+    def execute_ddl(self, request, params=None, no_change=False, ignore_errors=None):
         """Execute a DDL request and keep trace it in ddls attribute.
         request -- SQL query, no bind parameter allowed on DDL request.
         In check mode, query is not executed.
         """
+        if ignore_errors is None:
+            ignore_errors = []
         try:
             if self.module._verbosity >= 3:
                 self.module.warn("SQL: --{}".format(request))
@@ -231,7 +285,7 @@ class oracleConnection:
         except oracledb.DatabaseError as e:
             error = e.args[0]
             if error.code not in ignore_errors:
-                self.module.fail_json(msg=error.message, code=error.code, request=request, ddls=self.ddls, changed=self.changed)
+                self.module.fail_json(msg=error.message, code=error.code, ddls=self.ddls, changed=self.changed)
             else:
                 pass
 
@@ -268,15 +322,27 @@ class oracleConnection:
                             if num_lines < chunk_size:  # if less lines than the chunk value was fetched, it's the end
                                 break
                 else:
-                    with self.conn.cursor() as cursor:                    
-                        cursor.execute(statement)
-                self.ddls.append(statement)
+                    with self.conn.cursor() as cursor:
+                        cursor.execute(statement, params)
+                        _READONLY_PREFIXES = ('SELECT', 'WITH', '(')
+                        trimmed = statement.strip().upper()
+                        is_mutating = not trimmed.startswith(_READONLY_PREFIXES) or cursor.rowcount > 0
+                    self.ddls.append(statement)
+                    if is_mutating:
+                        self.changed = True
             else:
                 self.ddls.append('--' + statement)
             return output_lines
         except oracledb.DatabaseError as e:
             error = e.args[0]
-            self.module.fail_json(msg=error.message, code=error.code, request=statement)
+            self.module.fail_json(msg=error.message, code=error.code)
+
+    def set_container(self, pdb_name):
+        if not pdb_name:
+            return
+        if not re.match(r'^[A-Za-z][A-Za-z0-9_$#]*$', pdb_name):
+            self.module.fail_json(msg='Invalid pdb_name for alter session', changed=self.changed, ddls=self.ddls)
+        self.execute_ddl('ALTER SESSION SET CONTAINER = %s' % pdb_name, no_change=True)
 
     def resolve_object_name(self, object_name):
         statement = """

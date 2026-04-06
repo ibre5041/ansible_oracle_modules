@@ -12,10 +12,11 @@
       shell: "./gridSetup.sh -executeConfigTools -responseFile {{ oracle_install_dir_temp }}/grid.rsp -silent"
       args:
         chdir: "{{ oracle_home }}"
-      ignore_errors: true
       environment:
         #CV_ASSUME_DISTID: OEL7.8
-      register: grid_setup_out2 
+      register: grid_setup_out2
+      # gridSetup.sh returns 1-6 for non-critical warnings (e.g. swap size).
+      # Only codes > 6 indicate actual failure (exit codes are undocumented by Oracle).
       failed_when: grid_setup_out2.rc > 6
     - debug: 
         msg: "gridSetup.sh (part II) {{ grid_setup_out2 }}"

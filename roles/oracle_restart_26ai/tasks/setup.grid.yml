@@ -5,8 +5,8 @@
       template:
         src:  "{{ oracle_gi_response_file }}"
         dest: "{{ oracle_install_dir_temp }}"
-        mode: '0640'
-        owner: oracle
+        mode: '0600'
+        owner: "{{ oracle_os_user }}"
 
     - name: "gridSetup.sh (part I)"
       shell: "./gridSetup.sh -silent -responseFile {{ oracle_install_dir_temp }}/{{ oracle_gi_response_file }} ORACLE_HOME_NAME={{ oracle_home_name }}"

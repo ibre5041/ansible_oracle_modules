@@ -21,7 +21,11 @@
 - include_role:
     name: oracle_asm_disks_vmware
     public: yes
-#  when: crsbuild_present.stat.exists != True and is_vmware_environment
+  when: crsbuild_present.stat.exists != True and is_vmware_environment
+
+- name: remember if oracle-ohasd.service was missing
+  set_fact:
+    ohasd_was_missing: "{{ oracle_ohasd_service.status.LoadState == 'not-found' if (oracle_ohasd_service is defined and oracle_ohasd_service.status is defined and oracle_ohasd_service.status.LoadState is defined) else true }}"
 
 - name: wait for oracle-ohasd.service
   systemd:
@@ -102,7 +106,7 @@
   when: ansible_hostname == first_rac_node
 
 - name: setup.grid.yml
-  include: setup.grid.yml
+  include_tasks: setup.grid.yml
   when: crs_set_up.stat.exists != True and oracle_ohasd_service.status.LoadState == "not-found" and ansible_hostname == first_rac_node
 
 - name: orainstRoot.sh
@@ -117,6 +121,10 @@
 - name: root.sh (other nodes)
   shell: "{{ oracle_home }}/root.sh"
   when: ansible_hostname != first_rac_node and oracle_ohasd_service.status.LoadState == "not-found"
+
+- name: remember current oracle-ohasd.service state before start
+  set_fact:
+    ohasd_was_missing: "{{ ohasd_was_missing | default(oracle_ohasd_service.status.LoadState == 'not-found') }}"
 
 - name: wait for oracle-ohasd.service
   systemd:
@@ -137,8 +145,8 @@
     msg: "{{ oracle_asm_status }}"
 
 - name: config.grid.yml
-  include: config.grid.yml
-  when: crs_set_up.stat.exists != True and oracle_ohasd_service.status.LoadState == "not-found" and ansible_hostname == first_rac_node
+  include_tasks: config.grid.yml
+  when: crs_set_up.stat.exists != True and ohasd_was_missing and ansible_hostname == first_rac_node
 
 # - name: file perm fixup
 #   file:
@@ -163,7 +171,7 @@
 - name: Create ~oracle/.crsbuild
   block:
     - name: Create ~oracle/.crsbuild
-      copy: content="{{ ansible_date_time.iso8601 }}" dest="/home/oracle/.crsbuild"
+      copy: content="{{ ansible_date_time.iso8601 }}" dest="/home/{{ oracle_os_user }}/.crsbuild"
   become: yes
-  become_user: oracle
+  become_user: "{{ oracle_os_user }}"
   when: crsbuild_present.stat.exists != True

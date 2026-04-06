@@ -1,0 +1,72 @@
+name: Integration Tests
+
+on:
+  push:
+
+jobs:
+  integration-tests:
+    runs-on: ubuntu-latest
+
+    services:
+      oracle:
+        image: gvenzl/oracle-xe:21-slim
+        env:
+          ORACLE_PASSWORD: Oracle_4U
+        ports:
+          - 1521:1521
+        options: >-
+          --health-cmd healthcheck.sh
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 50
+          --health-start-period 90s
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install ansible oracledb
+
+      - name: Build and install collection
+        run: |
+          make build
+          VERSION=$(grep ^version: galaxy.yml | cut -d" " -f2)
+          ansible-galaxy collection install --force ibre5041-ansible_oracle_modules-${VERSION}.tar.gz
+
+      - name: Configure integration config (Docker)
+        run: |
+          cp tests/integration/integration_config.yml.docker \
+             ~/.ansible/collections/ansible_collections/ibre5041/ansible_oracle_modules/tests/integration/integration_config.yml
+
+      - name: Run integration tests
+        run: |
+          FAILED_ROLES=()
+          for ROLE in \
+              test_oracle_ping \
+              test_oracle_tnsnames \
+              test_oracle_sql \
+              test_oracle_awr \
+              test_oracle_directory \
+              test_oracle_profile \
+              test_oracle_role \
+              test_oracle_user \
+              test_oracle_tablespace \
+              test_oracle_parameter \
+              test_oracle_pdb \
+              test_oracle_facts; do
+            echo ""
+            echo "════════════════════════════════════════"
+            echo "  Running: $ROLE"
+            echo "════════════════════════════════════════"
+            make test ROLE=$ROLE || FAILED_ROLES+=($ROLE)
+          done
+
+          if [ ${#FAILED_ROLES[@]} -gt 0 ]; then
+            echo ""
+            echo "FAILED roles: ${FAILED_ROLES[*]}"
+            exit 1
+          fi
