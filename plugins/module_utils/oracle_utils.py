@@ -21,7 +21,7 @@ _AUTH_MODES = {}
 if oracledb_exists:
     _AUTH_MODES = {
         'sysdba': oracledb.SYSDBA,
-        'sysdg': getattr(oracledb, 'SYSDG', getattr(oracledb, 'AUTH_MODE_SYSDGD', None)),
+        'sysdg': getattr(oracledb, 'SYSDG', getattr(oracledb, 'AUTH_MODE_SYSDG', None)),
         'sysoper': getattr(oracledb, 'SYSOPER', getattr(oracledb, 'AUTH_MODE_SYSOPER', None)),
         'sysasm': getattr(oracledb, 'SYSASM', getattr(oracledb, 'AUTH_MODE_SYSASM', None)),
     }

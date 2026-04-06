@@ -241,6 +241,7 @@ def main():
     # Connect to database
     oc = oracleConnection(module)
     conn = oc.conn
+    conn.autocommit = False  # this module manages its own commit/rollback
     if conn.version < "11.2":
         module.fail_json(msg="Database version must be 11gR2 or greater", changed=False)
     apply_session_container(module, conn)
