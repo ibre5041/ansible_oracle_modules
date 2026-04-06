@@ -160,6 +160,20 @@ EXAMPLES = '''
 '''
 
 
+import re as _re
+
+
+def _redact_ddls(ddls):
+    """Redact passwords and secrets from DDL statements before returning to user."""
+    redacted = []
+    for ddl in ddls:
+        s = _re.sub(r'(IDENTIFIED\s+BY\s+)"[^"]*"', r'\1"***"', ddl, flags=_re.IGNORECASE)
+        s = _re.sub(r"(SECRET\s+)'[^']*'", r"\1'***'", s, flags=_re.IGNORECASE)
+        s = _re.sub(r"(USING\s+)'[^']*'", r"\1'***'", s, flags=_re.IGNORECASE)
+        redacted.append(s)
+    return redacted
+
+
 def get_wallet_status(conn):
     """Query V$ENCRYPTION_WALLET for current keystore status."""
     sql = """SELECT WRL_TYPE, WRL_PARAMETER, STATUS, WALLET_TYPE, WALLET_ORDER, KEYSTORE_MODE
@@ -286,6 +300,14 @@ def create_auto_login(conn, module):
     keystore_location = module.params["keystore_location"]
 
     if auto_login == 'none':
+        return
+
+    # Check if the desired auto-login type already exists
+    status = get_wallet_status(conn)
+    current_type = status.get('wallet_type', '') if status else ''
+    if auto_login == 'auto_login' and current_type == 'AUTOLOGIN':
+        return
+    if auto_login == 'local_auto_login' and current_type == 'LOCAL_AUTOLOGIN':
         return
 
     if not keystore_password:
@@ -462,7 +484,7 @@ def main():
         status = get_wallet_status(conn)
         module.exit_json(
             changed=conn.changed,
-            ddls=conn.ddls,
+            ddls=_redact_ddls(conn.ddls),
             msg='Secret managed successfully',
             wallet_status=status.get('status', '') if status else '',
             wallet_type=status.get('wallet_type', '') if status else '',
@@ -505,7 +527,7 @@ def main():
         status = get_wallet_status(conn)
         module.exit_json(
             changed=conn.changed,
-            ddls=conn.ddls,
+            ddls=_redact_ddls(conn.ddls),
             msg='Keystore managed successfully',
             wallet_status=status.get('status', '') if status else '',
             wallet_type=status.get('wallet_type', '') if status else '',
@@ -517,7 +539,7 @@ def main():
         status = get_wallet_status(conn)
         module.exit_json(
             changed=conn.changed,
-            ddls=conn.ddls,
+            ddls=_redact_ddls(conn.ddls),
             msg='Keystore is open',
             wallet_status=status.get('status', '') if status else '',
             wallet_type=status.get('wallet_type', '') if status else '',
@@ -529,7 +551,7 @@ def main():
         status = get_wallet_status(conn)
         module.exit_json(
             changed=conn.changed,
-            ddls=conn.ddls,
+            ddls=_redact_ddls(conn.ddls),
             msg='Keystore is closed',
             wallet_status=status.get('status', '') if status else '',
             wallet_type=status.get('wallet_type', '') if status else '',
