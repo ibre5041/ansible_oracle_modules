@@ -108,7 +108,8 @@ def build_backup_clause(backup=True, backup_tag=None):
         return ''
     clause = ' WITH BACKUP'
     if backup_tag:
-        clause += " USING '%s'" % backup_tag
+        safe_tag = backup_tag.replace("'", "''")
+        clause += " USING '%s'" % safe_tag
     return clause
 
 

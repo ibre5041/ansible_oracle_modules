@@ -90,7 +90,7 @@ options:
       - The mode with which to connect to the database
     required: false
     default: normal
-    choices: ['normal','sysdba']
+    choices: ['normal','sysdba','sysdg','sysoper','sysasm']
 notes:
     - oracledb needs to be installed
 requirements: [ "oracledb" ]

@@ -73,7 +73,15 @@ options:
     description: The mode with which to connect to the database
     required: true
     default: normal
-    choices: ['normal','sysdba']
+    choices: ['normal','sysdba','sysdg','sysoper','sysasm']
+  oracle_home:
+    description: The ORACLE_HOME path
+    required: false
+    aliases: ['oh']
+  dsn:
+    description: "Oracle Data Source Name (connect string or TNS alias), overrides hostname/port/service_name"
+    required: false
+    aliases: ['datasource_name']
 
 notes:
     - oracledb needs to be installed
@@ -424,5 +432,9 @@ except ImportError:
         for key, value in module_params.items():
             if isinstance(value, str):
                 module_params[key] = value.strip()
+
+    class oracleConnection:  # noqa: N801
+        def __init__(self, module):
+            module.fail_json(msg='oracle_utils is required. Ensure the collection is properly installed.', changed=False)
 if __name__ == '__main__':
     main()
