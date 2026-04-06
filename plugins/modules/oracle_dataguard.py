@@ -276,6 +276,7 @@ EXAMPLES = '''
 
 import json
 import os
+import re
 
 
 # ============================================================================
@@ -387,10 +388,22 @@ def dgmgrl_show_configuration(module, output_format):
 
 def dgmgrl_show_database(module, db_name, output_format):
     """Run SHOW DATABASE and return output."""
+    _validate_dgmgrl_identifier(module, db_name, 'database_name')
     rc, stdout, _stderr = run_dgmgrl(module, ['SHOW DATABASE %s VERBOSE' % db_name], output_format)
     if rc != 0:
         return None
     return stdout
+
+
+def _validate_dgmgrl_identifier(module, value, param_name):
+    """Validate that a value is a safe DGMGRL identifier (letters, digits, _, $, #)."""
+    if not re.match(r'^[A-Za-z][A-Za-z0-9_$#]*$', value):
+        module.fail_json(msg='Invalid %s: must be an Oracle identifier' % param_name, changed=False)
+
+
+def _quote_dgmgrl_literal(value):
+    """Escape single quotes in a DGMGRL string literal."""
+    return value.replace("'", "''")
 
 
 def dgmgrl_create_configuration(module):
@@ -405,8 +418,11 @@ def dgmgrl_create_configuration(module):
             changed=False
         )
 
+    _validate_dgmgrl_identifier(module, config_name, 'configuration_name')
+    _validate_dgmgrl_identifier(module, primary_db, 'primary_database')
+
     cmd = "CREATE CONFIGURATION %s AS PRIMARY DATABASE IS %s CONNECT IDENTIFIER IS '%s'" % (
-        config_name, primary_db, connect_id
+        config_name, primary_db, _quote_dgmgrl_literal(connect_id)
     )
     rc, stdout, stderr = run_dgmgrl(module, [cmd])
     if rc != 0 and 'already exists' not in stdout.lower():
@@ -425,7 +441,9 @@ def dgmgrl_add_database(module):
             changed=False
         )
 
-    cmd = "ADD DATABASE %s AS CONNECT IDENTIFIER IS '%s'" % (db_name, connect_id)
+    _validate_dgmgrl_identifier(module, db_name, 'database_name')
+
+    cmd = "ADD DATABASE %s AS CONNECT IDENTIFIER IS '%s'" % (db_name, _quote_dgmgrl_literal(connect_id))
     rc, stdout, stderr = run_dgmgrl(module, [cmd])
     if rc != 0 and 'already' not in stdout.lower():
         module.fail_json(msg='Failed to add database: %s %s' % (stdout, stderr), changed=False)
@@ -434,6 +452,7 @@ def dgmgrl_add_database(module):
 
 def dgmgrl_remove_database(module, db_name):
     """Remove a database from the configuration."""
+    _validate_dgmgrl_identifier(module, db_name, 'database_name')
     rc, stdout, stderr = run_dgmgrl(module, ['REMOVE DATABASE %s' % db_name])
     if rc != 0 and 'not found' not in stdout.lower():
         module.fail_json(msg='Failed to remove database: %s %s' % (stdout, stderr), changed=False)
@@ -449,26 +468,32 @@ def dgmgrl_remove_configuration(module):
 
 
 def dgmgrl_enable(module, target_type, target_name=None):
-    """Enable configuration or database."""
+    """Enable configuration or database. Returns True if changed."""
     if target_type == 'configuration':
         cmd = 'ENABLE CONFIGURATION'
     else:
+        _validate_dgmgrl_identifier(module, target_name, 'database_name')
         cmd = 'ENABLE DATABASE %s' % target_name
     rc, stdout, stderr = run_dgmgrl(module, [cmd])
     if rc != 0 and 'already enabled' not in stdout.lower():
         module.fail_json(msg='Failed to enable %s: %s %s' % (target_type, stdout, stderr), changed=False)
+    if 'already enabled' in stdout.lower():
+        return False
     return True
 
 
 def dgmgrl_disable(module, target_type, target_name=None):
-    """Disable configuration or database."""
+    """Disable configuration or database. Returns True if changed."""
     if target_type == 'configuration':
         cmd = 'DISABLE CONFIGURATION'
     else:
+        _validate_dgmgrl_identifier(module, target_name, 'database_name')
         cmd = 'DISABLE DATABASE %s' % target_name
     rc, stdout, stderr = run_dgmgrl(module, [cmd])
     if rc != 0 and 'already disabled' not in stdout.lower():
         module.fail_json(msg='Failed to disable %s: %s %s' % (target_type, stdout, stderr), changed=False)
+    if 'already disabled' in stdout.lower():
+        return False
     return True
 
 
@@ -476,6 +501,7 @@ def dgmgrl_switchover(module, db_name):
     """Perform a switchover to the specified database."""
     if not db_name:
         module.fail_json(msg='database_name is required for switchover', changed=False)
+    _validate_dgmgrl_identifier(module, db_name, 'database_name')
     rc, stdout, stderr = run_dgmgrl(module, ['SWITCHOVER TO %s' % db_name])
     if rc != 0:
         module.fail_json(msg='Switchover failed: %s %s' % (stdout, stderr), changed=False)
@@ -486,6 +512,7 @@ def dgmgrl_failover(module, db_name):
     """Perform a failover to the specified database."""
     if not db_name:
         module.fail_json(msg='database_name is required for failover', changed=False)
+    _validate_dgmgrl_identifier(module, db_name, 'database_name')
     rc, stdout, stderr = run_dgmgrl(module, ['FAILOVER TO %s' % db_name])
     if rc != 0:
         module.fail_json(msg='Failover failed: %s %s' % (stdout, stderr), changed=False)
@@ -507,9 +534,11 @@ def dgmgrl_set_properties(module, db_name, properties):
     """Set properties on a database."""
     if not db_name or not properties:
         return
+    _validate_dgmgrl_identifier(module, db_name, 'database_name')
     commands = []
     for prop, value in properties.items():
-        commands.append("EDIT DATABASE %s SET PROPERTY %s='%s'" % (db_name, prop, value))
+        _validate_dgmgrl_identifier(module, prop, 'property name')
+        commands.append("EDIT DATABASE %s SET PROPERTY %s='%s'" % (db_name, prop, _quote_dgmgrl_literal(str(value))))
     rc, stdout, stderr = run_dgmgrl(module, commands)
     if rc != 0:
         module.fail_json(msg='Failed to set properties: %s %s' % (stdout, stderr), changed=False)
@@ -535,7 +564,8 @@ def dgmgrl_set_protection_mode(module, protection_mode):
 
 def dgmgrl_set_state(module, db_name, db_state):
     """Set database transport/apply state."""
-    cmd = "EDIT DATABASE %s SET STATE='%s'" % (db_name, db_state.upper())
+    _validate_dgmgrl_identifier(module, db_name, 'database_name')
+    cmd = "EDIT DATABASE %s SET STATE='%s'" % (db_name, _quote_dgmgrl_literal(db_state.upper()))
     rc, stdout, stderr = run_dgmgrl(module, [cmd])
     if rc != 0:
         module.fail_json(msg='Failed to set state: %s %s' % (stdout, stderr), changed=False)
@@ -577,7 +607,9 @@ def dgmgrl_add_far_sync(module):
             changed=False
         )
 
-    cmd = "ADD FAR_SYNC %s AS CONNECT IDENTIFIER IS '%s'" % (fs_name, fs_connect)
+    _validate_dgmgrl_identifier(module, fs_name, 'far_sync_name')
+
+    cmd = "ADD FAR_SYNC %s AS CONNECT IDENTIFIER IS '%s'" % (fs_name, _quote_dgmgrl_literal(fs_connect))
     rc, stdout, stderr = run_dgmgrl(module, [cmd])
     if rc != 0 and 'already' not in stdout.lower():
         module.fail_json(msg='Failed to add Far Sync: %s %s' % (stdout, stderr), changed=False)
@@ -586,6 +618,7 @@ def dgmgrl_add_far_sync(module):
 
 def dgmgrl_validate(module, db_name):
     """Validate a database configuration."""
+    _validate_dgmgrl_identifier(module, db_name, 'database_name')
     cmd = 'VALIDATE DATABASE %s' % db_name
     rc, stdout, stderr = run_dgmgrl(module, [cmd])
     return {'rc': rc, 'output': stdout, 'errors': stderr}
@@ -873,11 +906,11 @@ def _broker_enable_disable(module, database_name, enable):
     """Handle broker enable/disable operations."""
     func = dgmgrl_enable if enable else dgmgrl_disable
     if database_name:
-        func(module, 'database', database_name)
+        changed = func(module, 'database', database_name)
     else:
-        func(module, 'configuration')
+        changed = func(module, 'configuration')
     action = 'Enabled' if enable else 'Disabled'
-    module.exit_json(changed=True, msg='%s successfully' % action)
+    module.exit_json(changed=changed, msg='%s successfully' % action)
 
 
 def _run_sql_mode(module):
