@@ -281,7 +281,7 @@ class oracleConnection:
 
     def execute_ddl(self, request, params=None, no_change=False, ignore_errors=None):
         """Execute a DDL request and keep trace it in ddls attribute.
-        request -- SQL query, no bind parameter allowed on DDL request.
+        request -- SQL or anonymous PL/SQL block; optional bind parameters via params.
         In check mode, query is not executed.
         """
         if ignore_errors is None:

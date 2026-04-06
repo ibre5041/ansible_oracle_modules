@@ -26,16 +26,23 @@ options:
     description:
       - List of plan directives
       - Each directive is a dict with keys group, cpu_p1, parallel_degree_limit_p1,
-        active_sess_pool_p1, max_idle_time, max_idle_blocker_time
+        active_sess_pool_p1, max_idle_time, max_idle_blocker_time, max_iops, max_mbps
+      - Per-directive C(max_iops) and C(max_mbps) override the module-level options below
     type: list
     elements: dict
     required: false
   max_iops:
-    description: Max I/O operations per second per session
+    description:
+      - Default max I/O operations per second per session for each plan directive when
+        creating the plan (O(state=present))
+      - Ignored unless O(directives) is non-empty; each directive can set its own C(max_iops)
     type: int
     required: false
   max_mbps:
-    description: Max megabytes per second per session
+    description:
+      - Default max megabytes per second per session for each plan directive when
+        creating the plan (O(state=present))
+      - Ignored unless O(directives) is non-empty; each directive can set its own C(max_mbps)
     type: int
     required: false
 author:
@@ -122,12 +129,21 @@ def create_plan(conn, module):
     # Create plan
     conn.execute_ddl(
         "BEGIN DBMS_RESOURCE_MANAGER.CREATE_PLAN("
-        "plan => '%s', comment => '%s'); END;" % (plan, comment)
+        "plan => :plan, comment => :comment); END;",
+        {'plan': plan, 'comment': comment},
     )
+
+    default_max_iops = module.params.get('max_iops')
+    default_max_mbps = module.params.get('max_mbps')
 
     # Create directives
     for d in directives:
-        _create_directive(conn, plan, d)
+        merged = dict(d)
+        if default_max_iops is not None and merged.get('max_iops') is None:
+            merged['max_iops'] = default_max_iops
+        if default_max_mbps is not None and merged.get('max_mbps') is None:
+            merged['max_mbps'] = default_max_mbps
+        _create_directive(conn, plan, merged)
 
     # Submit pending area
     conn.execute_ddl("BEGIN DBMS_RESOURCE_MANAGER.SUBMIT_PENDING_AREA(); END;")
@@ -135,8 +151,11 @@ def create_plan(conn, module):
 
 def _create_directive(conn, plan, directive):
     """Create a single plan directive."""
-    group = directive['group']
-    parts = ["plan => '%s'" % plan, "group_or_subplan => '%s'" % group]
+    fragments = [
+        "BEGIN DBMS_RESOURCE_MANAGER.CREATE_PLAN_DIRECTIVE(",
+        "plan => :plan, group_or_subplan => :group_or_subplan",
+    ]
+    params = {'plan': plan, 'group_or_subplan': directive['group']}
 
     for key, param in [('cpu_p1', 'cpu_p1'),
                        ('parallel_degree_limit_p1', 'parallel_degree_limit_p1'),
@@ -146,11 +165,11 @@ def _create_directive(conn, plan, directive):
                        ('max_iops', 'max_iops'),
                        ('max_mbps', 'max_mbps')]:
         if directive.get(key) is not None:
-            parts.append('%s => %d' % (param, directive[key]))
+            fragments.append(', %s => :%s' % (param, param))
+            params[param] = directive[key]
 
-    conn.execute_ddl(
-        "BEGIN DBMS_RESOURCE_MANAGER.CREATE_PLAN_DIRECTIVE(%s); END;" % ', '.join(parts)
-    )
+    fragments.append('); END;')
+    conn.execute_ddl(''.join(fragments), params)
 
 
 def drop_plan(conn, module):
@@ -158,7 +177,8 @@ def drop_plan(conn, module):
     plan = module.params["plan"]
     conn.execute_ddl("BEGIN DBMS_RESOURCE_MANAGER.CREATE_PENDING_AREA(); END;")
     conn.execute_ddl(
-        "BEGIN DBMS_RESOURCE_MANAGER.DELETE_PLAN_CASCADE(plan => '%s'); END;" % plan
+        "BEGIN DBMS_RESOURCE_MANAGER.DELETE_PLAN_CASCADE(plan => :plan); END;",
+        {'plan': plan},
     )
     conn.execute_ddl("BEGIN DBMS_RESOURCE_MANAGER.SUBMIT_PENDING_AREA(); END;")
 
@@ -167,7 +187,9 @@ def activate_plan(conn, module):
     """Set the active resource plan."""
     plan = module.params["plan"]
     conn.execute_ddl(
-        "ALTER SYSTEM SET RESOURCE_MANAGER_PLAN = '%s'" % plan
+        "BEGIN EXECUTE IMMEDIATE 'ALTER SYSTEM SET RESOURCE_MANAGER_PLAN = ' "
+        "|| DBMS_ASSERT.ENQUOTE_LITERAL(:plan); END;",
+        {'plan': plan},
     )
 
 

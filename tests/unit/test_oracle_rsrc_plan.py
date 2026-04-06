@@ -32,6 +32,12 @@ class _PlanConn(BaseFakeConn):
         self._plan_rows = plan_rows if plan_rows is not None else []
         self._directive_rows = directive_rows if directive_rows is not None else []
         self._active_plan = active_plan if active_plan is not None else ''
+        self.ddl_with_params = []
+
+    def execute_ddl(self, sql, params=None, ignore_errors=None):
+        self.ddls.append(sql)
+        self.ddl_with_params.append((sql, params))
+        self.changed = True
 
     def execute_select_to_dict(self, sql, params=None, fetchone=False, fail_on_error=True):
         sql_upper = sql.upper()
@@ -146,8 +152,27 @@ def test_plan_create(monkeypatch):
     assert result['changed'] is True
     assert 'created' in result['msg']
     assert any('CREATE_PENDING_AREA' in d for d in conn.ddls)
-    assert any('CREATE_PLAN' in d and 'TEST_PLAN' in d for d in conn.ddls)
+    assert any('CREATE_PLAN' in d and ':plan' in d and ':comment' in d for d in conn.ddls)
+    create_params = next(p for s, p in conn.ddl_with_params if p and 'CREATE_PLAN' in s)
+    assert create_params == {'plan': 'TEST_PLAN', 'comment': 'My test plan'}
     assert any('SUBMIT_PENDING_AREA' in d for d in conn.ddls)
+
+
+def test_plan_create_comment_with_apostrophe_uses_binds(monkeypatch):
+    mod = _load()
+
+    class Mod(BaseFakeModule):
+        params = _plan_params(state='present', comment="Don't throttle")
+
+    conn = _PlanConn(Mod(), plan_rows=[], directive_rows=[])
+    monkeypatch.setattr(mod, 'AnsibleModule', Mod)
+    monkeypatch.setattr(mod, 'oracleConnection', lambda m: conn, raising=False)
+
+    with pytest.raises(ExitJson):
+        mod.main()
+    create_params = next(p for s, p in conn.ddl_with_params if p and 'CREATE_PLAN' in s)
+    assert create_params['comment'] == "Don't throttle"
+    assert "'" not in next(s for s, p in conn.ddl_with_params if p and 'CREATE_PLAN' in s)
 
 
 def test_plan_create_with_directives(monkeypatch):
@@ -171,11 +196,42 @@ def test_plan_create_with_directives(monkeypatch):
     result = exc.value.args[0]
     assert result['changed'] is True
     assert 'created' in result['msg']
-    directive_ddls = [d for d in conn.ddls if 'CREATE_PLAN_DIRECTIVE' in d]
-    assert len(directive_ddls) == 3
-    assert any('OLTP_GROUP' in d and 'cpu_p1 => 70' in d for d in directive_ddls)
-    assert any('BATCH_GROUP' in d and 'cpu_p1 => 20' in d for d in directive_ddls)
-    assert any('OTHER_GROUPS' in d and 'cpu_p1 => 10' in d for d in directive_ddls)
+    directive_calls = [(s, p) for s, p in conn.ddl_with_params if s and 'CREATE_PLAN_DIRECTIVE' in s]
+    assert len(directive_calls) == 3
+    assert directive_calls[0][1]['group_or_subplan'] == 'OLTP_GROUP'
+    assert directive_calls[0][1]['cpu_p1'] == 70
+    assert directive_calls[1][1]['group_or_subplan'] == 'BATCH_GROUP'
+    assert directive_calls[1][1]['cpu_p1'] == 20
+    assert directive_calls[2][1]['group_or_subplan'] == 'OTHER_GROUPS'
+    assert directive_calls[2][1]['cpu_p1'] == 10
+
+
+def test_plan_create_top_level_max_iops_mbps_applied_to_directives(monkeypatch):
+    mod = _load()
+
+    directives = [
+        {'group': 'OLTP_GROUP', 'cpu_p1': 70},
+        {'group': 'OTHER_GROUPS', 'cpu_p1': 30, 'max_iops': 999},
+    ]
+
+    class Mod(BaseFakeModule):
+        params = _plan_params(
+            state='present',
+            directives=directives,
+            max_iops=100,
+            max_mbps=50,
+        )
+
+    conn = _PlanConn(Mod(), plan_rows=[], directive_rows=[])
+    monkeypatch.setattr(mod, 'AnsibleModule', Mod)
+    monkeypatch.setattr(mod, 'oracleConnection', lambda m: conn, raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    assert exc.value.args[0]['changed'] is True
+    directive_calls = [p for s, p in conn.ddl_with_params if s and 'CREATE_PLAN_DIRECTIVE' in s]
+    assert directive_calls[0]['max_iops'] == 100 and directive_calls[0]['max_mbps'] == 50
+    assert directive_calls[1]['max_iops'] == 999 and directive_calls[1]['max_mbps'] == 50
 
 
 def test_plan_create_idempotent(monkeypatch):
@@ -216,7 +272,9 @@ def test_plan_drop(monkeypatch):
     result = exc.value.args[0]
     assert result['changed'] is True
     assert 'dropped' in result['msg']
-    assert any('DELETE_PLAN_CASCADE' in d and 'TEST_PLAN' in d for d in conn.ddls)
+    assert any('DELETE_PLAN_CASCADE' in d and ':plan' in d for d in conn.ddls)
+    drop_params = next(p for s, p in conn.ddl_with_params if p and 'DELETE_PLAN_CASCADE' in s)
+    assert drop_params == {'plan': 'TEST_PLAN'}
     assert any('CREATE_PENDING_AREA' in d for d in conn.ddls)
     assert any('SUBMIT_PENDING_AREA' in d for d in conn.ddls)
 
@@ -287,7 +345,9 @@ def test_plan_activate(monkeypatch):
     result = exc.value.args[0]
     assert result['changed'] is True
     assert 'activated' in result['msg']
-    assert any('RESOURCE_MANAGER_PLAN' in d and 'TEST_PLAN' in d for d in conn.ddls)
+    assert any('ENQUOTE_LITERAL(:plan)' in d for d in conn.ddls)
+    act_params = next(p for s, p in conn.ddl_with_params if p and 'ENQUOTE_LITERAL' in s)
+    assert act_params == {'plan': 'TEST_PLAN'}
 
 
 def test_plan_activate_idempotent(monkeypatch):
