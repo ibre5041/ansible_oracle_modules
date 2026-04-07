@@ -276,13 +276,6 @@ def _audit_ident(s):
     return str(s).strip().upper()
 
 
-def _sql_single_quoted_literal(value):
-    """Escape *value* for use inside a single-quoted Oracle SQL string literal."""
-    if value is None:
-        return ''
-    return str(value).replace("'", "''")
-
-
 def desired_enable_scope(enabled_users, enabled_except_users):
     """Return scope tuple: ('all', frozenset()) | ('by', frozenset(names)) | ('except', frozenset(names))."""
     eu = enabled_users or []
@@ -372,7 +365,7 @@ def create_policy(conn, module):
     sql = 'CREATE AUDIT POLICY %s %s' % (policy_name, ' '.join(clauses))
 
     if audit_condition:
-        sql += " CONDITION '%s'" % _sql_single_quoted_literal(audit_condition)
+        sql += " CONDITION '%s'" % sql_single_quoted_literal(audit_condition)
         if evaluate_per:
             sql += ' EVALUATE PER %s' % evaluate_per.upper()
 
@@ -530,6 +523,7 @@ try:
     from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_utils import (  # noqa: E501
         oracleConnection,
         sanitize_string_params,
+        sql_single_quoted_literal,
     )
 except ImportError as _oracle_audit_import_err:  # pragma: no cover
     raise ImportError(

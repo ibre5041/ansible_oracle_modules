@@ -349,6 +349,30 @@ def test_dblink_create_present_neither_fixed_nor_current_user(monkeypatch):
     assert conn.ddls == []
 
 
+def test_dblink_create_connect_user_and_current_user_mutually_exclusive(monkeypatch):
+    mod = _load()
+
+    class Mod(BaseFakeModule):
+        params = _dblink_params(
+            state="present",
+            connect_user="REMOTE_USER",
+            connect_password="secret",
+            connect_using="remote_db",
+            current_user=True,
+        )
+
+    conn = _DblinkConn(Mod(), dblink_rows=[])
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "oracleConnection", lambda m: conn, raising=False)
+
+    with pytest.raises(FailJson) as exc:
+        mod.main()
+    result = exc.value.args[0]
+    assert result["changed"] is False
+    assert "mutually exclusive" in result["msg"]
+    assert conn.ddls == []
+
+
 def test_dblink_create_check_mode_no_ddl(monkeypatch):
     mod = _load()
 

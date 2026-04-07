@@ -88,6 +88,13 @@ def _ensure_oracle_client(module, oracle_home=None, required=False):
 # Shared SQL clause builders (used by oracle_wallet, oracle_tde, etc.)
 # ---------------------------------------------------------------------------
 
+def sql_single_quoted_literal(value):
+    """Escape value for use inside a single-quoted Oracle SQL string literal."""
+    if value is None:
+        return ''
+    return str(value).replace("'", "''")
+
+
 def build_force_clause(force_keystore):
     """Build FORCE KEYSTORE clause for ADMINISTER KEY MANAGEMENT."""
     if force_keystore:
@@ -108,8 +115,7 @@ def build_backup_clause(backup=True, backup_tag=None):
         return ''
     clause = ' WITH BACKUP'
     if backup_tag:
-        safe_tag = backup_tag.replace("'", "''")
-        clause += " USING '%s'" % safe_tag
+        clause += " USING '%s'" % sql_single_quoted_literal(backup_tag)
     return clause
 
 

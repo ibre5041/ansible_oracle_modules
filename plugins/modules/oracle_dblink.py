@@ -103,13 +103,6 @@ def dblink_exists(conn, link_name, link_type):
     return bool(get_dblink(conn, link_name, link_type))
 
 
-def _sql_single_quoted_literal(value):
-    """Escape value for use inside a single-quoted SQL string literal (Oracle quoting)."""
-    if value is None:
-        return ''
-    return str(value).replace("'", "''")
-
-
 def _sql_double_quoted_literal(value):
     """Escape value for use inside a double-quoted SQL delimiter (Oracle: double quote becomes \"\")."""
     if value is None:
@@ -140,7 +133,7 @@ def build_create_dblink_sql(module, redact_password=False):
         pwd = '********' if redact_password else _sql_double_quoted_literal(connect_password)
         sql += " CONNECT TO %s IDENTIFIED BY \"%s\"" % (connect_user, pwd)
 
-    sql += " USING '%s'" % _sql_single_quoted_literal(connect_using)
+    sql += " USING '%s'" % sql_single_quoted_literal(connect_using)
     return sql
 
 
@@ -188,9 +181,6 @@ def main():
             connect_using=dict(required=False),
             current_user=dict(default=False, type='bool'),
         ),
-        mutually_exclusive=[
-            ('connect_user', 'current_user'),
-        ],
         required_together=[
             ['connect_user', 'connect_password'],
         ],
@@ -216,6 +206,11 @@ def main():
         connect_user = module.params["connect_user"]
         connect_password = module.params["connect_password"]
         current_user = module.params["current_user"]
+        if connect_user and current_user:
+            module.fail_json(
+                msg='connect_user and current_user are mutually exclusive',
+                changed=False,
+            )
         if not current_user and not connect_user:
             module.fail_json(
                 msg='Either connect_user (with connect_password) or current_user=true is required for state=present',
@@ -255,11 +250,18 @@ from ansible.module_utils.basic import *  # noqa: F403
 
 try:
     from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_utils import (  # noqa: E501
-        oracleConnection, sanitize_string_params,
+        oracleConnection,
+        sanitize_string_params,
+        sql_single_quoted_literal,
     )
 except ImportError:
     def sanitize_string_params(_params):
         pass
+
+    def sql_single_quoted_literal(value):
+        if value is None:
+            return ''
+        return str(value).replace("'", "''")
 
 if __name__ == '__main__':
     main()
