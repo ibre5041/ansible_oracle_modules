@@ -206,13 +206,6 @@ def validate_wallet_inputs_before_connect(module):
     backup_tag = module.params['backup_tag']
     backup_location = module.params['backup_location']
 
-    if state == 'absent':
-        module.fail_json(
-            msg='Oracle does not support dropping a keystore via SQL. '
-                'Remove the keystore files manually from the filesystem.',
-            changed=False,
-        )
-
     if secret_state:
         if not module.params.get('secret_client'):
             module.fail_json(msg='secret_client is required for secret management', changed=False)
@@ -227,6 +220,13 @@ def validate_wallet_inputs_before_connect(module):
         _assert_sql_embeddable_str(module, module.params.get('secret_tag'), "'")
         _assert_sql_embeddable_str(module, backup_tag, "'")
         return
+
+    if state == 'absent':
+        module.fail_json(
+            msg='Oracle does not support dropping a keystore via SQL. '
+                'Remove the keystore files manually from the filesystem.',
+            changed=False,
+        )
 
     if state == 'present':
         loc = module.params.get('keystore_location')
@@ -287,11 +287,84 @@ def _redact_ddls(ddls):
     return redacted
 
 
-def get_wallet_status(conn):
-    """Query V$ENCRYPTION_WALLET for current keystore status."""
-    sql = """SELECT WRL_TYPE, WRL_PARAMETER, STATUS, WALLET_TYPE, WALLET_ORDER, KEYSTORE_MODE
-             FROM V$ENCRYPTION_WALLET
-             WHERE ROWNUM = 1"""
+def _vwallet_field(row, col):
+    """Read a V$ view column from a row dict (oracledb lower/upper keys)."""
+    if not row:
+        return ''
+    lc, uc = col.lower(), col.upper()
+    if lc in row:
+        return row[lc]
+    if uc in row:
+        return row[uc]
+    return ''
+
+
+def _aggregate_wallet_rows(rows):
+    """Merge multiple V$ENCRYPTION_WALLET rows when ``container`` is ``all``."""
+    if not rows:
+        return {}
+    if len(rows) == 1:
+        return rows[0]
+
+    statuses = []
+    for r in rows:
+        st = (_vwallet_field(r, 'STATUS') or '').upper()
+        statuses.append(st)
+
+    def _is_open(s):
+        return s in ('OPEN', 'OPEN_NO_MASTER_KEY')
+
+    def _is_closed(s):
+        return s in ('CLOSED', 'NOT_AVAILABLE') or not s
+
+    all_open = bool(statuses) and all(_is_open(s) for s in statuses)
+    all_closed = bool(statuses) and all(_is_closed(s) for s in statuses)
+    if all_open:
+        agg_status = 'OPEN'
+    elif all_closed:
+        agg_status = 'CLOSED'
+    else:
+        agg_status = 'MIXED'
+
+    first = rows[0]
+    open_rows = [rows[i] for i, s in enumerate(statuses) if _is_open(s)]
+    auto_types = ('AUTOLOGIN', 'LOCAL_AUTOLOGIN')
+
+    def _wtype(r):
+        return (_vwallet_field(r, 'WALLET_TYPE') or '').upper()
+
+    if open_rows and not all(_wtype(r) in auto_types for r in open_rows):
+        rep_wallet_type = 'PASSWORD'
+    else:
+        rep_wallet_type = _vwallet_field(first, 'WALLET_TYPE')
+
+    modes = {_vwallet_field(r, 'KEYSTORE_MODE') for r in rows if _vwallet_field(r, 'KEYSTORE_MODE')}
+    keystore_mode = 'MIXED' if len(modes) > 1 else _vwallet_field(first, 'KEYSTORE_MODE')
+
+    return {
+        'wrl_type': _vwallet_field(first, 'WRL_TYPE'),
+        'wrl_parameter': _vwallet_field(first, 'WRL_PARAMETER'),
+        'status': agg_status,
+        'wallet_type': rep_wallet_type,
+        'wallet_order': _vwallet_field(first, 'WALLET_ORDER'),
+        'keystore_mode': keystore_mode,
+    }
+
+
+def get_wallet_status(conn, container=None):
+    """Query V$ENCRYPTION_WALLET for keystore status.
+
+    With ``container='all'``, aggregates every row so open/close idempotency
+    reflects all PDBs/containers, not an arbitrary single row.
+    """
+    base_sql = """SELECT WRL_TYPE, WRL_PARAMETER, STATUS, WALLET_TYPE, WALLET_ORDER, KEYSTORE_MODE
+             FROM V$ENCRYPTION_WALLET"""
+    if container == 'all':
+        rows = conn.execute_select_to_dict(base_sql, fetchone=False)
+        if not rows:
+            return {}
+        return _aggregate_wallet_rows(rows)
+    sql = base_sql + "\n             WHERE ROWNUM = 1"
     return conn.execute_select_to_dict(sql, fetchone=True)
 
 
@@ -308,20 +381,29 @@ def get_secrets(conn):
     return conn.execute_select_to_dict(sql, fail_on_error=False) or []
 
 
-def secret_exists(conn, client_name):
-    """Check if a specific secret client entry exists."""
+def secret_exists(conn, client_name, secret_tag=None):
+    """Check if a secret exists for *client_name*, optionally scoped to *secret_tag*."""
     secrets = get_secrets(conn)
     if not secrets:
         return False
+    c_upper = client_name.upper()
+    want_tag = (secret_tag or '').strip()
+    want_tag_u = want_tag.upper() if want_tag else None
     for s in secrets:
-        if s.get('client', '').upper() == client_name.upper():
+        cli = (_vwallet_field(s, 'CLIENT') or '').upper()
+        if cli != c_upper:
+            continue
+        if want_tag_u is None:
+            return True
+        tag = (_vwallet_field(s, 'SECRET_TAG') or '').upper()
+        if tag == want_tag_u:
             return True
     return False
 
 
 def ensure_keystore_present(conn, module):
     """Create a software keystore if it doesn't exist."""
-    status = get_wallet_status(conn)
+    status = get_wallet_status(conn, module.params["container"])
     keystore_location = module.params["keystore_location"]
     keystore_password = module.params["keystore_password"]
 
@@ -350,12 +432,12 @@ def ensure_keystore_present(conn, module):
         loc_esc, pwd_esc
     )
     conn.execute_ddl(sql)
-    return get_wallet_status(conn)
+    return get_wallet_status(conn, module.params["container"])
 
 
 def ensure_keystore_open(conn, module):
     """Open the keystore if it is closed."""
-    status = get_wallet_status(conn)
+    status = get_wallet_status(conn, module.params["container"])
     current_status = status.get('status', '') if status else ''
     keystore_password = module.params["keystore_password"]
     container = module.params["container"]
@@ -375,12 +457,12 @@ def ensure_keystore_open(conn, module):
         force, pwd_esc, container_clause
     )
     conn.execute_ddl(sql)
-    return get_wallet_status(conn)
+    return get_wallet_status(conn, module.params["container"])
 
 
 def ensure_keystore_closed(conn, module):
     """Close the keystore if it is open."""
-    status = get_wallet_status(conn)
+    status = get_wallet_status(conn, module.params["container"])
     current_status = status.get('status', '') if status else ''
     keystore_password = module.params["keystore_password"]
     container = module.params["container"]
@@ -402,7 +484,7 @@ def ensure_keystore_closed(conn, module):
             pwd_esc, container_clause
         )
     conn.execute_ddl(sql)
-    return get_wallet_status(conn)
+    return get_wallet_status(conn, module.params["container"])
 
 
 def create_auto_login(conn, module):
@@ -415,7 +497,7 @@ def create_auto_login(conn, module):
         return
 
     # Check if the desired auto-login type already exists
-    status = get_wallet_status(conn)
+    status = get_wallet_status(conn, module.params["container"])
     current_type = status.get('wallet_type', '') if status else ''
     if auto_login == 'auto_login' and current_type == 'AUTOLOGIN':
         return
@@ -427,7 +509,7 @@ def create_auto_login(conn, module):
 
     # Determine location
     if not keystore_location:
-        status = get_wallet_status(conn)
+        status = get_wallet_status(conn, module.params["container"])
         keystore_location = status.get('wrl_parameter', '')
         if not keystore_location:
             wallet_root = get_wallet_root(conn)
@@ -516,7 +598,7 @@ def manage_secret(conn, module):
 
     force = build_force_clause(force_keystore)
     backup_clause = build_backup_clause(backup, backup_tag)
-    exists = secret_exists(conn, secret_client)
+    exists = secret_exists(conn, secret_client, secret_tag)
 
     safe_client = escape_sql_literal_or_fail(secret_client, "'", module)
     pwd_esc = escape_sql_literal_or_fail(keystore_password, '"', module)
@@ -541,8 +623,12 @@ def manage_secret(conn, module):
     elif secret_state == 'absent':
         if not exists:
             return  # Already absent, idempotent
-        sql = "ADMINISTER KEY MANAGEMENT %sDELETE SECRET FOR CLIENT '%s' IDENTIFIED BY \"%s\"%s" % (
-            force, safe_client, pwd_esc, backup_clause
+        tag_clause = ""
+        if secret_tag:
+            safe_tag_del = escape_sql_literal_or_fail(secret_tag, "'", module)
+            tag_clause = " USING TAG '%s'" % safe_tag_del
+        sql = "ADMINISTER KEY MANAGEMENT %sDELETE SECRET FOR CLIENT '%s'%s IDENTIFIED BY \"%s\"%s" % (
+            force, safe_client, tag_clause, pwd_esc, backup_clause
         )
         conn.execute_ddl(sql)
 
@@ -597,7 +683,7 @@ def main():
     validate_wallet_inputs_before_connect(module)
 
     def _exit_status_query(conn_):
-        status = get_wallet_status(conn_)
+        status = get_wallet_status(conn_, module.params["container"])
         secrets = get_secrets(conn_)
         module.exit_json(
             changed=False,
@@ -620,7 +706,7 @@ def main():
     # Secret management takes priority if secret_state is set
     if secret_state:
         manage_secret(conn, module)
-        status = get_wallet_status(conn)
+        status = get_wallet_status(conn, module.params["container"])
         module.exit_json(
             changed=conn.changed,
             ddls=_redact_ddls(conn.ddls),
@@ -656,7 +742,7 @@ def main():
             else:
                 backup_keystore(conn, module)
 
-        status = get_wallet_status(conn)
+        status = get_wallet_status(conn, module.params["container"])
         module.exit_json(
             changed=conn.changed,
             ddls=_redact_ddls(conn.ddls),
@@ -668,7 +754,7 @@ def main():
 
     elif state == 'open':
         ensure_keystore_open(conn, module)
-        status = get_wallet_status(conn)
+        status = get_wallet_status(conn, module.params["container"])
         module.exit_json(
             changed=conn.changed,
             ddls=_redact_ddls(conn.ddls),
@@ -680,7 +766,7 @@ def main():
 
     elif state == 'closed':
         ensure_keystore_closed(conn, module)
-        status = get_wallet_status(conn)
+        status = get_wallet_status(conn, module.params["container"])
         module.exit_json(
             changed=conn.changed,
             ddls=_redact_ddls(conn.ddls),

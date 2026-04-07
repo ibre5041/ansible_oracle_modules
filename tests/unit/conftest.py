@@ -63,9 +63,16 @@ def _ensure_fake_ansible_basic():
                     "set monkeypatch.setattr(mod, 'oracleConnection', FakeOC) in the test."
                 )
 
+        def _sanitize_string_params(module_params):
+            """Mirror production oracle_utils.sanitize_string_params; return dict for tests."""
+            for key, value in module_params.items():
+                if isinstance(value, str):
+                    module_params[key] = value.strip()
+            return module_params
+
         _ou_mod = types.ModuleType(_ou_path)
         _ou_mod.oracleConnection = _StubOracleConnection
-        _ou_mod.sanitize_string_params = lambda _params: None
+        _ou_mod.sanitize_string_params = _sanitize_string_params
         _ou_mod.sql_single_quoted_literal = _sql_single_quoted_literal
 
         # Shared SQL clause builders used by oracle_tde, oracle_wallet, etc.

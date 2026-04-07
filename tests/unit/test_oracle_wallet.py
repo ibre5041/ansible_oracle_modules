@@ -62,16 +62,23 @@ def _wallet_params(**overrides):
 class _WalletConn(BaseFakeConn):
     """Simulates V$ENCRYPTION_WALLET responses."""
 
-    def __init__(self, module, wallet_status='NOT_AVAILABLE', wallet_type='', keystore_mode='NONE', secrets=None):
+    def __init__(
+        self, module, wallet_status='NOT_AVAILABLE', wallet_type='', keystore_mode='NONE',
+        secrets=None, wallet_rows=None,
+    ):
         super().__init__(module)
         self._wallet_status = wallet_status
         self._wallet_type = wallet_type
         self._keystore_mode = keystore_mode
         self._secrets = secrets or []
+        self._wallet_rows = wallet_rows
 
     def execute_select_to_dict(self, sql, params=None, fetchone=False, fail_on_error=True):
         sql_upper = sql.upper()
         if 'V$ENCRYPTION_WALLET' in sql_upper:
+            if self._wallet_rows is not None:
+                rows = self._wallet_rows
+                return rows[0] if fetchone else rows
             row = {
                 'wrl_type': 'FILE',
                 'wrl_parameter': '/opt/oracle/wallets/tde',
@@ -436,6 +443,114 @@ def test_wallet_delete_secret_idempotent(monkeypatch):
         mod.main()
     result = exc.value.args[0]
     assert result["changed"] is False
+
+
+def test_wallet_secret_task_not_blocked_by_state_absent(monkeypatch):
+    """secret_state validation runs before the state==absent keystore guard."""
+    mod = _load()
+
+    class Mod(BaseFakeModule):
+        params = _wallet_params(
+            state="absent",
+            secret_state="absent",
+            secret_client="MY_APP",
+            keystore_password="pw",
+        )
+
+    secrets = [{'client': 'MY_APP', 'secret_tag': 'tag1'}]
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(
+        mod, "oracleConnection",
+        lambda m: _WalletConn(m, 'OPEN', 'PASSWORD', secrets=secrets),
+        raising=False,
+    )
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    assert exc.value.args[0]["msg"] == "Secret managed successfully"
+
+
+def test_wallet_delete_secret_includes_using_tag_when_requested(monkeypatch):
+    mod = _load()
+
+    class Mod(BaseFakeModule):
+        params = _wallet_params(
+            secret_client="MY_APP",
+            secret_state="absent",
+            secret_tag="mytag",
+            keystore_password="pw",
+        )
+
+    secrets = [{'client': 'MY_APP', 'secret_tag': 'mytag'}]
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(
+        mod, "oracleConnection",
+        lambda m: _WalletConn(m, 'OPEN', 'PASSWORD', secrets=secrets),
+        raising=False,
+    )
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    ddl = "\n".join(exc.value.args[0]["ddls"])
+    assert "DELETE SECRET" in ddl
+    assert "USING TAG 'mytag'" in ddl
+
+
+def test_wallet_open_container_all_mixed_runs_open(monkeypatch):
+    mod = _load()
+    rows = [
+        {
+            'wrl_type': 'FILE', 'wrl_parameter': '/a', 'status': 'OPEN',
+            'wallet_type': 'PASSWORD', 'wallet_order': 'SINGLE', 'keystore_mode': 'UNITED',
+        },
+        {
+            'wrl_type': 'FILE', 'wrl_parameter': '/b', 'status': 'CLOSED',
+            'wallet_type': 'PASSWORD', 'wallet_order': 'SINGLE', 'keystore_mode': 'UNITED',
+        },
+    ]
+
+    class Mod(BaseFakeModule):
+        params = _wallet_params(state="open", container="all")
+
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(
+        mod, "oracleConnection",
+        lambda m: _WalletConn(m, wallet_rows=rows),
+        raising=False,
+    )
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    assert exc.value.args[0]["changed"] is True
+    assert any("SET KEYSTORE OPEN" in d for d in exc.value.args[0]["ddls"])
+
+
+def test_wallet_open_container_all_idempotent_when_all_open(monkeypatch):
+    mod = _load()
+    rows = [
+        {
+            'wrl_type': 'FILE', 'wrl_parameter': '/a', 'status': 'OPEN',
+            'wallet_type': 'PASSWORD', 'wallet_order': 'SINGLE', 'keystore_mode': 'UNITED',
+        },
+        {
+            'wrl_type': 'FILE', 'wrl_parameter': '/b', 'status': 'OPEN_NO_MASTER_KEY',
+            'wallet_type': 'PASSWORD', 'wallet_order': 'SINGLE', 'keystore_mode': 'UNITED',
+        },
+    ]
+
+    class Mod(BaseFakeModule):
+        params = _wallet_params(state="open", container="all")
+
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(
+        mod, "oracleConnection",
+        lambda m: _WalletConn(m, wallet_rows=rows),
+        raising=False,
+    )
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    assert exc.value.args[0]["changed"] is False
 
 
 # ===========================================================================
