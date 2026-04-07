@@ -103,6 +103,20 @@ def dblink_exists(conn, link_name, link_type):
     return bool(get_dblink(conn, link_name, link_type))
 
 
+def _sql_single_quoted_literal(value):
+    """Escape value for use inside a single-quoted SQL string literal (Oracle quoting)."""
+    if value is None:
+        return ''
+    return str(value).replace("'", "''")
+
+
+def _sql_double_quoted_literal(value):
+    """Escape value for use inside a double-quoted SQL delimiter (Oracle: double quote becomes \"\")."""
+    if value is None:
+        return ''
+    return str(value).replace('"', '""')
+
+
 def build_create_dblink_sql(module, redact_password=False):
     """Build CREATE DATABASE LINK DDL (optionally mask password for check-mode display)."""
     link_name = module.params["link_name"]
@@ -120,10 +134,10 @@ def build_create_dblink_sql(module, redact_password=False):
     if current_user:
         sql += ' CONNECT TO CURRENT_USER'
     elif connect_user:
-        pwd = '********' if redact_password else connect_password
+        pwd = '********' if redact_password else _sql_double_quoted_literal(connect_password)
         sql += " CONNECT TO %s IDENTIFIED BY \"%s\"" % (connect_user, pwd)
 
-    sql += ' USING \'%s\'' % connect_using
+    sql += " USING '%s'" % _sql_single_quoted_literal(connect_using)
     return sql
 
 

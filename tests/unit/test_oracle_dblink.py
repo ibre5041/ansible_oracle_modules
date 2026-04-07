@@ -137,6 +137,52 @@ def test_dblink_create_private(monkeypatch):
     assert "USING 'remote_db'" in ddl
 
 
+def test_dblink_create_escapes_double_quote_in_password(monkeypatch):
+    mod = _load()
+
+    class Mod(BaseFakeModule):
+        params = _dblink_params(
+            state="present",
+            connect_user="REMOTE_USER",
+            connect_password='p"a"ss',
+            connect_using="remote_db",
+        )
+
+    conn = _DblinkConn(Mod(), dblink_rows=[])
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "oracleConnection", lambda m: conn, raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    result = exc.value.args[0]
+    assert result["changed"] is True
+    ddl = conn.ddls[0]
+    assert 'IDENTIFIED BY "p""a""ss"' in ddl
+
+
+def test_dblink_create_escapes_quote_in_connect_using(monkeypatch):
+    mod = _load()
+
+    class Mod(BaseFakeModule):
+        params = _dblink_params(
+            state="present",
+            connect_user="REMOTE_USER",
+            connect_password="secret",
+            connect_using="ORA$''@//host:1521/XEPDB1",
+        )
+
+    conn = _DblinkConn(Mod(), dblink_rows=[])
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "oracleConnection", lambda m: conn, raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    result = exc.value.args[0]
+    assert result["changed"] is True
+    ddl = conn.ddls[0]
+    assert "USING 'ORA$''''@//host:1521/XEPDB1'" in ddl
+
+
 def test_dblink_create_public(monkeypatch):
     mod = _load()
 
