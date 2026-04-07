@@ -76,13 +76,24 @@ def _ensure_fake_ansible_basic():
         # Shared SQL clause builders used by oracle_tde, oracle_wallet, etc.
         _ou_mod.build_force_clause = lambda fk: 'FORCE KEYSTORE ' if fk else ''
         _ou_mod.build_container_clause = lambda c: ' CONTAINER = ALL' if c == 'all' else ''
+        def _sql_single_quoted_literal(value):
+            """Match oracle_utils.sql_single_quoted_literal for unit tests (no package import)."""
+            if value is None:
+                return None
+            if not isinstance(value, str):
+                raise TypeError('sql_single_quoted_literal expects str or None')
+            return value.replace("'", "''")
+
+        _ou_mod.sql_single_quoted_literal = _sql_single_quoted_literal
+
         def _build_backup(backup=True, backup_tag=None):
             if not backup:
                 return ''
             clause = ' WITH BACKUP'
             if backup_tag:
-                clause += " USING '%s'" % backup_tag
+                clause += " USING '%s'" % _sql_single_quoted_literal(backup_tag)
             return clause
+
         _ou_mod.build_backup_clause = _build_backup
         sys.modules[_ou_path] = _ou_mod
 

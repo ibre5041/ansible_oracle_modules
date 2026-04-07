@@ -163,13 +163,122 @@ EXAMPLES = '''
 import re as _re
 
 
+def escape_sql_literal(value, quote_char):
+    """Escape *value* for embedding in a SQL fragment bounded by *quote_char*.
+
+    Oracle string literals double embedded single quotes; delimited strings
+    double embedded double quotes. Newlines are rejected so DDL stays a single
+    statement line.
+    """
+    if not isinstance(value, str):
+        raise TypeError('escape_sql_literal expects a string value')
+    if '\n' in value or '\r' in value:
+        raise ValueError('SQL parameter values must not contain newline or carriage return characters')
+    if quote_char == "'":
+        return value.replace("'", "''")
+    if quote_char == '"':
+        return value.replace('"', '""')
+    raise ValueError('quote_char must be single or double quote')
+
+
+def escape_sql_literal_or_fail(value, quote_char, module):
+    try:
+        return escape_sql_literal(value, quote_char)
+    except (TypeError, ValueError) as e:
+        module.fail_json(msg=str(e), changed=False)
+
+
+def _assert_sql_embeddable_str(module, value, quote_char):
+    """Reject values that cannot legally be embedded in a SQL literal."""
+    if value is None or value == '':
+        return
+    try:
+        escape_sql_literal(value, quote_char)
+    except (TypeError, ValueError) as e:
+        module.fail_json(msg=str(e), changed=False)
+
+
+def validate_wallet_inputs_before_connect(module):
+    """Validate task arguments before opening any database connection."""
+    state = module.params['state']
+    secret_state = module.params['secret_state']
+    change_password_flag = module.params['change_password']
+    backup_tag = module.params['backup_tag']
+    backup_location = module.params['backup_location']
+
+    if state == 'absent':
+        module.fail_json(
+            msg='Oracle does not support dropping a keystore via SQL. '
+                'Remove the keystore files manually from the filesystem.',
+            changed=False,
+        )
+
+    if secret_state:
+        if not module.params.get('secret_client'):
+            module.fail_json(msg='secret_client is required for secret management', changed=False)
+        if not module.params.get('keystore_password'):
+            module.fail_json(msg='keystore_password is required for secret management', changed=False)
+        if secret_state == 'present' and not module.params.get('secret'):
+            module.fail_json(msg='secret is required when secret_state=present', changed=False)
+        _assert_sql_embeddable_str(module, module.params.get('secret_client'), "'")
+        _assert_sql_embeddable_str(module, module.params.get('keystore_password'), '"')
+        if module.params.get('secret'):
+            _assert_sql_embeddable_str(module, module.params['secret'], "'")
+        _assert_sql_embeddable_str(module, module.params.get('secret_tag'), "'")
+        _assert_sql_embeddable_str(module, backup_tag, "'")
+        return
+
+    if state == 'present':
+        loc = module.params.get('keystore_location')
+        if loc:
+            _assert_sql_embeddable_str(module, loc, "'")
+        _assert_sql_embeddable_str(module, backup_tag, "'")
+        _assert_sql_embeddable_str(module, backup_location, "'")
+        if change_password_flag:
+            _assert_sql_embeddable_str(module, module.params.get('keystore_password'), '"')
+            _assert_sql_embeddable_str(module, module.params.get('new_password'), '"')
+        if (backup_tag or backup_location) and not change_password_flag:
+            if not module.params.get('keystore_password'):
+                module.fail_json(
+                    msg='keystore_password is required when backup_tag or backup_location is set',
+                    changed=False,
+                )
+        return
+
+    if state == 'open':
+        ks = module.params.get('keystore_password')
+        if ks:
+            _assert_sql_embeddable_str(module, ks, '"')
+        return
+
+    if state == 'closed':
+        ks = module.params.get('keystore_password')
+        if ks:
+            _assert_sql_embeddable_str(module, ks, '"')
+
+
 def _redact_ddls(ddls):
     """Redact passwords and secrets from DDL statements before returning to user."""
+    # Oracle doubles embedded quotes inside literals; match full quoted spans.
+    _sq_lit = r"'(?:[^']|'')*'"
+    _dq_lit = r'"(?:[^"]|"")*"'
     redacted = []
     for ddl in ddls:
-        s = _re.sub(r'(IDENTIFIED\s+BY\s+)"[^"]*"', r'\1"***"', ddl, flags=_re.IGNORECASE)
-        s = _re.sub(r"(SECRET\s+)'[^']*'", r"\1'***'", s, flags=_re.IGNORECASE)
-        s = _re.sub(r"(USING\s+)'[^']*'", r"\1'***'", s, flags=_re.IGNORECASE)
+        s = _re.sub(r'(IDENTIFIED\s+BY\s+)' + _dq_lit, r'\1"***"', ddl, flags=_re.IGNORECASE)
+        s = _re.sub(r'(SECRET\s+)' + _sq_lit, r"\1'***'", s, flags=_re.IGNORECASE)
+        s = _re.sub(r'(USING\s+)' + _sq_lit, r"\1'***'", s, flags=_re.IGNORECASE)
+        s = _re.sub(
+            r'(ALTER\s+KEYSTORE\s+PASSWORD\s+.*?SET\s+)' + _dq_lit,
+            r"\1'***'",
+            s,
+            flags=_re.IGNORECASE,
+        )
+        s = _re.sub(
+            r'(ALTER\s+KEYSTORE\s+PASSWORD\s+.*?SET\s+)' + _sq_lit,
+            r"\1'***'",
+            s,
+            flags=_re.IGNORECASE,
+        )
         redacted.append(s)
     return redacted
 
@@ -231,13 +340,10 @@ def ensure_keystore_present(conn, module):
                 changed=False
             )
 
-    if "'" in keystore_location:
-        module.fail_json(
-            msg='keystore_location must not contain single quotes',
-            changed=False,
-        )
+    loc_esc = escape_sql_literal_or_fail(keystore_location, "'", module)
+    pwd_esc = escape_sql_literal_or_fail(keystore_password, '"', module)
     sql = "ADMINISTER KEY MANAGEMENT CREATE KEYSTORE '%s' IDENTIFIED BY \"%s\"" % (
-        keystore_location, keystore_password
+        loc_esc, pwd_esc
     )
     conn.execute_ddl(sql)
     return get_wallet_status(conn)
@@ -259,9 +365,10 @@ def ensure_keystore_open(conn, module):
 
     force = build_force_clause(force_keystore)
     container_clause = build_container_clause(container)
+    pwd_esc = escape_sql_literal_or_fail(keystore_password, '"', module)
 
     sql = "ADMINISTER KEY MANAGEMENT %sSET KEYSTORE OPEN IDENTIFIED BY \"%s\"%s" % (
-        force, keystore_password, container_clause
+        force, pwd_esc, container_clause
     )
     conn.execute_ddl(sql)
     return get_wallet_status(conn)
@@ -286,8 +393,9 @@ def ensure_keystore_closed(conn, module):
     else:
         if not keystore_password:
             module.fail_json(msg='keystore_password is required to close a password-based keystore', changed=False)
+        pwd_esc = escape_sql_literal_or_fail(keystore_password, '"', module)
         sql = "ADMINISTER KEY MANAGEMENT SET KEYSTORE CLOSE IDENTIFIED BY \"%s\"%s" % (
-            keystore_password, container_clause
+            pwd_esc, container_clause
         )
     conn.execute_ddl(sql)
     return get_wallet_status(conn)
@@ -329,15 +437,25 @@ def create_auto_login(conn, module):
 
     local_clause = 'LOCAL ' if auto_login == 'local_auto_login' else ''
 
+    loc_esc = escape_sql_literal_or_fail(keystore_location, "'", module)
+    pwd_esc = escape_sql_literal_or_fail(keystore_password, '"', module)
     sql = "ADMINISTER KEY MANAGEMENT CREATE %sAUTO_LOGIN KEYSTORE FROM KEYSTORE '%s' IDENTIFIED BY \"%s\"" % (
-        local_clause, keystore_location, keystore_password
+        local_clause, loc_esc, pwd_esc
     )
     conn.execute_ddl(sql)
 
 
-def backup_keystore(conn, module):
-    """Create a backup of the keystore."""
-    keystore_password = module.params["keystore_password"]
+def backup_keystore(conn, module, identified_by_password=None):
+    """Create a backup of the keystore.
+
+    After ``ALTER KEYSTORE PASSWORD``, pass *identified_by_password* (the new
+    password) so ``IDENTIFIED BY`` matches the current keystore password.
+    """
+    keystore_password = (
+        identified_by_password
+        if identified_by_password is not None
+        else module.params["keystore_password"]
+    )
     backup_tag = module.params["backup_tag"]
     backup_location = module.params["backup_location"]
     force_keystore = module.params["force_keystore"]
@@ -346,13 +464,16 @@ def backup_keystore(conn, module):
         module.fail_json(msg='keystore_password is required to backup the keystore', changed=False)
 
     force = build_force_clause(force_keystore)
+    pwd_esc = escape_sql_literal_or_fail(keystore_password, '"', module)
 
     sql = "ADMINISTER KEY MANAGEMENT %sBACKUP KEYSTORE" % force
     if backup_tag:
-        sql += " USING '%s'" % backup_tag
-    sql += " IDENTIFIED BY \"%s\"" % keystore_password
+        tag_esc = escape_sql_literal_or_fail(backup_tag, "'", module)
+        sql += " USING '%s'" % tag_esc
+    sql += " IDENTIFIED BY \"%s\"" % pwd_esc
     if backup_location:
-        sql += " TO '%s'" % backup_location
+        loc_esc = escape_sql_literal_or_fail(backup_location, "'", module)
+        sql += " TO '%s'" % loc_esc
     conn.execute_ddl(sql)
 
 
@@ -369,9 +490,11 @@ def change_keystore_password(conn, module):
 
     force = build_force_clause(force_keystore)
     backup_clause = build_backup_clause(backup, backup_tag)
+    old_esc = escape_sql_literal_or_fail(keystore_password, '"', module)
+    new_esc = escape_sql_literal_or_fail(new_password, '"', module)
 
     sql = "ADMINISTER KEY MANAGEMENT %sALTER KEYSTORE PASSWORD IDENTIFIED BY \"%s\" SET \"%s\"%s" % (
-        force, keystore_password, new_password, backup_clause
+        force, old_esc, new_esc, backup_clause
     )
     conn.execute_ddl(sql)
 
@@ -387,34 +510,27 @@ def manage_secret(conn, module):
     backup_tag = module.params["backup_tag"]
     force_keystore = module.params["force_keystore"]
 
-    if not secret_client:
-        module.fail_json(msg='secret_client is required for secret management', changed=False)
-    if not keystore_password:
-        module.fail_json(msg='keystore_password is required for secret management', changed=False)
-
     force = build_force_clause(force_keystore)
     backup_clause = build_backup_clause(backup, backup_tag)
     exists = secret_exists(conn, secret_client)
 
-    safe_client = secret_client.replace("'", "''")
+    safe_client = escape_sql_literal_or_fail(secret_client, "'", module)
+    pwd_esc = escape_sql_literal_or_fail(keystore_password, '"', module)
 
     if secret_state == 'present':
-        if not secret:
-            module.fail_json(msg='secret is required when secret_state=present', changed=False)
-
-        safe_secret = secret.replace("'", "''")
+        safe_secret = escape_sql_literal_or_fail(secret, "'", module)
         tag_clause = ""
         if secret_tag:
-            safe_tag = secret_tag.replace("'", "''")
+            safe_tag = escape_sql_literal_or_fail(secret_tag, "'", module)
             tag_clause = " USING TAG '%s'" % safe_tag
 
         if exists:
             sql = "ADMINISTER KEY MANAGEMENT %sUPDATE SECRET '%s' FOR CLIENT '%s'%s IDENTIFIED BY \"%s\"%s" % (
-                force, safe_secret, safe_client, tag_clause, keystore_password, backup_clause
+                force, safe_secret, safe_client, tag_clause, pwd_esc, backup_clause
             )
         else:
             sql = "ADMINISTER KEY MANAGEMENT %sADD SECRET '%s' FOR CLIENT '%s'%s IDENTIFIED BY \"%s\"%s" % (
-                force, safe_secret, safe_client, tag_clause, keystore_password, backup_clause
+                force, safe_secret, safe_client, tag_clause, pwd_esc, backup_clause
             )
         conn.execute_ddl(sql)
 
@@ -422,7 +538,7 @@ def manage_secret(conn, module):
         if not exists:
             return  # Already absent, idempotent
         sql = "ADMINISTER KEY MANAGEMENT %sDELETE SECRET FOR CLIENT '%s' IDENTIFIED BY \"%s\"%s" % (
-            force, safe_client, keystore_password, backup_clause
+            force, safe_client, pwd_esc, backup_clause
         )
         conn.execute_ddl(sql)
 
@@ -474,12 +590,31 @@ def main():
     backup_tag = module.params["backup_tag"]
     backup_location = module.params["backup_location"]
 
+    validate_wallet_inputs_before_connect(module)
+
+    def _exit_status_query(conn_):
+        status = get_wallet_status(conn_)
+        secrets = get_secrets(conn_)
+        module.exit_json(
+            changed=False,
+            wallet_status=status.get('status', '') if status else '',
+            wallet_type=status.get('wallet_type', '') if status else '',
+            keystore_mode=status.get('keystore_mode', '') if status else '',
+            wrl_type=status.get('wrl_type', '') if status else '',
+            wrl_parameter=status.get('wrl_parameter', '') if status else '',
+            secrets=[{'client': s.get('client', ''), 'tag': s.get('secret_tag', '')} for s in secrets],
+        )
+
+    if module.check_mode:
+        if state == 'status':
+            conn = oracleConnection(module)
+            _exit_status_query(conn)
+        module.exit_json(changed=False, msg='Check mode: no keystore operations executed')
+
     conn = oracleConnection(module)
 
     # Secret management takes priority if secret_state is set
     if secret_state:
-        if module.check_mode:
-            module.exit_json(changed=False, msg='Check mode: no keystore operations executed')
         manage_secret(conn, module)
         status = get_wallet_status(conn)
         module.exit_json(
@@ -492,20 +627,7 @@ def main():
         )
 
     if state == 'status':
-        status = get_wallet_status(conn)
-        secrets = get_secrets(conn)
-        module.exit_json(
-            changed=False,
-            wallet_status=status.get('status', '') if status else '',
-            wallet_type=status.get('wallet_type', '') if status else '',
-            keystore_mode=status.get('keystore_mode', '') if status else '',
-            wrl_type=status.get('wrl_type', '') if status else '',
-            wrl_parameter=status.get('wrl_parameter', '') if status else '',
-            secrets=[{'client': s.get('client', ''), 'tag': s.get('secret_tag', '')} for s in secrets],
-        )
-
-    if module.check_mode:
-        module.exit_json(changed=False, msg='Check mode: no keystore operations executed')
+        _exit_status_query(conn)
 
     if state == 'present':
         status = ensure_keystore_present(conn, module)
@@ -518,10 +640,16 @@ def main():
         if change_password_flag:
             change_keystore_password(conn, module)
 
-        # Handle explicit backup request
+        # Explicit BACKUP KEYSTORE (WITH BACKUP on ALTER has no TO clause; if
+        # backup_tag is set with backup=False, ALTER omits WITH BACKUP too).
         if backup_tag or backup_location:
-            # Only backup if explicitly requested via tag or location
-            if not change_password_flag:  # change_password already does WITH BACKUP
+            if change_password_flag:
+                if backup_location or not module.params["backup"]:
+                    backup_keystore(
+                        conn, module,
+                        identified_by_password=module.params["new_password"],
+                    )
+            else:
                 backup_keystore(conn, module)
 
         status = get_wallet_status(conn)
@@ -556,14 +684,6 @@ def main():
             wallet_status=status.get('status', '') if status else '',
             wallet_type=status.get('wallet_type', '') if status else '',
             keystore_mode=status.get('keystore_mode', '') if status else '',
-        )
-
-    elif state == 'absent':
-        # Oracle does not have a DROP KEYSTORE command. Keystore removal is a filesystem operation.
-        module.fail_json(
-            msg='Oracle does not support dropping a keystore via SQL. '
-                'Remove the keystore files manually from the filesystem.',
-            changed=False,
         )
 
 

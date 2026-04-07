@@ -121,6 +121,15 @@ def build_backup_clause(backup=True, backup_tag=None):
     return clause
 
 
+def sql_single_quoted_literal(value):
+    """Double embedded single quotes for safe use inside Oracle '...' string literals."""
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise TypeError('sql_single_quoted_literal expects str or None')
+    return value.replace("'", "''")
+
+
 def sanitize_string_params(module_params):
     """Strip leading/trailing whitespace from every string value in module.params.
 

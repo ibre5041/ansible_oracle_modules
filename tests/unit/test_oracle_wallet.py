@@ -11,6 +11,31 @@ def _load():
     )
 
 
+def test_escape_sql_literal_doubles_quotes():
+    mod = _load()
+    assert mod.escape_sql_literal("a'b", "'") == "a''b"
+    assert mod.escape_sql_literal('a"b', '"') == 'a""b'
+
+
+def test_escape_sql_literal_rejects_newlines():
+    mod = _load()
+    with pytest.raises(ValueError):
+        mod.escape_sql_literal("a\nb", "'")
+    with pytest.raises(ValueError):
+        mod.escape_sql_literal("a\rb", '"')
+
+
+def test_redact_ddls_handles_doubled_quotes_in_secret():
+    mod = _load()
+    ddl = (
+        "ADMINISTER KEY MANAGEMENT FORCE ADD SECRET 'foo''bar' FOR CLIENT 'X' "
+        'IDENTIFIED BY "***"'
+    )
+    out = mod._redact_ddls([ddl])[0]
+    assert "foo" not in out
+    assert "SECRET '***'" in out
+
+
 def _wallet_params(**overrides):
     base = {
         **BASE_CONN_PARAMS,
@@ -266,6 +291,58 @@ def test_wallet_change_password(monkeypatch):
     result = exc.value.args[0]
     assert result["changed"] is True
     assert any("ALTER KEYSTORE PASSWORD" in d for d in result["ddls"])
+    joined = "\n".join(result["ddls"])
+    assert "NewPass456" not in joined
+    assert "TestKeystorePass123" not in joined
+    assert "SET '***'" in joined
+
+
+def test_wallet_change_password_with_backup_location_runs_backup_keystore(monkeypatch):
+    mod = _load()
+
+    class Mod(BaseFakeModule):
+        params = _wallet_params(
+            state="present",
+            change_password=True,
+            new_password="NewPass456",
+            backup_location="/opt/oracle/backup/wallets",
+        )
+
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "oracleConnection", lambda m: _WalletConn(m, 'OPEN', 'PASSWORD'), raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    result = exc.value.args[0]
+    ddls = result["ddls"]
+    assert any("ALTER KEYSTORE PASSWORD" in d for d in ddls)
+    assert any("BACKUP KEYSTORE" in d for d in ddls)
+    assert any("TO '/opt/oracle/backup/wallets'" in d for d in ddls)
+
+
+def test_wallet_change_password_backup_false_still_honors_backup_tag(monkeypatch):
+    mod = _load()
+
+    class Mod(BaseFakeModule):
+        params = _wallet_params(
+            state="present",
+            change_password=True,
+            new_password="NewPass456",
+            backup=False,
+            backup_tag="before_pw_change",
+        )
+
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "oracleConnection", lambda m: _WalletConn(m, 'OPEN', 'PASSWORD'), raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    result = exc.value.args[0]
+    ddls = result["ddls"]
+    assert any("ALTER KEYSTORE PASSWORD" in d for d in ddls)
+    backup_ddls = [d for d in ddls if "BACKUP KEYSTORE" in d]
+    assert backup_ddls
+    assert any("USING '***'" in d for d in backup_ddls)
 
 
 # ===========================================================================
@@ -350,6 +427,96 @@ def test_wallet_delete_secret_idempotent(monkeypatch):
 # ===========================================================================
 # Tests: state=absent
 # ===========================================================================
+
+def test_wallet_absent_skips_connection(monkeypatch):
+    mod = _load()
+    called = []
+
+    def _track_conn(m):
+        called.append(1)
+        return _WalletConn(m, 'OPEN')
+
+    class Mod(BaseFakeModule):
+        params = _wallet_params(state="absent")
+
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "oracleConnection", _track_conn, raising=False)
+
+    with pytest.raises(FailJson):
+        mod.main()
+    assert called == []
+
+
+def test_wallet_secret_missing_value_skips_connection(monkeypatch):
+    mod = _load()
+    called = []
+
+    def _track_conn(m):
+        called.append(1)
+        return _WalletConn(m, 'OPEN', 'PASSWORD')
+
+    class Mod(BaseFakeModule):
+        params = _wallet_params(
+            secret_state="present",
+            secret_client="MY_APP",
+            secret=None,
+            keystore_password="pw",
+        )
+
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "oracleConnection", _track_conn, raising=False)
+
+    with pytest.raises(FailJson) as exc:
+        mod.main()
+    assert "secret is required" in exc.value.args[0]["msg"]
+    assert called == []
+
+
+def test_wallet_check_mode_secret_skips_connection(monkeypatch):
+    mod = _load()
+    called = []
+
+    def _track_conn(m):
+        called.append(1)
+        return _WalletConn(m, 'OPEN', 'PASSWORD')
+
+    class Mod(BaseFakeModule):
+        check_mode = True
+        params = _wallet_params(
+            secret_state="present",
+            secret_client="MY_APP",
+            secret="s",
+            keystore_password="pw",
+        )
+
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "oracleConnection", _track_conn, raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    assert exc.value.args[0]["changed"] is False
+    assert called == []
+
+
+def test_wallet_check_mode_status_opens_connection(monkeypatch):
+    mod = _load()
+    called = []
+
+    def _track_conn(m):
+        called.append(1)
+        return _WalletConn(m, 'OPEN', 'PASSWORD', secrets=[])
+
+    class Mod(BaseFakeModule):
+        check_mode = True
+        params = _wallet_params(state="status")
+
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "oracleConnection", _track_conn, raising=False)
+
+    with pytest.raises(ExitJson):
+        mod.main()
+    assert called == [1]
+
 
 def test_wallet_absent_fails(monkeypatch):
     mod = _load()
