@@ -162,8 +162,8 @@ EXAMPLES = '''
   register: audit_info
 '''
 
-# Unquoted Oracle identifiers: letter/$/#/_, then alphanumerics / _ / $ / #, max 128 chars.
-_ORACLE_UNQUOTED_IDENT_RE = re.compile(r'^[A-Za-z#$][A-Za-z0-9_$#]{0,127}$')
+# Unquoted Oracle identifiers: letter, then alphanumerics / _ / $ / #, max 128 chars.
+_ORACLE_UNQUOTED_IDENT_RE = re.compile(r'^[A-Za-z][A-Za-z0-9_$#]{0,127}$')
 
 
 def _fail_invalid_identifier(module, label, value):

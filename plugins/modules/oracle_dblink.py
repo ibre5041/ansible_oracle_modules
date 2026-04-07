@@ -278,7 +278,11 @@ except ImportError:
     def sql_single_quoted_literal(value):
         if value is None:
             return ''
-        return str(value).replace("'", "''")
+        s = str(value)
+        if s.startswith("'") and s.endswith("'") and len(s) >= 2:
+            s = s[1:-1]
+        return s.replace("'", "''")
+
 
 if __name__ == '__main__':
     main()
