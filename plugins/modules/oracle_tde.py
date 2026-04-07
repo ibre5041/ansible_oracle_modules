@@ -177,7 +177,7 @@ def _redact_ddls(ddls):
     for ddl in ddls:
         s = _re.sub(r'(IDENTIFIED\s+BY\s+)"[^"]*"', r'\1"***"', ddl, flags=_re.IGNORECASE)
         s = _re.sub(r"(SECRET\s+)'[^']*'", r"\1'***'", s, flags=_re.IGNORECASE)
-        s = _re.sub(r"(USING\s+)'[^']*'", r"\1'***'", s, flags=_re.IGNORECASE)
+        s = _re.sub(r"(USING\s+TAG\s+)'[^']*'", r"\1'***'", s, flags=_re.IGNORECASE)
         redacted.append(s)
     return redacted
 
@@ -256,7 +256,7 @@ def set_master_key(conn, module):
     if algorithm:
         sql += " USING ALGORITHM '%s'" % algorithm
     if key_tag:
-        sql += " USING TAG '%s'" % key_tag
+        sql += " USING TAG '%s'" % key_tag.replace("'", "''")
     sql += " IDENTIFIED BY \"%s\"" % keystore_password
     sql += build_backup_clause()
     sql += container_clause
@@ -283,7 +283,7 @@ def create_master_key(conn, module):
     if algorithm:
         sql += " USING ALGORITHM '%s'" % algorithm
     if key_tag:
-        sql += " USING TAG '%s'" % key_tag
+        sql += " USING TAG '%s'" % key_tag.replace("'", "''")
     sql += " IDENTIFIED BY \"%s\"" % keystore_password
     sql += build_backup_clause()
     sql += container_clause
