@@ -58,6 +58,27 @@ _PUBLIC_LINK_ROW = {
 }
 
 
+def test_get_dblink_compares_upper_catalog_name():
+    """Delimited link names keep case in DBA_DB_LINKS; match must upper both sides."""
+    mod = _load()
+
+    class _Cap:
+        def __init__(self):
+            self.sql = None
+
+        def execute_select_to_dict(self, sql, params=None, fetchone=False, fail_on_error=True):
+            self.sql = sql
+            return []
+
+    norm = lambda s: " ".join(s.split())
+    c = _Cap()
+    mod.get_dblink(c, "Mixed--Case", "private")
+    assert "UPPER(DB_LINK) = UPPER(:name)" in norm(c.sql)
+    c2 = _Cap()
+    mod.get_dblink(c2, "Mixed--Case", "public")
+    assert "UPPER(DB_LINK) = UPPER(:name)" in norm(c2.sql)
+
+
 # ===========================================================================
 # Tests: state=status
 # ===========================================================================

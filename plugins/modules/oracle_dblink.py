@@ -94,10 +94,10 @@ def get_dblink(conn, link_name, link_type):
     """Query DBA_DB_LINKS for a database link."""
     if link_type == 'public':
         sql = """SELECT OWNER, DB_LINK, USERNAME, HOST, CREATED
-                 FROM DBA_DB_LINKS WHERE DB_LINK = UPPER(:name) AND OWNER = 'PUBLIC'"""
+                 FROM DBA_DB_LINKS WHERE UPPER(DB_LINK) = UPPER(:name) AND OWNER = 'PUBLIC'"""
     else:
         sql = """SELECT OWNER, DB_LINK, USERNAME, HOST, CREATED
-                 FROM DBA_DB_LINKS WHERE DB_LINK = UPPER(:name) AND OWNER != 'PUBLIC'"""
+                 FROM DBA_DB_LINKS WHERE UPPER(DB_LINK) = UPPER(:name) AND OWNER != 'PUBLIC'"""
     return conn.execute_select_to_dict(sql, {'name': link_name})
 
 
