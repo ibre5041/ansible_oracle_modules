@@ -66,9 +66,10 @@ options:
   tablespace_encryption_policy:
     description:
       - Database-level tablespace encryption policy parameter
-      - AUTO_ENABLE encrypts all new tablespaces automatically (26ai)
-      - DDL requires explicit ENCRYPTION clause in CREATE TABLESPACE
-    choices: ['AUTO_ENABLE', 'MANUAL_ENABLE', 'DECRYPT_ONLY', 'DDL']
+      - AUTO_ENABLE encrypts all new tablespaces automatically
+      - MANUAL_ENABLE requires explicit ENCRYPTION clause in CREATE TABLESPACE
+      - DECRYPT_ONLY allows decryption but prevents new encryption
+    choices: ['AUTO_ENABLE', 'MANUAL_ENABLE', 'DECRYPT_ONLY']
     required: false
   force_keystore:
     description: Use FORCE KEYSTORE clause (temporarily opens auto-login keystore)
@@ -483,7 +484,7 @@ def main():
 
             tablespace_encryption_policy=dict(required=False,
                                               choices=['AUTO_ENABLE', 'MANUAL_ENABLE',
-                                                       'DECRYPT_ONLY', 'DDL']),
+                                                       'DECRYPT_ONLY']),
 
             force_keystore=dict(default=False, type='bool'),
             container=dict(default='current', choices=['current', 'all']),
