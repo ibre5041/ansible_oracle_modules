@@ -260,7 +260,7 @@ def set_master_key(conn, module):
     sql += build_backup_clause()
     sql += container_clause
 
-    conn.execute_ddl(sql)
+    conn.execute_ddl(sql, ddls_entry=_redact_ddls([sql])[0])
 
 
 def create_master_key(conn, module):
@@ -287,7 +287,7 @@ def create_master_key(conn, module):
     sql += build_backup_clause()
     sql += container_clause
 
-    conn.execute_ddl(sql)
+    conn.execute_ddl(sql, ddls_entry=_redact_ddls([sql])[0])
 
 
 def export_keys(conn, module):
@@ -312,7 +312,7 @@ def export_keys(conn, module):
     sql = "ADMINISTER KEY MANAGEMENT %sEXPORT KEYS WITH SECRET '%s' TO '%s' IDENTIFIED BY \"%s\"" % (
         force, safe_secret, safe_file, keystore_password.replace('"', '""')
     )
-    conn.execute_ddl(sql)
+    conn.execute_ddl(sql, ddls_entry=_redact_ddls([sql])[0])
 
 
 def import_keys(conn, module):
@@ -337,7 +337,7 @@ def import_keys(conn, module):
     sql = "ADMINISTER KEY MANAGEMENT %sIMPORT KEYS WITH SECRET '%s' FROM '%s' IDENTIFIED BY \"%s\"%s" % (
         force, safe_secret, safe_file, keystore_password.replace('"', '""'), build_backup_clause()
     )
-    conn.execute_ddl(sql)
+    conn.execute_ddl(sql, ddls_entry=_redact_ddls([sql])[0])
 
 
 def encrypt_tablespace(conn, module):
