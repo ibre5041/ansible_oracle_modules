@@ -89,10 +89,12 @@ def _ensure_oracle_client(module, oracle_home=None, required=False):
 # ---------------------------------------------------------------------------
 
 def sql_single_quoted_literal(value):
-    """Escape value for use inside a single-quoted Oracle SQL string literal."""
     if value is None:
         return ''
-    return str(value).replace("'", "''")
+    s = str(value)
+    if s.startswith("'") and s.endswith("'"):
+        s = s[1:-1]
+    return s.replace("'", "''")
 
 
 def build_force_clause(force_keystore):
