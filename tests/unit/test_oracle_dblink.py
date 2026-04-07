@@ -134,6 +134,8 @@ def test_dblink_create_private(monkeypatch):
     assert "CREATE DATABASE LINK TEST_LINK" in ddl
     assert "PUBLIC" not in ddl
     assert "CONNECT TO REMOTE_USER IDENTIFIED BY" in ddl
+    assert 'IDENTIFIED BY "********"' in ddl
+    assert "secret" not in ddl
     assert "USING 'remote_db'" in ddl
 
 
@@ -157,7 +159,9 @@ def test_dblink_create_escapes_double_quote_in_password(monkeypatch):
     result = exc.value.args[0]
     assert result["changed"] is True
     ddl = conn.ddls[0]
-    assert 'IDENTIFIED BY "p""a""ss"' in ddl
+    assert 'IDENTIFIED BY "********"' in ddl
+    assert 'p"a"ss' not in ddl
+    assert 'IDENTIFIED BY "p""a""ss"' in conn._last_executed_ddl
 
 
 def test_dblink_create_escapes_quote_in_connect_using(monkeypatch):
@@ -207,6 +211,8 @@ def test_dblink_create_public(monkeypatch):
     ddl = conn.ddls[0]
     assert "CREATE PUBLIC DATABASE LINK TEST_LINK" in ddl
     assert "CONNECT TO REMOTE_USER IDENTIFIED BY" in ddl
+    assert 'IDENTIFIED BY "********"' in ddl
+    assert "secret" not in ddl
     assert "USING 'remote_db'" in ddl
 
 

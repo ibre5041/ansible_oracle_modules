@@ -69,9 +69,11 @@ class BaseFakeConn:
             return self.rows[0] if self.rows else ()
         return self.rows
 
-    def execute_ddl(self, sql, params=None, ignore_errors=None):
-        self.ddls.append(sql)
-        self.changed = True
+    def execute_ddl(self, sql, params=None, ignore_errors=None, no_change=False, ddls_entry=None):
+        self._last_executed_ddl = sql
+        self.ddls.append(ddls_entry if ddls_entry is not None else sql)
+        if not no_change:
+            self.changed = True
 
     def execute_statement(self, sql, params=None):
         self.ddls.append(sql)

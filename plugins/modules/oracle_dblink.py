@@ -118,7 +118,10 @@ def _sql_double_quoted_literal(value):
 
 
 def build_create_dblink_sql(module, redact_password=False):
-    """Build CREATE DATABASE LINK DDL (optionally mask password for check-mode display)."""
+    """Build CREATE DATABASE LINK DDL.
+
+    When redact_password is True, IDENTIFIED BY uses a placeholder (module result / check mode).
+    """
     link_name = module.params["link_name"]
     link_type = module.params["link_type"]
     connect_user = module.params["connect_user"]
@@ -154,7 +157,9 @@ def build_drop_dblink_sql(module):
 
 def create_dblink(conn, module):
     """Create a database link."""
-    conn.execute_ddl(build_create_dblink_sql(module, redact_password=False))
+    exec_sql = build_create_dblink_sql(module, redact_password=False)
+    log_sql = build_create_dblink_sql(module, redact_password=True)
+    conn.execute_ddl(exec_sql, ddls_entry=log_sql)
 
 
 def drop_dblink(conn, module):
