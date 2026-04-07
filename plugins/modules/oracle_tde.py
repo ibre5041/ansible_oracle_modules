@@ -573,7 +573,6 @@ try:
         build_backup_clause, build_container_clause, build_force_clause,
     )
 except ImportError as e:
-    HAS_ORACLE_UTILS = False
     _oracle_utils_err = e
 
     def sanitize_string_params(module_params):
