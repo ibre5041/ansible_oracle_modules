@@ -216,14 +216,16 @@ def is_tablespace_encrypted(conn, tablespace_name):
     return bool(r)
 
 
-def check_prerequisites(conn, module):
+def check_prerequisites(conn, module, honor_force_keystore=False):
     """Verify that keystore is open before TDE operations.
 
-    When force_keystore is True, skip the check — the FORCE KEYSTORE clause
-    tells Oracle to use the password-based keystore even when an auto-login
-    keystore is active, so the password keystore may appear CLOSED.
+    When honor_force_keystore is True **and** force_keystore is set, skip the
+    check — the FORCE KEYSTORE clause tells Oracle to use the password-based
+    keystore even when an auto-login keystore is active, so the password
+    keystore may appear CLOSED.  Tablespace operations never emit FORCE
+    KEYSTORE, so they must always validate the keystore state.
     """
-    if module.params.get("force_keystore"):
+    if honor_force_keystore and module.params.get("force_keystore"):
         return get_wallet_status(conn)
     status = get_wallet_status(conn)
     if not status or status.get('status') not in ('OPEN', 'OPEN_NO_MASTER_KEY'):
@@ -238,7 +240,7 @@ def check_prerequisites(conn, module):
 
 def set_master_key(conn, module):
     """Create and activate a new master encryption key."""
-    check_prerequisites(conn, module)
+    check_prerequisites(conn, module, honor_force_keystore=True)
     keystore_password = module.params["keystore_password"]
     algorithm = module.params["algorithm"]
     key_tag = module.params["key_tag"]
@@ -265,7 +267,7 @@ def set_master_key(conn, module):
 
 def create_master_key(conn, module):
     """Create a master key without activating it."""
-    check_prerequisites(conn, module)
+    check_prerequisites(conn, module, honor_force_keystore=True)
     keystore_password = module.params["keystore_password"]
     algorithm = module.params["algorithm"]
     key_tag = module.params["key_tag"]
@@ -292,7 +294,7 @@ def create_master_key(conn, module):
 
 def export_keys(conn, module):
     """Export encryption keys to a file."""
-    check_prerequisites(conn, module)
+    check_prerequisites(conn, module, honor_force_keystore=True)
     keystore_password = module.params["keystore_password"]
     export_file = module.params["export_file"]
     export_secret = module.params["export_secret"]
@@ -317,7 +319,7 @@ def export_keys(conn, module):
 
 def import_keys(conn, module):
     """Import encryption keys from a file."""
-    check_prerequisites(conn, module)
+    check_prerequisites(conn, module, honor_force_keystore=True)
     keystore_password = module.params["keystore_password"]
     export_file = module.params["export_file"]
     export_secret = module.params["export_secret"]
@@ -365,7 +367,7 @@ def encrypt_tablespace(conn, module):
 
     mode = 'ONLINE' if online else 'OFFLINE'
 
-    safe_ts = '"%s"' % tablespace.replace('"', '""')
+    safe_ts = '"%s"' % tablespace.upper().replace('"', '""')
     sql = "ALTER TABLESPACE %s ENCRYPTION %s" % (safe_ts, mode)
     if algorithm:
         sql += " USING '%s'" % algorithm
@@ -394,7 +396,7 @@ def decrypt_tablespace(conn, module):
 
     mode = 'ONLINE' if online else 'OFFLINE'
 
-    safe_ts = '"%s"' % tablespace.replace('"', '""')
+    safe_ts = '"%s"' % tablespace.upper().replace('"', '""')
     sql = "ALTER TABLESPACE %s ENCRYPTION %s DECRYPT" % (safe_ts, mode)
 
     if file_name_convert and online:
@@ -417,7 +419,7 @@ def rekey_tablespace(conn, module):
 
     mode = 'ONLINE' if online else 'OFFLINE'
 
-    safe_ts = '"%s"' % tablespace.replace('"', '""')
+    safe_ts = '"%s"' % tablespace.upper().replace('"', '""')
     sql = "ALTER TABLESPACE %s ENCRYPTION %s" % (safe_ts, mode)
     if algorithm:
         sql += " USING '%s'" % algorithm
@@ -512,9 +514,6 @@ def main():
             encrypted_tablespaces=encrypted_ts,
         )
 
-    if module.check_mode:
-        module.exit_json(changed=False, msg='Check mode: no TDE operations executed')
-
     if state == 'present':
         # Handle encryption policy parameter
         if tablespace_encryption_policy:
@@ -573,11 +572,26 @@ try:
         oracleConnection, sanitize_string_params,
         build_backup_clause, build_container_clause, build_force_clause,
     )
-except ImportError:
+except ImportError as e:
+    HAS_ORACLE_UTILS = False
+    _oracle_utils_err = e
+
     def sanitize_string_params(module_params):
         for key, value in module_params.items():
             if isinstance(value, str):
                 module_params[key] = value.strip()
+
+    def oracleConnection(*args, **kwargs):
+        raise ImportError("oracle_utils is required: %s" % _oracle_utils_err)
+
+    def build_backup_clause(*args, **kwargs):
+        raise ImportError("oracle_utils is required: %s" % _oracle_utils_err)
+
+    def build_container_clause(*args, **kwargs):
+        raise ImportError("oracle_utils is required: %s" % _oracle_utils_err)
+
+    def build_force_clause(*args, **kwargs):
+        raise ImportError("oracle_utils is required: %s" % _oracle_utils_err)
 
 if __name__ == '__main__':
     main()
