@@ -365,7 +365,8 @@ def encrypt_tablespace(conn, module):
 
     mode = 'ONLINE' if online else 'OFFLINE'
 
-    sql = "ALTER TABLESPACE %s ENCRYPTION %s" % (tablespace, mode)
+    safe_ts = '"%s"' % tablespace.replace('"', '""')
+    sql = "ALTER TABLESPACE %s ENCRYPTION %s" % (safe_ts, mode)
     if algorithm:
         sql += " USING '%s'" % algorithm
     sql += " ENCRYPT"
@@ -393,7 +394,8 @@ def decrypt_tablespace(conn, module):
 
     mode = 'ONLINE' if online else 'OFFLINE'
 
-    sql = "ALTER TABLESPACE %s ENCRYPTION %s DECRYPT" % (tablespace, mode)
+    safe_ts = '"%s"' % tablespace.replace('"', '""')
+    sql = "ALTER TABLESPACE %s ENCRYPTION %s DECRYPT" % (safe_ts, mode)
 
     if file_name_convert and online:
         pairs = ', '.join("'%s', '%s'" % (k.replace("'", "''"), v.replace("'", "''")) for k, v in file_name_convert.items())
@@ -415,7 +417,8 @@ def rekey_tablespace(conn, module):
 
     mode = 'ONLINE' if online else 'OFFLINE'
 
-    sql = "ALTER TABLESPACE %s ENCRYPTION %s" % (tablespace, mode)
+    safe_ts = '"%s"' % tablespace.replace('"', '""')
+    sql = "ALTER TABLESPACE %s ENCRYPTION %s" % (safe_ts, mode)
     if algorithm:
         sql += " USING '%s'" % algorithm
     sql += " REKEY"
