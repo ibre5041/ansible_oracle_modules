@@ -258,7 +258,12 @@ def validate_wallet_inputs_before_connect(module):
 
 
 def _redact_ddls(ddls):
-    """Redact passwords and secrets from DDL statements before returning to user."""
+    """Redact passwords and secrets from DDL statements before returning to user.
+
+    Backup identifiers in ``... USING 'tag'`` (BACKUP KEYSTORE / WITH BACKUP) are
+    left visible; they are not credentials. ``USING TAG`` for secrets uses a
+    different token sequence and is unaffected.
+    """
     # Oracle doubles embedded quotes inside literals; match full quoted spans.
     _sq_lit = r"'(?:[^']|'')*'"
     _dq_lit = r'"(?:[^"]|"")*"'
@@ -266,7 +271,6 @@ def _redact_ddls(ddls):
     for ddl in ddls:
         s = _re.sub(r'(IDENTIFIED\s+BY\s+)' + _dq_lit, r'\1"***"', ddl, flags=_re.IGNORECASE)
         s = _re.sub(r'(SECRET\s+)' + _sq_lit, r"\1'***'", s, flags=_re.IGNORECASE)
-        s = _re.sub(r'(USING\s+)' + _sq_lit, r"\1'***'", s, flags=_re.IGNORECASE)
         s = _re.sub(
             r'(ALTER\s+KEYSTORE\s+PASSWORD\s+.*?SET\s+)' + _dq_lit,
             r"\1'***'",

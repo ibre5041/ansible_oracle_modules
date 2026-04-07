@@ -356,7 +356,7 @@ def test_wallet_change_password_backup_false_still_honors_backup_tag(monkeypatch
     assert any("ALTER KEYSTORE PASSWORD" in d for d in ddls)
     backup_ddls = [d for d in ddls if "BACKUP KEYSTORE" in d]
     assert backup_ddls
-    assert any("USING '***'" in d for d in backup_ddls)
+    assert any("USING 'before_pw_change'" in d for d in backup_ddls)
 
 
 # ===========================================================================
