@@ -187,6 +187,52 @@ def test_dblink_create_escapes_quote_in_connect_using(monkeypatch):
     assert "USING 'ORA$''''@//host:1521/XEPDB1'" in ddl
 
 
+def test_dblink_create_quotes_link_name_when_not_plain_identifier(monkeypatch):
+    mod = _load()
+
+    class Mod(BaseFakeModule):
+        params = _dblink_params(
+            state="present",
+            link_name="EGG--INJECT",
+            connect_user="REMOTE_USER",
+            connect_password="secret",
+            connect_using="remote_db",
+        )
+
+    conn = _DblinkConn(Mod(), dblink_rows=[])
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "oracleConnection", lambda m: conn, raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    assert exc.value.args[0]["changed"] is True
+    ddl = conn.ddls[0]
+    assert 'DATABASE LINK "EGG--INJECT"' in ddl
+    assert "USING 'remote_db'" in ddl
+
+
+def test_dblink_create_quotes_connect_user_when_not_plain_identifier(monkeypatch):
+    mod = _load()
+
+    class Mod(BaseFakeModule):
+        params = _dblink_params(
+            state="present",
+            connect_user="rem-user",
+            connect_password="secret",
+            connect_using="remote_db",
+        )
+
+    conn = _DblinkConn(Mod(), dblink_rows=[])
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "oracleConnection", lambda m: conn, raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    assert exc.value.args[0]["changed"] is True
+    ddl = conn.ddls[0]
+    assert 'CONNECT TO "rem-user" IDENTIFIED BY' in ddl
+
+
 def test_dblink_create_public(monkeypatch):
     mod = _load()
 

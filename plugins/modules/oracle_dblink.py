@@ -1,6 +1,8 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
+import re
+
 DOCUMENTATION = '''
 ---
 module: oracle_dblink
@@ -110,6 +112,18 @@ def _sql_double_quoted_literal(value):
     return str(value).replace('"', '""')
 
 
+_SAFE_UNQUOTED_ORACLE_IDENT = re.compile(r'^[A-Za-z][A-Za-z0-9_#$]*$')
+
+
+def _ddl_oracle_identifier(name):
+    if name is None:
+        return ''
+    s = str(name)
+    if _SAFE_UNQUOTED_ORACLE_IDENT.match(s):
+        return s
+    return '"%s"' % _sql_double_quoted_literal(s)
+
+
 def build_create_dblink_sql(module, redact_password=False):
     """Build CREATE DATABASE LINK DDL.
 
@@ -125,13 +139,16 @@ def build_create_dblink_sql(module, redact_password=False):
     sql = 'CREATE'
     if link_type == 'public':
         sql += ' PUBLIC'
-    sql += ' DATABASE LINK %s' % link_name
+    sql += ' DATABASE LINK %s' % _ddl_oracle_identifier(link_name)
 
     if current_user:
         sql += ' CONNECT TO CURRENT_USER'
     elif connect_user:
         pwd = '********' if redact_password else _sql_double_quoted_literal(connect_password)
-        sql += " CONNECT TO %s IDENTIFIED BY \"%s\"" % (connect_user, pwd)
+        sql += " CONNECT TO %s IDENTIFIED BY \"%s\"" % (
+            _ddl_oracle_identifier(connect_user),
+            pwd,
+        )
 
     sql += " USING '%s'" % sql_single_quoted_literal(connect_using)
     return sql
@@ -144,7 +161,7 @@ def build_drop_dblink_sql(module):
     sql = 'DROP'
     if link_type == 'public':
         sql += ' PUBLIC'
-    sql += ' DATABASE LINK %s' % link_name
+    sql += ' DATABASE LINK %s' % _ddl_oracle_identifier(link_name)
     return sql
 
 

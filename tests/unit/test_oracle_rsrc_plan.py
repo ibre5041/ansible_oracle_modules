@@ -34,10 +34,12 @@ class _PlanConn(BaseFakeConn):
         self._active_plan = active_plan if active_plan is not None else ''
         self.ddl_with_params = []
 
-    def execute_ddl(self, sql, params=None, ignore_errors=None):
-        self.ddls.append(sql)
+    def execute_ddl(self, sql, params=None, no_change=False, ignore_errors=None, ddls_entry=None):
+        trace = ddls_entry if ddls_entry is not None else sql
+        self.ddls.append(trace)
         self.ddl_with_params.append((sql, params))
-        self.changed = True
+        if not no_change:
+            self.changed = True
 
     def execute_select_to_dict(self, sql, params=None, fetchone=False, fail_on_error=True):
         sql_upper = sql.upper()
