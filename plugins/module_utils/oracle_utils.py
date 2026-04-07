@@ -416,7 +416,16 @@ class oracleConnection:
             return
         if not re.match(r'^[A-Za-z][A-Za-z0-9_$#]*$', pdb_name):
             self.module.fail_json(msg='Invalid pdb_name for alter session', changed=self.changed, ddls=self.ddls)
-        self.execute_ddl('ALTER SESSION SET CONTAINER = %s' % pdb_name, no_change=True)
+        # Execute directly instead of via execute_ddl so that the session
+        # container is switched even in check_mode — subsequent SELECT queries
+        # need to run against the correct PDB.
+        sql = 'ALTER SESSION SET CONTAINER = %s' % pdb_name
+        try:
+            with self.conn.cursor() as cursor:
+                cursor.execute(sql)
+        except oracledb.DatabaseError as e:
+            error = e.args[0]
+            self.module.fail_json(msg=error.message, code=error.code, ddls=self.ddls, changed=self.changed)
 
     def resolve_object_name(self, object_name):
         statement = """

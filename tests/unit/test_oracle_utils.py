@@ -49,14 +49,29 @@ def test_set_container_rejects_invalid_name():
         raise AssertionError("set_container should fail on invalid pdb name")
 
 
+class _DummyCursor:
+    def execute(self, _sql, _params=None):
+        pass
+    def __enter__(self):
+        return self
+    def __exit__(self, *args):
+        pass
+
+
+class _DummyConn:
+    def cursor(self):
+        return _DummyCursor()
+
+
 def test_set_container_valid_does_not_mark_changed_in_check_mode():
     utils = load_module_from_path(module_path("plugins", "module_utils", "oracle_utils.py"), "oracle_utils_test_3")
     conn = _new_conn_instance(utils, check_mode=True)
+    conn.conn = _DummyConn()
 
     conn.set_container("PDB1")
 
     assert conn.changed is False
-    assert conn.ddls == ["--ALTER SESSION SET CONTAINER = PDB1"]
+    assert conn.ddls == []
 
 
 def test_execute_statement_check_mode_records_statement():
