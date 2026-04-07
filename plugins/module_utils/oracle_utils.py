@@ -89,6 +89,11 @@ def _ensure_oracle_client(module, oracle_home=None, required=False):
 # ---------------------------------------------------------------------------
 
 def sql_single_quoted_literal(value):
+    """Escape *value* for use inside a single-quoted Oracle SQL string literal.
+
+    ``None`` yields ``''``. Other values are coerced with ``str()`` so callers
+    (e.g. unified audit condition text) stay compatible; single quotes are doubled.
+    """
     if value is None:
         return ''
     s = str(value)
@@ -119,15 +124,6 @@ def build_backup_clause(backup=True, backup_tag=None):
     if backup_tag:
         clause += " USING '%s'" % sql_single_quoted_literal(backup_tag)
     return clause
-
-
-def sql_single_quoted_literal(value):
-    """Double embedded single quotes for safe use inside Oracle '...' string literals."""
-    if value is None:
-        return None
-    if not isinstance(value, str):
-        raise TypeError('sql_single_quoted_literal expects str or None')
-    return value.replace("'", "''")
 
 
 def sanitize_string_params(module_params):

@@ -321,13 +321,13 @@ def ensure_keystore_present(conn, module):
     keystore_location = module.params["keystore_location"]
     keystore_password = module.params["keystore_password"]
 
-    if not keystore_password:
-        module.fail_json(msg='keystore_password is required to create a keystore', changed=False)
-
     # If keystore already exists (status is not NOT_AVAILABLE and not empty)
     current_status = status.get('status', '') if status else ''
     if current_status and current_status != 'NOT_AVAILABLE':
         return status
+
+    if not keystore_password:
+        module.fail_json(msg='keystore_password is required to create a keystore', changed=False)
 
     # Determine location
     if not keystore_location:

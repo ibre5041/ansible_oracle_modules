@@ -148,6 +148,20 @@ def test_wallet_create_idempotent_when_exists(monkeypatch):
     assert result["changed"] is False
 
 
+def test_wallet_present_idempotent_without_password_when_already_exists(monkeypatch):
+    mod = _load()
+
+    class Mod(BaseFakeModule):
+        params = _wallet_params(state="present", keystore_password=None)
+
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "oracleConnection", lambda m: _WalletConn(m, 'OPEN', 'PASSWORD'), raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    assert exc.value.args[0]["changed"] is False
+
+
 # ===========================================================================
 # Tests: state=open
 # ===========================================================================
