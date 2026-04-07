@@ -447,7 +447,7 @@ def set_encryption_parameter(conn, module):
     if current and current.upper() == policy.upper():
         return  # Already set, idempotent
 
-    conn.execute_ddl("ALTER SYSTEM SET TABLESPACE_ENCRYPTION = '%s' SCOPE=BOTH" % policy)
+    conn.execute_ddl("ALTER SYSTEM SET TABLESPACE_ENCRYPTION = '%s' SCOPE=SPFILE" % policy)
 
 
 def main():
