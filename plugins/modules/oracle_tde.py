@@ -256,7 +256,7 @@ def set_master_key(conn, module):
         sql += " USING ALGORITHM '%s'" % algorithm
     if key_tag:
         sql += " USING TAG '%s'" % key_tag.replace("'", "''")
-    sql += " IDENTIFIED BY \"%s\"" % keystore_password
+    sql += " IDENTIFIED BY \"%s\"" % keystore_password.replace('"', '""')
     sql += build_backup_clause()
     sql += container_clause
 
@@ -283,7 +283,7 @@ def create_master_key(conn, module):
         sql += " USING ALGORITHM '%s'" % algorithm
     if key_tag:
         sql += " USING TAG '%s'" % key_tag.replace("'", "''")
-    sql += " IDENTIFIED BY \"%s\"" % keystore_password
+    sql += " IDENTIFIED BY \"%s\"" % keystore_password.replace('"', '""')
     sql += build_backup_clause()
     sql += container_clause
 
@@ -310,7 +310,7 @@ def export_keys(conn, module):
     safe_secret = export_secret.replace("'", "''")
     safe_file = export_file.replace("'", "''")
     sql = "ADMINISTER KEY MANAGEMENT %sEXPORT KEYS WITH SECRET '%s' TO '%s' IDENTIFIED BY \"%s\"" % (
-        force, safe_secret, safe_file, keystore_password
+        force, safe_secret, safe_file, keystore_password.replace('"', '""')
     )
     conn.execute_ddl(sql)
 
@@ -335,7 +335,7 @@ def import_keys(conn, module):
     safe_secret = export_secret.replace("'", "''")
     safe_file = export_file.replace("'", "''")
     sql = "ADMINISTER KEY MANAGEMENT %sIMPORT KEYS WITH SECRET '%s' FROM '%s' IDENTIFIED BY \"%s\"%s" % (
-        force, safe_secret, safe_file, keystore_password, build_backup_clause()
+        force, safe_secret, safe_file, keystore_password.replace('"', '""'), build_backup_clause()
     )
     conn.execute_ddl(sql)
 
@@ -371,7 +371,7 @@ def encrypt_tablespace(conn, module):
     sql += " ENCRYPT"
 
     if file_name_convert and online:
-        pairs = ', '.join("'%s', '%s'" % (k, v) for k, v in file_name_convert.items())
+        pairs = ', '.join("'%s', '%s'" % (k.replace("'", "''"), v.replace("'", "''")) for k, v in file_name_convert.items())
         sql += " FILE_NAME_CONVERT = (%s)" % pairs
 
     conn.execute_ddl(sql)
@@ -396,7 +396,7 @@ def decrypt_tablespace(conn, module):
     sql = "ALTER TABLESPACE %s ENCRYPTION %s DECRYPT" % (tablespace, mode)
 
     if file_name_convert and online:
-        pairs = ', '.join("'%s', '%s'" % (k, v) for k, v in file_name_convert.items())
+        pairs = ', '.join("'%s', '%s'" % (k.replace("'", "''"), v.replace("'", "''")) for k, v in file_name_convert.items())
         sql += " FILE_NAME_CONVERT = (%s)" % pairs
 
     conn.execute_ddl(sql)
@@ -421,7 +421,7 @@ def rekey_tablespace(conn, module):
     sql += " REKEY"
 
     if file_name_convert and online:
-        pairs = ', '.join("'%s', '%s'" % (k, v) for k, v in file_name_convert.items())
+        pairs = ', '.join("'%s', '%s'" % (k.replace("'", "''"), v.replace("'", "''")) for k, v in file_name_convert.items())
         sql += " FILE_NAME_CONVERT = (%s)" % pairs
 
     conn.execute_ddl(sql)
