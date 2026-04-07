@@ -447,8 +447,8 @@ def test_apply_norestart_changes(monkeypatch):
     executed = []
 
     class _FakeConn(BaseFakeConn):
-        def execute_ddl(self, sql, params=None, ignore_errors=None):
-            executed.append(sql)
+        def execute_ddl(self, sql, params=None, no_change=False, ignore_errors=None, ddls_entry=None):
+            executed.append(ddls_entry if ddls_entry is not None else sql)
 
     monkeypatch.setattr(mod, "oracleConnection", _FakeConn, raising=False)
     result = mod.apply_norestart_changes(m, ["alter database force logging", "alter database flashback on"])

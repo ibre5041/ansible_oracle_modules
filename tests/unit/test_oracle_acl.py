@@ -55,10 +55,12 @@ class _AclConn(BaseFakeConn):
 
         return rows
 
-    def execute_ddl(self, sql, params=None, ignore_errors=None):
-        self.ddls.append(sql)
+    def execute_ddl(self, sql, params=None, no_change=False, ignore_errors=None, ddls_entry=None):
+        trace = ddls_entry if ddls_entry is not None else sql
+        self.ddls.append(trace)
         self.ddl_binds.append(dict(params) if params else {})
-        self.changed = True
+        if not no_change:
+            self.changed = True
 
 
 # ---------------------------------------------------------------------------

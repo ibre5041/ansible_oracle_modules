@@ -88,6 +88,13 @@ def _ensure_oracle_client(module, oracle_home=None, required=False):
 # Shared SQL clause builders (used by oracle_wallet, oracle_tde, etc.)
 # ---------------------------------------------------------------------------
 
+def sql_single_quoted_literal(value):
+    """Escape value for use inside a single-quoted Oracle SQL string literal."""
+    if value is None:
+        return ''
+    return str(value).replace("'", "''")
+
+
 def build_force_clause(force_keystore):
     """Build FORCE KEYSTORE clause for ADMINISTER KEY MANAGEMENT."""
     if force_keystore:
@@ -108,8 +115,7 @@ def build_backup_clause(backup=True, backup_tag=None):
         return ''
     clause = ' WITH BACKUP'
     if backup_tag:
-        safe_tag = backup_tag.replace("'", "''")
-        clause += " USING '%s'" % safe_tag
+        clause += " USING '%s'" % sql_single_quoted_literal(backup_tag)
     return clause
 
 
@@ -326,22 +332,26 @@ class oracleConnection:
                 self.module.warn(error.message)
 
 
-    def execute_ddl(self, request, params=None, no_change=False, ignore_errors=None):
+    def execute_ddl(self, request, params=None, no_change=False, ignore_errors=None, ddls_entry=None):
         """Execute a DDL request and keep trace it in ddls attribute.
         request -- SQL or anonymous PL/SQL block; optional bind parameters via params.
         In check mode, query is not executed.
+        ddls_entry -- If set, this string is recorded in ``ddls`` and shown for ``-vvv``
+            instead of ``request`` after success. Use to avoid returning secrets in the
+            module result while still executing ``request`` on the database.
         """
         if ignore_errors is None:
             ignore_errors = []
+        trace = ddls_entry if ddls_entry is not None else request
         try:
             if self.module._verbosity >= 3:
-                self.module.warn("SQL: --{}".format(request))
+                self.module.warn("SQL: --{}".format(trace))
             if not self.module.check_mode:
                 with self.conn.cursor() as cursor:
                     cursor.execute(request, params)
-                    self.ddls.append(request)
+                    self.ddls.append(trace)
             else:
-                self.ddls.append('--' + request)
+                self.ddls.append('--' + trace)
             if not no_change: # In case of alter session, do not set changed to True
                 self.changed = True
         except oracledb.DatabaseError as e:
