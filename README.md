@@ -30,28 +30,34 @@ The default behaviour for the modules using `oracledb` is this:
 
 # Modules:
 
+    ansible-doc --type module -l ibre5041.ansible_oracle_modules
+
 | Module						    | Description |
 | :-------------------------------------------------------- | :---------- |
 | [oracle_ping](../content/module/oracle_ping/)		    | Test database connection |
 | [oracle_acfs](../content/module/oracle_acfs/)		    | Manage ACFS filesystems |
+| [oracle_acl](../content/module/oracle_acl/)		    | Manage Oracle network Access Control Lists |
+| [oracle_audit](../content/module/oracle_audit/)           | Manage Oracle Unified Auditing policies |
 | [oracle_asmdg](../content/module/oracle_asmdg/)	    | Manage diskgroups in an Oracle database |
 | [oracle_asmvol](../content/module/oracle_asmvol/)	    | Manage Oracle ASMCMD Volumes |
 | [oracle_awr](../content/module/oracle_awr/)		    | Manage AWR configuration |
 | [oracle_datapatch](../content/module/oracle_datapatch/)   | Manage datapatch functionality |
 | [oracle_db](../content/module/oracle_db/)		    | Create/delete a database using dbca |
+| [oracle_dblink](../content/module/oracle_dblink/)         | Manage Oracle database links |
 | [oracle_crs_asm](../content/module/oracle_crs_asm/)       | Manage CRS/HAS resource ASM instance |
 | [oracle_crs_db](../content/module/oracle_crs_db/)         | Manage CRS/HAS resource database |
 | [oracle_crs_listener](../content/module/oracle_crs_listener/) | Manage CRS/HAS resource listener |
 | [oracle_crs_service](../content/module/oracle_crs_service/) | Manage CRS/HAS resource database service |
 | [oracle_directory](../content/module/oracle_directory/)   | Create/drop DIRECTORY in an Oracle database |
 | [oracle_facts](../content/module/oracle_facts/)	    | Returns some facts about Oracle DB |
+| [oracle_flashback](../content/module/oracle_flashback/)   | Manage Oracle restore points and flashback database |
 | [oracle_gi_facts](../content/module/oracle_gi_facts/)	    | Returns some facts about Grid Infrastructure environment |
 | [oracle_grant](../content/module/oracle_grant/)	    | Manage grant/privileges in an Oracle database |
-| [oracle_jobclass](../content/module/oracle_jobclass/)	    |
-| [oracle_job](../content/module/oracle_job/)		    |
-| [oracle_jobschedule](../content/module/oracle_jobschedule/)|
-| [oracle_jobwindow](../content/module/oracle_jobwindow/)   |
-| [oracle_ldapuser](../content/module/oracle_ldapuser/)	    |
+| [oracle_jobclass](../content/module/oracle_jobclass/)	    | |
+| [oracle_job](../content/module/oracle_job/)		    | |
+| [oracle_jobschedule](../content/module/oracle_jobschedule/)| |
+| [oracle_jobwindow](../content/module/oracle_jobwindow/)   | |
+| [oracle_ldapuser](../content/module/oracle_ldapuser/)	    | |
 | [oracle_opatch](../content/module/oracle_opatch/)	    | Manage patches in an Oracle environment |
 | [oracle_oratab](../content/module/oracle_oratab/)	    | Reads oratab to ansible_facts |
 | [oracle_parameter](../content/module/oracle_parameter/)   | Manage parameters in an Oracle database |
@@ -60,16 +66,29 @@ The default behaviour for the modules using `oracledb` is this:
 | [oracle_profile](../content/module/oracle_profile/)	    | Manage profiles in an Oracle database |
 | [oracle_redo](../content/module/oracle_redo/)		    | Manage Oracle redo related things |
 | [oracle_role](../content/module/oracle_role/)		    | Manage users/roles in an Oracle database |
-| [oracle_rsrc_consgroup](../content/module/oracle_rsrc_consgroup/)| 
-| [oracle_services](../content/module/oracle_services/)	    |
+| [oracle_rsrc_consgroup](../content/module/oracle_rsrc_consgroup/)| Manage DBMS_RESOURCE_MANAGER consumer groups |
+| [oracle_rsrc_plan](../content/module/oracle_rsrc_plan/)|  | Manage Oracle Resource Manager plans |
+| [oracle_services](../content/module/oracle_services/)	    | Manage services in an Oracle database |
 | [oracle_sqldba](../content/module/oracle_sqldba/)	    | Execute sql (scripts) using sqlplus (BEQ) or catcon.pl |
-| [oracle_sql](../content/module/oracle_sql/)		    | Execute arbitrary sql
-| [oracle_stats_prefs](../content/module/oracle_stats_prefs/)| 
+| [oracle_sql](../content/module/oracle_sql/)		    | Execute arbitrary sql |
+| [oracle_stats_prefs](../content/module/oracle_stats_prefs/)| Manage DBMS_STAT |
 | [oracle_tablespace](../content/module/oracle_tablespace/) | Manage tablespaces in an Oracle database
 | [oracle_tnsnames](../content/module/oracle_tnsnames/)	    | Manipulate Oracle's tnsnames.ora and other .ora files
 | [oracle_user](../content/module/oracle_user/)		    | Manage users/schemas in an Oracle database
 
+# Filters
+
+    ansible-doc --type filter -l ibre5041.ansible_oracle_modules
+
+| Filter						    | Description |
+| :-------------------------------------------------------- | :---------- |
+| [pwhash12c](../content/filter/pwhash12c/)                 | Compute hash of Oracle password |
+
+NOTE: This filter also depends on: `pip install pbkdf2`
+
 # Roles
+
+    ansible-doc --type role -l ibre5041.ansible_oracle_modules
 
 | Role   						    | Description |
 | :-------------------------------------------------------- | :---------- |
