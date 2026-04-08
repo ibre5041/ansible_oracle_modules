@@ -508,23 +508,31 @@ def _get_cert_dn(module, cert_file):
 
 
 def _cert_exists_in_wallet(module, dn=None, alias=None):
-    """Check if a certificate with given DN or alias exists in the wallet."""
+    """Check if a certificate with given DN or alias exists in the wallet.
+
+    Returns the cert section key ('trusted_cert', 'user_cert', 'requested_cert')
+    if found by DN, 'alias' if found by alias, or None if not found.
+    The return value is truthy when the cert exists.
+    """
     parsed = _wallet_display(module)
 
     if dn:
-        all_certs = (parsed['trusted_certs']
-                     + parsed['user_certs']
-                     + parsed['requested_certs'])
-        for cert_dn in all_certs:
-            if cert_dn.upper() == dn.upper():
-                return True
+        section_type_map = {
+            'trusted_certs': 'trusted_cert',
+            'user_certs': 'user_cert',
+            'requested_certs': 'requested_cert',
+        }
+        for section, cert_type in section_type_map.items():
+            for cert_dn in parsed[section]:
+                if cert_dn.upper() == dn.upper():
+                    return cert_type
 
     if alias:
         for wallet_alias in parsed.get('aliases', []):
             if wallet_alias.upper() == alias.upper():
-                return True
+                return 'alias'
 
-    return False
+    return None
 
 
 def _manage_cert(module):
@@ -644,14 +652,28 @@ def _remove_cert(module):
             changed=False,
         )
 
-    if not _cert_exists_in_wallet(module, dn=cert_dn, alias=cert_alias):
+    found_type = _cert_exists_in_wallet(module, dn=cert_dn, alias=cert_alias)
+    if not found_type:
         return False
 
     if module.check_mode:
         return True
 
+    # orapki wallet remove requires a certificate type flag
+    type_flag_map = {
+        'trusted_cert': '-trusted_cert',
+        'user_cert': '-user_cert',
+        'requested_cert': '-cert_req',
+    }
+
     args = ['wallet', 'remove', '-wallet', wallet_location]
     if cert_dn:
+        if found_type not in type_flag_map:
+            module.fail_json(
+                msg='Cannot determine certificate type for DN %s' % cert_dn,
+                changed=False,
+            )
+        args.append(type_flag_map[found_type])
         args.extend(['-dn', cert_dn])
     elif cert_alias:
         args.extend(['-alias', cert_alias])
