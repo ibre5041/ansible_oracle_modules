@@ -651,7 +651,7 @@ def _credential_exists(module, alias, credential_type='credential'):
         aliases = _parse_list_entries(stdout)
     else:
         aliases = _parse_list_credentials(stdout)
-    return alias in aliases
+    return alias.upper() in (a.upper() for a in aliases)
 
 
 def _manage_credential(module):
@@ -710,6 +710,15 @@ def _upsert_credential(module, exists, connect_key):
     credential_alias = module.params["credential_alias"]
     wallet_location = module.params["wallet_location"]
     wallet_password = module.params["wallet_password"]
+
+    if credential_type == 'entry':
+        credential_secret = module.params["credential_secret"]
+        if not credential_secret:
+            module.fail_json(
+                msg='credential_secret is required for entry type',
+                changed=False,
+            )
+
     if module.check_mode:
         return True
 
@@ -740,12 +749,6 @@ def _upsert_credential(module, exists, connect_key):
         return True
 
     if credential_type == 'entry':
-        credential_secret = module.params["credential_secret"]
-        if not credential_secret:
-            module.fail_json(
-                msg='credential_secret is required for entry type',
-                changed=False,
-            )
 
         if exists:
             subcmd = 'modify_entry'
