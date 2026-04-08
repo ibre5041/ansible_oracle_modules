@@ -652,6 +652,11 @@ def _manage_credential(module):
             )
         lookup_key = credential_db
     else:
+        if not credential_alias:
+            module.fail_json(
+                msg='credential_alias is required for entry operations',
+                changed=False,
+            )
         lookup_key = credential_alias
     exists = _credential_exists(module, lookup_key, credential_type)
 
@@ -698,13 +703,18 @@ def _upsert_credential(module, exists, connect_key):
                 changed=False,
             )
 
-    if module.check_mode:
-        return True
-
     if credential_type == 'credential':
         credential_db = module.params["credential_db"]
         credential_user = module.params["credential_user"]
         credential_password = module.params["credential_password"]
+
+        # Nothing to modify when credential already exists and no
+        # user/password params are provided.
+        if exists and not credential_user and not credential_password:
+            return False
+
+        if module.check_mode:
+            return True
 
         if exists:
             args = ['secretstore', 'modify_credential',
@@ -728,6 +738,9 @@ def _upsert_credential(module, exists, connect_key):
         return True
 
     if credential_type == 'entry':
+
+        if module.check_mode:
+            return True
 
         if exists:
             subcmd = 'modify_entry'
@@ -822,8 +835,6 @@ def main():
         required_if=[
             ('cert_state', 'present', ('cert_type',)),
             ('cert_state', 'exported', ('cert_export_file',)),
-            ('credential_state', 'present', ('credential_alias',)),
-            ('credential_state', 'absent', ('credential_alias',)),
             ('change_password', True, ('wallet_password', 'new_password')),
         ],
         mutually_exclusive=[
