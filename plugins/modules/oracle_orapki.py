@@ -285,11 +285,23 @@ def _run_orapki(module, args):
         else:
             safe_args.append(arg)
 
+    # Collect the actual sensitive values so we can scrub them from output.
+    sensitive_values = set()
+    prev = None
+    for arg in args:
+        if prev in sensitive_flags:
+            sensitive_values.add(arg)
+        prev = arg
+
     cmd = [_get_orapki_bin(module), *args]
     rc, stdout, stderr = module.run_command(cmd)
     if rc != 0:
+        output = (stderr or stdout).strip()
+        for val in sensitive_values:
+            if val:
+                output = output.replace(val, '********')
         module.fail_json(
-            msg='orapki failed: %s' % (stderr or stdout).strip(),
+            msg='orapki failed: %s' % output,
             rc=rc,
             cmd=' '.join([_get_orapki_bin(module), *safe_args]),
             changed=False,
@@ -554,6 +566,7 @@ def _add_cert(module):
     cert_type = module.params["cert_type"]
     cert_file = module.params["cert_file"]
     cert_dn = module.params["cert_dn"]
+    cert_alias = module.params["cert_alias"]
     cert_keysize = module.params["cert_keysize"]
     cert_validity = module.params["cert_validity"]
     wallet_location = module.params["wallet_location"]
@@ -573,13 +586,15 @@ def _add_cert(module):
                 msg='cert_dn is required when DN cannot be extracted from cert_file',
                 changed=False,
             )
-        if _cert_exists_in_wallet(module, dn=dn_from_file):
+        if _cert_exists_in_wallet(module, dn=dn_from_file, alias=cert_alias):
             return False
         if module.check_mode:
             return True
         type_flag = '-trusted_cert' if cert_type == 'trusted_cert' else '-user_cert'
         args = ['wallet', 'add', '-wallet', wallet_location,
                 type_flag, '-cert', cert_file]
+        if cert_alias:
+            args.extend(['-alias', cert_alias])
         if _is_sso_only_wallet(wallet_location):
             args.append('-auto_login_only')
         elif wallet_password:
@@ -593,13 +608,15 @@ def _add_cert(module):
                 msg='cert_dn is required for self_signed certificates',
                 changed=False,
             )
-        if _cert_exists_in_wallet(module, dn=cert_dn):
+        if _cert_exists_in_wallet(module, dn=cert_dn, alias=cert_alias):
             return False
         if module.check_mode:
             return True
         args = ['wallet', 'add', '-wallet', wallet_location,
                 '-dn', cert_dn, '-keysize', str(cert_keysize),
                 '-self_signed', '-validity', str(cert_validity)]
+        if cert_alias:
+            args.extend(['-alias', cert_alias])
         if _is_sso_only_wallet(wallet_location):
             args.append('-auto_login_only')
         elif wallet_password:
@@ -619,6 +636,11 @@ def _remove_cert(module):
     if not cert_dn and not cert_alias:
         module.fail_json(
             msg='cert_dn or cert_alias is required to remove a certificate',
+            changed=False,
+        )
+    if cert_dn and cert_alias:
+        module.fail_json(
+            msg='cert_dn and cert_alias are mutually exclusive for certificate removal',
             changed=False,
         )
 
@@ -678,6 +700,11 @@ def _manage_credential(module):
     # For credentials, Oracle identifies by connect_string (credential_db).
     # For entries, the identifier is the alias (credential_alias).
     if credential_type == 'credential':
+        if credential_alias:
+            module.fail_json(
+                msg='credential_alias is not supported for credential_type=credential; use credential_db instead',
+                changed=False,
+            )
         if not credential_db:
             module.fail_json(
                 msg='credential_db is required for credential operations',
