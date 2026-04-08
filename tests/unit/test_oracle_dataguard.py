@@ -32,6 +32,10 @@ def _dg_params(**overrides):
         "far_sync_name": None,
         "far_sync_connect_identifier": None,
         "observer_state": None,
+        "validate_connect_identifier": None,
+        "primary_database_candidates": None,
+        "tags": None,
+        "reset_tags": None,
         "output_format": "text",
         "force_logging": None,
         "apply_state": None,
@@ -66,8 +70,10 @@ class _DgBrokerModule(BaseFakeModule):
     """Module that stubs run_command for DGMGRL."""
 
     _dgmgrl_responses = {}
+    _run_command_calls = []
 
     def run_command(self, command, **kwargs):
+        type(self)._run_command_calls.append((command, kwargs))
         data = kwargs.get('data', '')
         # Check which commands are in the script
         for key, (rc, stdout, stderr) in self._dgmgrl_responses.items():
@@ -503,6 +509,318 @@ def test_dg_sql_set_protection_mode(monkeypatch):
     result = exc.value.args[0]
     assert result["changed"] is True
     assert any("MAXIMIZE AVAILABILITY" in d for d in result["ddls"])
+
+
+# ===========================================================================
+# Tests: FSFO Target
+# ===========================================================================
+
+def test_dg_broker_fsfo_enable_with_target(monkeypatch):
+    mod = _load()
+
+    class Mod(_DgBrokerModule):
+        params = _dg_params(
+            oracle_home="/fake/oracle",
+            state="present",
+            fsfo="enabled",
+            fsfo_target="STDBY",
+        )
+        _dgmgrl_responses = {
+            'SHOW CONFIGURATION': (0, SHOW_CONFIG_OUTPUT, ''),
+            'ENABLE FAST_START FAILOVER': (0, 'Succeeded.', ''),
+        }
+        _run_command_calls = []
+
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "os", _FakeOs("/fake/oracle"))
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    result = exc.value.args[0]
+    assert result["changed"] is True
+    # Verify the target was included in the command
+    calls = [kwargs.get('data', '') for args, kwargs in Mod._run_command_calls]
+    assert any('TARGET TO STDBY' in c for c in calls)
+
+
+def test_dg_broker_fsfo_enable_without_target(monkeypatch):
+    mod = _load()
+
+    class Mod(_DgBrokerModule):
+        params = _dg_params(
+            oracle_home="/fake/oracle",
+            state="present",
+            fsfo="enabled",
+        )
+        _dgmgrl_responses = {
+            'SHOW CONFIGURATION': (0, SHOW_CONFIG_OUTPUT, ''),
+            'ENABLE FAST_START FAILOVER': (0, 'Succeeded.', ''),
+        }
+        _run_command_calls = []
+
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "os", _FakeOs("/fake/oracle"))
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    result = exc.value.args[0]
+    assert result["changed"] is True
+    calls = [kwargs.get('data', '') for args, kwargs in Mod._run_command_calls]
+    assert any('ENABLE FAST_START FAILOVER' in c and 'TARGET' not in c for c in calls)
+
+
+# ===========================================================================
+# Tests: VALIDATE DGConnectIdentifier (26ai)
+# ===========================================================================
+
+def test_dg_broker_validate_connect_identifier(monkeypatch):
+    mod = _load()
+
+    class Mod(_DgBrokerModule):
+        params = _dg_params(
+            oracle_home="/fake/oracle",
+            state="status",
+            validate_connect_identifier="stdby-host:1521/STDBY",
+        )
+        _dgmgrl_responses = {
+            'SHOW CONFIGURATION': (0, SHOW_CONFIG_OUTPUT, ''),
+            'VALIDATE DGCONNECTIDENTIFIER': (0, 'Validation succeeded.', ''),
+            'SHOW': (0, '', ''),
+        }
+
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "os", _FakeOs("/fake/oracle"))
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    result = exc.value.args[0]
+    assert result["changed"] is False
+    assert result["validate_connect_identifier"] is not None
+    assert result["validate_connect_identifier"]["rc"] == 0
+
+
+def test_dg_broker_validate_connect_identifier_injection(monkeypatch):
+    mod = _load()
+
+    class Mod(_DgBrokerModule):
+        params = _dg_params(
+            oracle_home="/fake/oracle",
+            state="status",
+            validate_connect_identifier="host:1521/SVC; DROP CONFIGURATION",
+        )
+        _dgmgrl_responses = {
+            'SHOW CONFIGURATION': (0, SHOW_CONFIG_OUTPUT, ''),
+        }
+
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "os", _FakeOs("/fake/oracle"))
+
+    with pytest.raises(FailJson) as exc:
+        mod.main()
+    assert 'Invalid' in exc.value.args[0]['msg']
+
+
+# ===========================================================================
+# Tests: PrimaryDatabaseCandidates (26ai)
+# ===========================================================================
+
+def test_dg_broker_set_primary_db_candidates(monkeypatch):
+    mod = _load()
+
+    class Mod(_DgBrokerModule):
+        params = _dg_params(
+            oracle_home="/fake/oracle",
+            state="present",
+            primary_database_candidates=["PROD", "STDBY"],
+        )
+        _dgmgrl_responses = {
+            'SHOW CONFIGURATION': (0, SHOW_CONFIG_OUTPUT, ''),
+            'PRIMARYDATABASECANDIDATES': (0, 'Succeeded.', ''),
+        }
+
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "os", _FakeOs("/fake/oracle"))
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    result = exc.value.args[0]
+    assert result["changed"] is True
+
+
+def test_dg_broker_primary_db_candidates_invalid_name(monkeypatch):
+    mod = _load()
+
+    class Mod(_DgBrokerModule):
+        params = _dg_params(
+            oracle_home="/fake/oracle",
+            state="present",
+            primary_database_candidates=["PROD", "BAD NAME"],
+        )
+        _dgmgrl_responses = {
+            'SHOW CONFIGURATION': (0, SHOW_CONFIG_OUTPUT, ''),
+        }
+
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "os", _FakeOs("/fake/oracle"))
+
+    with pytest.raises(FailJson) as exc:
+        mod.main()
+    assert 'Invalid' in exc.value.args[0]['msg']
+
+
+def test_dg_broker_primary_db_candidates_unsupported(monkeypatch):
+    mod = _load()
+
+    class Mod(_DgBrokerModule):
+        params = _dg_params(
+            oracle_home="/fake/oracle",
+            state="present",
+            primary_database_candidates=["PROD"],
+        )
+        _dgmgrl_responses = {
+            'SHOW CONFIGURATION': (0, SHOW_CONFIG_OUTPUT, ''),
+            'PRIMARYDATABASECANDIDATES': (1, 'ORA-16599: invalid property', ''),
+        }
+        _warnings = []
+
+        def warn(self, msg):
+            type(self)._warnings.append(msg)
+
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "os", _FakeOs("/fake/oracle"))
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    result = exc.value.args[0]
+    # changed=False because the feature was skipped
+    assert any('not supported' in w for w in Mod._warnings)
+
+
+# ===========================================================================
+# Tests: Tagging (26ai)
+# ===========================================================================
+
+def test_dg_broker_set_tags_database(monkeypatch):
+    mod = _load()
+
+    class Mod(_DgBrokerModule):
+        params = _dg_params(
+            oracle_home="/fake/oracle",
+            state="present",
+            database_name="STDBY",
+            tags={"environment": "production", "tier": "dr"},
+        )
+        _dgmgrl_responses = {
+            'SHOW CONFIGURATION': (0, SHOW_CONFIG_OUTPUT, ''),
+            'SET TAG': (0, 'Succeeded.', ''),
+        }
+        _run_command_calls = []
+
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "os", _FakeOs("/fake/oracle"))
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    result = exc.value.args[0]
+    assert result["changed"] is True
+    calls = [kwargs.get('data', '') for args, kwargs in Mod._run_command_calls]
+    assert any('EDIT DATABASE STDBY SET TAG' in c for c in calls)
+
+
+def test_dg_broker_set_tags_configuration(monkeypatch):
+    mod = _load()
+
+    class Mod(_DgBrokerModule):
+        params = _dg_params(
+            oracle_home="/fake/oracle",
+            state="present",
+            tags={"site": "dc1"},
+        )
+        _dgmgrl_responses = {
+            'SHOW CONFIGURATION': (0, SHOW_CONFIG_OUTPUT, ''),
+            'SET TAG': (0, 'Succeeded.', ''),
+        }
+        _run_command_calls = []
+
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "os", _FakeOs("/fake/oracle"))
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    result = exc.value.args[0]
+    assert result["changed"] is True
+    calls = [kwargs.get('data', '') for args, kwargs in Mod._run_command_calls]
+    assert any('EDIT CONFIGURATION SET TAG' in c for c in calls)
+
+
+def test_dg_broker_reset_tags(monkeypatch):
+    mod = _load()
+
+    class Mod(_DgBrokerModule):
+        params = _dg_params(
+            oracle_home="/fake/oracle",
+            state="present",
+            database_name="STDBY",
+            reset_tags=["environment"],
+        )
+        _dgmgrl_responses = {
+            'SHOW CONFIGURATION': (0, SHOW_CONFIG_OUTPUT, ''),
+            'RESET TAG': (0, 'Succeeded.', ''),
+        }
+        _run_command_calls = []
+
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "os", _FakeOs("/fake/oracle"))
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    result = exc.value.args[0]
+    assert result["changed"] is True
+    calls = [kwargs.get('data', '') for args, kwargs in Mod._run_command_calls]
+    assert any('EDIT DATABASE STDBY RESET TAG environment' in c for c in calls)
+
+
+def test_dg_broker_show_tags_in_status(monkeypatch):
+    mod = _load()
+
+    class Mod(_DgBrokerModule):
+        params = _dg_params(
+            oracle_home="/fake/oracle",
+            state="status",
+        )
+        _dgmgrl_responses = {
+            'SHOW CONFIGURATION': (0, SHOW_CONFIG_OUTPUT, ''),
+            'SHOW': (0, 'environment=production\ntier=dr\n', ''),
+        }
+
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "os", _FakeOs("/fake/oracle"))
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    result = exc.value.args[0]
+    assert result["tags"] is not None
+
+
+def test_dg_broker_tags_invalid_name(monkeypatch):
+    mod = _load()
+
+    class Mod(_DgBrokerModule):
+        params = _dg_params(
+            oracle_home="/fake/oracle",
+            state="present",
+            tags={"bad tag!": "value"},
+        )
+        _dgmgrl_responses = {
+            'SHOW CONFIGURATION': (0, SHOW_CONFIG_OUTPUT, ''),
+        }
+
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "os", _FakeOs("/fake/oracle"))
+
+    with pytest.raises(FailJson) as exc:
+        mod.main()
+    assert 'Invalid tag name' in exc.value.args[0]['msg']
 
 
 # ===========================================================================

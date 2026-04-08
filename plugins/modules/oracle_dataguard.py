@@ -18,7 +18,7 @@ description:
   - Query Data Guard status, lag, and health
   - SQL mode for environments without broker
   - Compatible with Oracle 19c, 23ai, and 26ai
-  - "Oracle 26ai features: JSON output, PrimaryDatabaseCandidates, VALIDATE DGConnectIdentifier, tagging"
+  - "Oracle 26ai features: JSON output, VALIDATE DGConnectIdentifier, PrimaryDatabaseCandidates, tagging, FSFO target"
 version_added: "3.4.0"
 options:
   mode_dg:
@@ -95,7 +95,9 @@ options:
     choices: ['enabled', 'disabled']
     required: false
   fsfo_target:
-    description: Target database for Fast-Start Failover
+    description:
+      - Target database for Fast-Start Failover
+      - "When enabling FSFO, issues ENABLE FAST_START FAILOVER TARGET TO <target>"
     required: false
   far_sync_name:
     description: Name of the Far Sync instance
@@ -106,6 +108,34 @@ options:
   observer_state:
     description: Observer state
     choices: ['started', 'stopped']
+    required: false
+  validate_connect_identifier:
+    description:
+      - Connect identifier to validate via DGMGRL VALIDATE DGConnectIdentifier
+      - "Tests network resolution, connectivity, and service name validation"
+      - "Oracle 26ai+ feature"
+    required: false
+  primary_database_candidates:
+    description:
+      - List of database unique names eligible to become primary
+      - Sets the PrimaryDatabaseCandidates configuration property
+      - "Oracle 26ai+ feature, will warn and skip on older versions"
+    type: list
+    elements: str
+    required: false
+  tags:
+    description:
+      - Dictionary of tags to set on the target object
+      - "Target is determined by database_name (DATABASE), far_sync_name (FAR_SYNC), or CONFIGURATION if neither is set"
+      - "Uses EDIT <object> SET TAG syntax (Oracle 26ai+)"
+    type: dict
+    required: false
+  reset_tags:
+    description:
+      - List of tag names to remove from the target object
+      - "Uses EDIT <object> RESET TAG syntax (Oracle 26ai+)"
+    type: list
+    elements: str
     required: false
   output_format:
     description:
@@ -229,6 +259,45 @@ EXAMPLES = '''
   oracle_dataguard:
     oracle_home: /u01/app/oracle/product/19c
     state: absent
+
+# --- Oracle 26ai Features ---
+
+- name: Enable Fast-Start Failover with specific target
+  oracle_dataguard:
+    oracle_home: /u01/app/oracle/product/26ai
+    state: present
+    fsfo: enabled
+    fsfo_target: STDBY
+
+- name: Validate a DG connect identifier (26ai+)
+  oracle_dataguard:
+    oracle_home: /u01/app/oracle/product/26ai
+    state: status
+    validate_connect_identifier: "stdby-host:1521/STDBY"
+
+- name: Set PrimaryDatabaseCandidates (26ai+)
+  oracle_dataguard:
+    oracle_home: /u01/app/oracle/product/26ai
+    state: present
+    primary_database_candidates:
+      - PROD
+      - STDBY
+
+- name: Set tags on a database (26ai+)
+  oracle_dataguard:
+    oracle_home: /u01/app/oracle/product/26ai
+    state: present
+    database_name: STDBY
+    tags:
+      environment: production
+      tier: dr
+
+- name: Remove tags from configuration (26ai+)
+  oracle_dataguard:
+    oracle_home: /u01/app/oracle/product/26ai
+    state: present
+    reset_tags:
+      - environment
 
 # --- SQL Mode ---
 
@@ -572,10 +641,14 @@ def dgmgrl_set_state(module, db_name, db_state):
     return True
 
 
-def dgmgrl_manage_fsfo(module, fsfo_state):
+def dgmgrl_manage_fsfo(module, fsfo_state, fsfo_target=None):
     """Enable or disable Fast-Start Failover."""
     if fsfo_state == 'enabled':
-        cmd = 'ENABLE FAST_START FAILOVER'
+        if fsfo_target:
+            _validate_dgmgrl_identifier(module, fsfo_target, 'fsfo_target')
+            cmd = 'ENABLE FAST_START FAILOVER TARGET TO %s' % fsfo_target
+        else:
+            cmd = 'ENABLE FAST_START FAILOVER'
     else:
         cmd = 'DISABLE FAST_START FAILOVER'
     rc, stdout, stderr = run_dgmgrl(module, [cmd])
@@ -622,6 +695,116 @@ def dgmgrl_validate(module, db_name):
     cmd = 'VALIDATE DATABASE %s' % db_name
     rc, stdout, stderr = run_dgmgrl(module, [cmd])
     return {'rc': rc, 'output': stdout, 'errors': stderr}
+
+
+# ============================================================================
+# Oracle 26ai Features
+# ============================================================================
+
+def _validate_dgmgrl_connect_string(module, value, param_name):
+    """Validate a connect identifier is safe for DGMGRL (no injection)."""
+    if not value or ';' in value or '\n' in value:
+        module.fail_json(msg='Invalid %s: must not be empty or contain ; or newlines' % param_name, changed=False)
+
+
+def dgmgrl_validate_connect_identifier(module, connect_identifier):
+    """Validate a DG connect identifier (26ai+)."""
+    _validate_dgmgrl_connect_string(module, connect_identifier, 'validate_connect_identifier')
+    cmd = 'VALIDATE DGConnectIdentifier %s' % connect_identifier
+    rc, stdout, stderr = run_dgmgrl(module, [cmd])
+    return {'rc': rc, 'output': stdout, 'errors': stderr}
+
+
+def dgmgrl_set_primary_database_candidates(module, candidates):
+    """Set PrimaryDatabaseCandidates configuration property (26ai+)."""
+    for c in candidates:
+        _validate_dgmgrl_identifier(module, c, 'primary_database_candidates member')
+    value = ','.join(candidates)
+    cmd = "EDIT CONFIGURATION SET PROPERTY PrimaryDatabaseCandidates='%s'" % _quote_dgmgrl_literal(value)
+    rc, stdout, stderr = run_dgmgrl(module, [cmd])
+    if rc != 0:
+        if 'not supported' in stdout.lower() or 'invalid property' in stdout.lower():
+            module.warn('PrimaryDatabaseCandidates not supported on this Oracle version')
+            return False
+        module.fail_json(msg='Failed to set PrimaryDatabaseCandidates: %s %s' % (stdout, stderr), changed=False)
+    return True
+
+
+def _validate_dgmgrl_tag_name(module, tag_name):
+    """Validate a tag name — alphanumeric, underscores, hyphens."""
+    if not re.match(r'^[A-Za-z][A-Za-z0-9_-]*$', tag_name):
+        module.fail_json(msg='Invalid tag name: %s' % tag_name, changed=False)
+
+
+def _resolve_tag_target(module):
+    """Determine the DGMGRL object type and name for tag operations.
+
+    Returns (target_keyword, target_name) e.g. ('DATABASE', 'STDBY') or ('CONFIGURATION', '').
+    """
+    db_name = module.params.get("database_name")
+    fs_name = module.params.get("far_sync_name")
+    if db_name:
+        _validate_dgmgrl_identifier(module, db_name, 'database_name')
+        return ('DATABASE', db_name)
+    if fs_name:
+        _validate_dgmgrl_identifier(module, fs_name, 'far_sync_name')
+        return ('FAR_SYNC', fs_name)
+    return ('CONFIGURATION', '')
+
+
+def dgmgrl_set_tags(module, tags):
+    """Set tags on a DGMGRL object (26ai+)."""
+    target_type, target_name = _resolve_tag_target(module)
+    commands = []
+    for tag_name, tag_value in tags.items():
+        _validate_dgmgrl_tag_name(module, tag_name)
+        if target_name:
+            cmd = "EDIT %s %s SET TAG %s='%s'" % (
+                target_type, target_name, tag_name, _quote_dgmgrl_literal(str(tag_value)))
+        else:
+            cmd = "EDIT %s SET TAG %s='%s'" % (
+                target_type, tag_name, _quote_dgmgrl_literal(str(tag_value)))
+        commands.append(cmd)
+    rc, stdout, stderr = run_dgmgrl(module, commands)
+    if rc != 0:
+        if 'not supported' in stdout.lower():
+            module.warn('Tagging not supported on this Oracle version')
+            return False
+        module.fail_json(msg='Failed to set tags: %s %s' % (stdout, stderr), changed=False)
+    return True
+
+
+def dgmgrl_reset_tags(module, tag_names):
+    """Reset (remove) tags from a DGMGRL object (26ai+)."""
+    target_type, target_name = _resolve_tag_target(module)
+    commands = []
+    for tag_name in tag_names:
+        _validate_dgmgrl_tag_name(module, tag_name)
+        if target_name:
+            cmd = 'EDIT %s %s RESET TAG %s' % (target_type, target_name, tag_name)
+        else:
+            cmd = 'EDIT %s RESET TAG %s' % (target_type, tag_name)
+        commands.append(cmd)
+    rc, stdout, stderr = run_dgmgrl(module, commands)
+    if rc != 0:
+        if 'not supported' in stdout.lower():
+            module.warn('Tagging not supported on this Oracle version')
+            return False
+        module.fail_json(msg='Failed to reset tags: %s %s' % (stdout, stderr), changed=False)
+    return True
+
+
+def dgmgrl_show_tags(module, output_format):
+    """Show tags on a DGMGRL object (26ai+). Returns tag output string or None."""
+    target_type, target_name = _resolve_tag_target(module)
+    if target_name:
+        cmd = 'SHOW %s %s TAG' % (target_type, target_name)
+    else:
+        cmd = 'SHOW %s TAG' % target_type
+    rc, stdout, stderr = run_dgmgrl(module, [cmd])
+    if rc != 0:
+        return None
+    return stdout
 
 
 # ============================================================================
@@ -778,6 +961,12 @@ def main():
             # Observer
             observer_state=dict(required=False, choices=['started', 'stopped']),
 
+            # 26ai features
+            validate_connect_identifier=dict(required=False),
+            primary_database_candidates=dict(required=False, type='list', elements='str'),
+            tags=dict(required=False, type='dict'),
+            reset_tags=dict(required=False, type='list', elements='str'),
+
             # Output format (26ai JSON)
             output_format=dict(default='text', choices=['text', 'json']),
 
@@ -834,14 +1023,23 @@ def _broker_status(module, database_name, output_format):
     config = dgmgrl_show_configuration(module, output_format)
     db_detail = None
     validate_result = None
+    validate_connect = None
+    tags_output = None
     if database_name:
         db_detail = dgmgrl_show_database(module, database_name, output_format)
         validate_result = dgmgrl_validate(module, database_name)
+    if module.params.get("validate_connect_identifier"):
+        validate_connect = dgmgrl_validate_connect_identifier(
+            module, module.params["validate_connect_identifier"])
+    if config.get('status') != 'NOT_CONFIGURED':
+        tags_output = dgmgrl_show_tags(module, output_format)
     module.exit_json(
         changed=False,
         configuration=config,
         database_detail=db_detail,
         validate=validate_result,
+        validate_connect_identifier=validate_connect,
+        tags=tags_output,
     )
 
 
@@ -872,12 +1070,21 @@ def _broker_present(module, database_name, output_format):
     if module.params["database_state"] and database_name:
         dgmgrl_set_state(module, database_name, module.params["database_state"])
         changed = True
+    if module.params["primary_database_candidates"]:
+        if dgmgrl_set_primary_database_candidates(module, module.params["primary_database_candidates"]):
+            changed = True
     if module.params["fsfo"]:
-        dgmgrl_manage_fsfo(module, module.params["fsfo"])
+        dgmgrl_manage_fsfo(module, module.params["fsfo"], module.params.get("fsfo_target"))
         changed = True
     if module.params["observer_state"]:
         dgmgrl_manage_observer(module, module.params["observer_state"])
         changed = True
+    if module.params["tags"]:
+        if dgmgrl_set_tags(module, module.params["tags"]):
+            changed = True
+    if module.params["reset_tags"]:
+        if dgmgrl_reset_tags(module, module.params["reset_tags"]):
+            changed = True
 
     config = dgmgrl_show_configuration(module, output_format)
     module.exit_json(changed=changed, configuration=config, msg='Data Guard configuration updated')
