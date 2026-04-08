@@ -479,6 +479,15 @@ def main():
 
 from ansible.module_utils.basic import *  # noqa: F403
 
+# In this case we do import from local project sub-directory <project-dir>/module_utils
+# While this file is placed in <project-dir>/library
+# No collections are used
+#try:
+#    from ansible.module_utils.oracle_utils import oracleConnection, sanitize_string_params
+#except:
+#    pass
+
+# In this case we do import from collections
 try:
     from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_utils import (  # noqa: E501
         oracleConnection, sanitize_string_params,
@@ -486,13 +495,6 @@ try:
 except ImportError:
     def sanitize_string_params(_params):
         pass
-
-    class oracleConnection:  # noqa: N801
-        def __init__(self, module):
-            module.fail_json(
-                msg='oracle_utils is required. Ensure the collection is properly installed.',
-                changed=False,
-            )
 
 if __name__ == '__main__':
     main()
