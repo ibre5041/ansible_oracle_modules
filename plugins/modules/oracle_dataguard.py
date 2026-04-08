@@ -1018,12 +1018,14 @@ def _run_broker_mode(module):
     database_name = module.params["database_name"]
     output_format = module.params["output_format"]
 
+    if state == 'status':
+        # Status is read-only, allow it even in check mode.
+        _broker_status(module, database_name, output_format)
+
     if module.check_mode:
         module.exit_json(changed=False, msg='Check mode: no broker operations executed')
 
-    if state == 'status':
-        _broker_status(module, database_name, output_format)
-    elif state == 'present':
+    if state == 'present':
         _broker_present(module, database_name, output_format)
     elif state == 'absent':
         _broker_absent(module, database_name)
