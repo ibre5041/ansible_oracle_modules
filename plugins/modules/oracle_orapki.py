@@ -323,16 +323,10 @@ def _parse_wallet_display(stdout):
     return result
 
 
-def _parse_list_credentials(stdout):
-    """Parse 'orapki secretstore list_credentials' output.
+def _parse_numbered_list(stdout):
+    """Parse orapki output lines of the form ``N: value ...``.
 
-    Expected format::
-
-        List credential (index: connect_string username)
-        1: PROD sys
-        2: DEV admin
-
-    Returns list of connect_string values.
+    Returns list of the first token after the index on each matching line.
     """
     aliases = []
     for line in stdout.split('\n'):
@@ -343,24 +337,9 @@ def _parse_list_credentials(stdout):
     return aliases
 
 
-def _parse_list_entries(stdout):
-    """Parse 'orapki secretstore list_entries' output.
-
-    Expected format::
-
-        List secret store entries:
-        1: my_entry_alias
-        2: another_entry
-
-    Returns list of entry alias strings.
-    """
-    aliases = []
-    for line in stdout.split('\n'):
-        line = line.strip()
-        m = re.match(r'^\d+:\s+(\S+)', line)
-        if m:
-            aliases.append(m.group(1))
-    return aliases
+# Convenience aliases so call sites stay descriptive.
+_parse_list_credentials = _parse_numbered_list
+_parse_list_entries = _parse_numbered_list
 
 
 # ============================================================================
