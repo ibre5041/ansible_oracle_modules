@@ -767,7 +767,7 @@ def _validate_dgmgrl_connect_string(module, value, param_name):
 def dgmgrl_validate_connect_identifier(module, connect_identifier):
     """Validate a DG connect identifier (26ai+)."""
     _validate_dgmgrl_connect_string(module, connect_identifier, 'validate_connect_identifier')
-    cmd = 'VALIDATE DGConnectIdentifier %s' % connect_identifier
+    cmd = "VALIDATE DGConnectIdentifier '%s'" % _quote_dgmgrl_literal(module, connect_identifier)
     rc, stdout, stderr = run_dgmgrl(module, [cmd])
     return {'rc': rc, 'output': stdout, 'errors': stderr}
 
