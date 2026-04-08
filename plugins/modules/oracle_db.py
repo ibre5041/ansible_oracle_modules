@@ -944,6 +944,7 @@ def main():
     module.params["user"] = None
     module.params["password"] = None
     module.params["mode"] = 'sysdba'
+    module.params["service_name"] = None
 
     if oracle_home:
         os.environ['ORACLE_HOME'] = oracle_home.rstrip('/')
@@ -962,18 +963,6 @@ def main():
     ohomes.list_processes()
     ohomes.parse_oratab()
     #ohomes.oracle_gi_managed = False# TODO REMOVE - override GI presence for testing
-
-    # Connection details for database
-    if db_unique_name:
-        service_name = db_unique_name
-    else:
-        service_name = db_name
-
-    if domain:
-        service_name = "%s.%s" % (service_name, domain)
-
-    module.params["service_name"] = service_name
-    # module.warn("service_name {}".format(service_name))
 
     if state == 'started':
         sid = guess_oracle_sid(module, ohomes)
