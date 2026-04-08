@@ -310,12 +310,26 @@ def _vwallet_field(row, col):
     return ''
 
 
+def _normalize_wallet_row(row):
+    """Normalize a V$ENCRYPTION_WALLET row dict to lowercase keys."""
+    if not row:
+        return {}
+    return {
+        'wrl_type': _vwallet_field(row, 'WRL_TYPE'),
+        'wrl_parameter': _vwallet_field(row, 'WRL_PARAMETER'),
+        'status': _vwallet_field(row, 'STATUS'),
+        'wallet_type': _vwallet_field(row, 'WALLET_TYPE'),
+        'wallet_order': _vwallet_field(row, 'WALLET_ORDER'),
+        'keystore_mode': _vwallet_field(row, 'KEYSTORE_MODE'),
+    }
+
+
 def _aggregate_wallet_rows(rows):
     """Merge multiple V$ENCRYPTION_WALLET rows when ``container`` is ``all``."""
     if not rows:
         return {}
     if len(rows) == 1:
-        return rows[0]
+        return _normalize_wallet_row(rows[0])
 
     statuses = []
     for r in rows:
@@ -383,14 +397,14 @@ def get_wallet_status(conn, container=None):
             return {}
         return _aggregate_wallet_rows(rows)
     sql = base_sql + "\n             WHERE ROWNUM = 1"
-    return conn.execute_select_to_dict(sql, fetchone=True)
+    return _normalize_wallet_row(conn.execute_select_to_dict(sql, fetchone=True))
 
 
 def get_wallet_root(conn):
     """Get WALLET_ROOT parameter value."""
     sql = "SELECT VALUE FROM V$PARAMETER WHERE NAME = 'wallet_root'"
     r = conn.execute_select_to_dict(sql, fetchone=True)
-    return r.get('value') if r else None
+    return _vwallet_field(r, 'VALUE') if r else None
 
 
 def get_secrets(conn):
@@ -710,7 +724,7 @@ def main():
             keystore_mode=status.get('keystore_mode', '') if status else '',
             wrl_type=status.get('wrl_type', '') if status else '',
             wrl_parameter=status.get('wrl_parameter', '') if status else '',
-            secrets=[{'client': s.get('client', ''), 'tag': s.get('secret_tag', '')} for s in secrets],
+            secrets=[{'client': _vwallet_field(s, 'CLIENT'), 'tag': _vwallet_field(s, 'SECRET_TAG')} for s in secrets],
         )
 
     if module.check_mode:
