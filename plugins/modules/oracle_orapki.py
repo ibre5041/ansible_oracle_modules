@@ -272,13 +272,26 @@ def _run_orapki(module, args):
     Uses list-form command to avoid shell injection.
     Fails the module on non-zero return code.
     """
+    sensitive_flags = frozenset(('-pwd', '-oldpwd', '-newpwd', '-password', '-secret'))
+    safe_args = []
+    redact_next = False
+    for arg in args:
+        if redact_next:
+            safe_args.append('********')
+            redact_next = False
+        elif arg in sensitive_flags:
+            safe_args.append(arg)
+            redact_next = True
+        else:
+            safe_args.append(arg)
+
     cmd = [_get_orapki_bin(module)] + args
     rc, stdout, stderr = module.run_command(cmd)
     if rc != 0:
         module.fail_json(
             msg='orapki failed: %s' % (stderr or stdout).strip(),
             rc=rc,
-            cmd=' '.join(args),
+            cmd=' '.join(safe_args),
             changed=False,
         )
     return stdout, stderr
@@ -374,7 +387,6 @@ def _ensure_wallet_present(module):
     wallet_password = module.params["wallet_password"]
     auto_login = module.params["auto_login"]
 
-    p12 = os.path.join(wallet_location, 'ewallet.p12')
     sso = os.path.join(wallet_location, 'cwallet.sso')
 
     if _wallet_exists(wallet_location):
@@ -474,6 +486,15 @@ def _change_wallet_password(module):
 # Certificate management
 # ============================================================================
 
+def _get_cert_dn(module, cert_file):
+    """Extract the Subject DN from a certificate file using orapki."""
+    stdout, _stderr = _run_orapki(module, ['cert', 'display', '-cert', cert_file])
+    for line in stdout.split('\n'):
+        if line.strip().startswith('Subject:'):
+            return line.split(':', 1)[1].strip()
+    return None
+
+
 def _cert_exists_in_wallet(module, dn=None, alias=None):
     """Check if a certificate with given DN or alias exists in the wallet."""
     parsed = _wallet_display(module)
@@ -543,9 +564,9 @@ def _add_cert(module):
                 msg='cert_file is required for %s' % cert_type,
                 changed=False,
             )
-        # For trusted/user certs, check DN from file would require parsing
-        # the cert. Instead, we let orapki handle duplicates (it will error).
-        # For self_signed, we can check by DN.
+        dn_from_file = cert_dn or _get_cert_dn(module, cert_file)
+        if dn_from_file and _cert_exists_in_wallet(module, dn=dn_from_file):
+            return False
         if module.check_mode:
             return True
         type_flag = '-trusted_cert' if cert_type == 'trusted_cert' else '-user_cert'
