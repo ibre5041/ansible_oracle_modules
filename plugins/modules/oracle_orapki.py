@@ -291,7 +291,7 @@ def _run_orapki(module, args):
         module.fail_json(
             msg='orapki failed: %s' % (stderr or stdout).strip(),
             rc=rc,
-            cmd=' '.join(safe_args),
+            cmd=' '.join([_get_orapki_bin(module), *safe_args]),
             changed=False,
         )
     return stdout, stderr
@@ -732,6 +732,12 @@ def _upsert_credential(module, exists, connect_key):
         credential_db = module.params["credential_db"]
         credential_user = module.params["credential_user"]
         credential_password = module.params["credential_password"]
+
+        if not exists and (not credential_user or not credential_password):
+            module.fail_json(
+                msg='credential_user and credential_password are required to create a credential',
+                changed=False,
+            )
 
         # Nothing to modify when credential already exists and no
         # user/password params are provided.
