@@ -421,6 +421,12 @@ def _ensure_wallet_present(module):
             return True
         return False
 
+    if auto_login != 'auto_login_only' and not wallet_password:
+        module.fail_json(
+            msg='wallet_password is required to create a wallet',
+            changed=False,
+        )
+
     if module.check_mode:
         return True
 
@@ -428,11 +434,6 @@ def _ensure_wallet_present(module):
         args = ['wallet', 'create', '-wallet', wallet_location,
                 '-auto_login_only']
     else:
-        if not wallet_password:
-            module.fail_json(
-                msg='wallet_password is required to create a wallet',
-                changed=False,
-            )
         args = ['wallet', 'create', '-wallet', wallet_location,
                 '-pwd', wallet_password]
         if auto_login == 'auto_login':
@@ -567,6 +568,8 @@ def _manage_cert(module):
             export_args.append('-auto_login_only')
         elif wallet_password:
             export_args.extend(['-pwd', wallet_password])
+        if module.check_mode:
+            return True
         if os.path.isfile(cert_export_file):
             # Export to a temp file and compare with the existing one.
             import tempfile
@@ -587,8 +590,6 @@ def _manage_cert(module):
             finally:
                 if os.path.exists(tmp_path):
                     os.unlink(tmp_path)
-        if module.check_mode:
-            return True
         _run_orapki(module, export_args)
         return True
 
