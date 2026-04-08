@@ -491,7 +491,9 @@ def _validate_dgmgrl_identifier(module, value, param_name):
 
 
 def _quote_dgmgrl_literal(value):
-    """Escape single quotes in a DGMGRL string literal."""
+    """Escape single quotes and reject injection characters in a DGMGRL string literal."""
+    if ';' in value or '\n' in value or '\r' in value:
+        raise ValueError("DGMGRL literal must not contain semicolons or newlines: %r" % value)
     return value.replace("'", "''")
 
 
