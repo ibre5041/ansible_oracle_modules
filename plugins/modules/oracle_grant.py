@@ -54,7 +54,7 @@ author:
 EXAMPLES = '''
 
 - name: append user privs
-  oracle_grants:
+  oracle_grant:
     mode: sysdba
     schema: u_foo
     grants:
@@ -67,7 +67,7 @@ EXAMPLES = '''
     grant_mode: append
 
  - name: revoke user privs
-  oracle_grants:
+  oracle_grant:
     mode: sysdba
     schema: u_foo
     grant_mode: exact
