@@ -407,7 +407,8 @@ def parse_show_configuration(stdout):
         'databases': [],
         'fast_start_failover': '',
     }
-    for line in stdout.split('\n'):
+    lines = stdout.split('\n')
+    for i, line in enumerate(lines):
         line = line.strip()
         if line.startswith('Configuration -'):
             result['name'] = line.split('-', 1)[1].strip()
@@ -435,7 +436,10 @@ def parse_show_configuration(stdout):
         elif line.startswith('Fast-Start Failover:'):
             result['fast_start_failover'] = line.split(':', 1)[1].strip()
         elif line.startswith('Configuration Status:'):
-            result['status'] = line.split(':', 1)[1].strip()
+            # Status value appears on the next line in DGMGRL output
+            if i + 1 < len(lines):
+                status_line = lines[i + 1].strip()
+                result['status'] = status_line.split('(')[0].strip() if '(' in status_line else status_line
     return result
 
 
@@ -592,6 +596,7 @@ def dgmgrl_convert_database(module, db_name, target_type):
     """Convert database to snapshot or physical standby."""
     if not db_name:
         module.fail_json(msg='database_name is required for convert', changed=False)
+    _validate_dgmgrl_identifier(module, db_name, 'database_name')
     cmd = 'CONVERT DATABASE %s TO %s' % (db_name, target_type)
     rc, stdout, stderr = run_dgmgrl(module, [cmd])
     if rc != 0:
@@ -1051,6 +1056,7 @@ def _broker_present(module, database_name, output_format):
     if module.params["configuration_name"] and config.get('status') == 'NOT_CONFIGURED':
         dgmgrl_create_configuration(module)
         changed = True
+        config = dgmgrl_show_configuration(module, 'text')
 
     if database_name and config.get('status') != 'NOT_CONFIGURED':
         existing_dbs = [d['name'] for d in config.get('databases', [])]
@@ -1122,6 +1128,8 @@ def _broker_enable_disable(module, database_name, enable):
 
 def _run_sql_mode(module):
     """Handle all SQL mode operations."""
+    if oracleConnection is None:
+        module.fail_json(msg='SQL mode requires oracledb module. Install via: pip install oracledb', changed=False)
     state = module.params["state"]
     protection_mode = module.params["protection_mode"]
     conn = oracleConnection(module)
@@ -1166,6 +1174,8 @@ try:
         oracleConnection, sanitize_string_params,
     )
 except ImportError:
+    oracleConnection = None
+
     def sanitize_string_params(module_params):
         for key, value in module_params.items():
             if isinstance(value, str):

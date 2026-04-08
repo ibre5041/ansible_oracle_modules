@@ -836,6 +836,7 @@ def test_parse_show_configuration():
     assert len(result["databases"]) == 2
     assert result["databases"][0]["role"] == "PRIMARY"
     assert result["databases"][1]["role"] == "PHYSICAL STANDBY"
+    assert result["status"] == "SUCCESS"
 
 
 # ===========================================================================
