@@ -398,7 +398,8 @@ def test_wallet_update_existing_secret(monkeypatch):
             secret_state="present"
         )
 
-    secrets = [{'client': 'MY_APP', 'secret_tag': 'tag1'}]
+    # Tagless secret — matches the tagless query from params above.
+    secrets = [{'client': 'MY_APP', 'secret_tag': ''}]
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
     monkeypatch.setattr(mod, "oracleConnection", lambda m: _WalletConn(m, 'OPEN', 'PASSWORD', secrets=secrets), raising=False)
 
@@ -417,7 +418,8 @@ def test_wallet_delete_secret(monkeypatch):
             secret_client="MY_APP", secret_state="absent"
         )
 
-    secrets = [{'client': 'MY_APP', 'secret_tag': 'tag1'}]
+    # Tagless secret — matches the tagless delete from params above.
+    secrets = [{'client': 'MY_APP', 'secret_tag': ''}]
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
     monkeypatch.setattr(mod, "oracleConnection", lambda m: _WalletConn(m, 'OPEN', 'PASSWORD', secrets=secrets), raising=False)
 

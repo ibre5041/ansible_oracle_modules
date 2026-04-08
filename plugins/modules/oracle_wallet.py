@@ -213,6 +213,11 @@ def validate_wallet_inputs_before_connect(module):
             module.fail_json(msg='keystore_password is required for secret management', changed=False)
         if secret_state == 'present' and not module.params.get('secret'):
             module.fail_json(msg='secret is required when secret_state=present', changed=False)
+        if backup_location:
+            module.fail_json(
+                msg='backup_location is not supported for secret management (Oracle does not support TO clause with secret DDL)',
+                changed=False,
+            )
         _assert_sql_embeddable_str(module, module.params.get('secret_client'), "'")
         _assert_sql_embeddable_str(module, module.params.get('keystore_password'), '"')
         if module.params.get('secret'):
@@ -234,6 +239,11 @@ def validate_wallet_inputs_before_connect(module):
             _assert_sql_embeddable_str(module, loc, "'")
         _assert_sql_embeddable_str(module, backup_tag, "'")
         _assert_sql_embeddable_str(module, backup_location, "'")
+        auto_login = module.params.get('auto_login')
+        if auto_login and auto_login != 'none':
+            if not module.params.get('keystore_password'):
+                module.fail_json(msg='keystore_password is required when auto_login is set', changed=False)
+            _assert_sql_embeddable_str(module, module.params.get('keystore_password'), '"')
         if change_password_flag:
             _assert_sql_embeddable_str(module, module.params.get('keystore_password'), '"')
             _assert_sql_embeddable_str(module, module.params.get('new_password'), '"')
@@ -257,34 +267,35 @@ def validate_wallet_inputs_before_connect(module):
             _assert_sql_embeddable_str(module, ks, '"')
 
 
-def _redact_ddls(ddls):
-    """Redact passwords and secrets from DDL statements before returning to user.
+def _redact_ddl(ddl):
+    """Redact passwords and secrets from a single DDL statement.
 
     Backup identifiers in ``... USING 'tag'`` (BACKUP KEYSTORE / WITH BACKUP) are
     left visible; they are not credentials. ``USING TAG`` for secrets uses a
     different token sequence and is unaffected.
     """
-    # Oracle doubles embedded quotes inside literals; match full quoted spans.
     _sq_lit = r"'(?:[^']|'')*'"
     _dq_lit = r'"(?:[^"]|"")*"'
-    redacted = []
-    for ddl in ddls:
-        s = _re.sub(r'(IDENTIFIED\s+BY\s+)' + _dq_lit, r'\1"***"', ddl, flags=_re.IGNORECASE)
-        s = _re.sub(r'(SECRET\s+)' + _sq_lit, r"\1'***'", s, flags=_re.IGNORECASE)
-        s = _re.sub(
-            r'(ALTER\s+KEYSTORE\s+PASSWORD\s+.*?SET\s+)' + _dq_lit,
-            r"\1'***'",
-            s,
-            flags=_re.IGNORECASE,
-        )
-        s = _re.sub(
-            r'(ALTER\s+KEYSTORE\s+PASSWORD\s+.*?SET\s+)' + _sq_lit,
-            r"\1'***'",
-            s,
-            flags=_re.IGNORECASE,
-        )
-        redacted.append(s)
-    return redacted
+    s = _re.sub(r'(IDENTIFIED\s+BY\s+)' + _dq_lit, r'\1"***"', ddl, flags=_re.IGNORECASE)
+    s = _re.sub(r'(SECRET\s+)' + _sq_lit, r"\1'***'", s, flags=_re.IGNORECASE)
+    s = _re.sub(
+        r'(ALTER\s+KEYSTORE\s+PASSWORD\s+.*?SET\s+)' + _dq_lit,
+        r"\1'***'",
+        s,
+        flags=_re.IGNORECASE,
+    )
+    s = _re.sub(
+        r'(ALTER\s+KEYSTORE\s+PASSWORD\s+.*?SET\s+)' + _sq_lit,
+        r"\1'***'",
+        s,
+        flags=_re.IGNORECASE,
+    )
+    return s
+
+
+def _redact_ddls(ddls):
+    """Redact passwords and secrets from a list of DDL statements."""
+    return [_redact_ddl(d) for d in ddls]
 
 
 def _vwallet_field(row, col):
@@ -394,15 +405,12 @@ def secret_exists(conn, client_name, secret_tag=None):
     if not secrets:
         return False
     c_upper = client_name.upper()
-    want_tag = (secret_tag or '').strip()
-    want_tag_u = want_tag.upper() if want_tag else None
+    want_tag_u = (secret_tag or '').strip().upper()
     for s in secrets:
         cli = (_vwallet_field(s, 'CLIENT') or '').upper()
         if cli != c_upper:
             continue
-        if want_tag_u is None:
-            return True
-        tag = (_vwallet_field(s, 'SECRET_TAG') or '').upper()
+        tag = (_vwallet_field(s, 'SECRET_TAG') or '').strip().upper()
         if tag == want_tag_u:
             return True
     return False
@@ -438,7 +446,7 @@ def ensure_keystore_present(conn, module):
     sql = "ADMINISTER KEY MANAGEMENT CREATE KEYSTORE '%s' IDENTIFIED BY \"%s\"" % (
         loc_esc, pwd_esc
     )
-    conn.execute_ddl(sql)
+    conn.execute_ddl(sql, ddls_entry=_redact_ddl(sql))
     return get_wallet_status(conn, module.params["container"])
 
 
@@ -463,7 +471,7 @@ def ensure_keystore_open(conn, module):
     sql = "ADMINISTER KEY MANAGEMENT %sSET KEYSTORE OPEN IDENTIFIED BY \"%s\"%s" % (
         force, pwd_esc, container_clause
     )
-    conn.execute_ddl(sql)
+    conn.execute_ddl(sql, ddls_entry=_redact_ddl(sql))
     return get_wallet_status(conn, module.params["container"])
 
 
@@ -490,7 +498,7 @@ def ensure_keystore_closed(conn, module):
         sql = "ADMINISTER KEY MANAGEMENT SET KEYSTORE CLOSE IDENTIFIED BY \"%s\"%s" % (
             pwd_esc, container_clause
         )
-    conn.execute_ddl(sql)
+    conn.execute_ddl(sql, ddls_entry=_redact_ddl(sql))
     return get_wallet_status(conn, module.params["container"])
 
 
@@ -535,7 +543,7 @@ def create_auto_login(conn, module):
     sql = "ADMINISTER KEY MANAGEMENT CREATE %sAUTO_LOGIN KEYSTORE FROM KEYSTORE '%s' IDENTIFIED BY \"%s\"" % (
         local_clause, loc_esc, pwd_esc
     )
-    conn.execute_ddl(sql)
+    conn.execute_ddl(sql, ddls_entry=_redact_ddl(sql))
 
 
 def backup_keystore(conn, module, identified_by_password=None):
@@ -567,7 +575,7 @@ def backup_keystore(conn, module, identified_by_password=None):
     if backup_location:
         loc_esc = escape_sql_literal_or_fail(backup_location, "'", module)
         sql += " TO '%s'" % loc_esc
-    conn.execute_ddl(sql)
+    conn.execute_ddl(sql, ddls_entry=_redact_ddl(sql))
 
 
 def change_keystore_password(conn, module):
@@ -589,7 +597,7 @@ def change_keystore_password(conn, module):
     sql = "ADMINISTER KEY MANAGEMENT %sALTER KEYSTORE PASSWORD IDENTIFIED BY \"%s\" SET \"%s\"%s" % (
         force, old_esc, new_esc, backup_clause
     )
-    conn.execute_ddl(sql)
+    conn.execute_ddl(sql, ddls_entry=_redact_ddl(sql))
 
 
 def manage_secret(conn, module):
@@ -625,7 +633,7 @@ def manage_secret(conn, module):
             sql = "ADMINISTER KEY MANAGEMENT %sADD SECRET '%s' FOR CLIENT '%s'%s IDENTIFIED BY \"%s\"%s" % (
                 force, safe_secret, safe_client, tag_clause, pwd_esc, backup_clause
             )
-        conn.execute_ddl(sql)
+        conn.execute_ddl(sql, ddls_entry=_redact_ddl(sql))
 
     elif secret_state == 'absent':
         if not exists:
@@ -637,7 +645,7 @@ def manage_secret(conn, module):
         sql = "ADMINISTER KEY MANAGEMENT %sDELETE SECRET FOR CLIENT '%s'%s IDENTIFIED BY \"%s\"%s" % (
             force, safe_client, tag_clause, pwd_esc, backup_clause
         )
-        conn.execute_ddl(sql)
+        conn.execute_ddl(sql, ddls_entry=_redact_ddl(sql))
 
 
 def main():
@@ -681,7 +689,7 @@ def main():
     if not HAS_ORACLE_UTILS:
         module.fail_json(msg='oracle_utils is required for oracle_wallet: %s' % _ORACLE_UTILS_ERR)
 
-    sanitize_string_params(module.params)
+    sanitize_string_params(module.params, no_trim={'password', 'keystore_password', 'new_password', 'secret'})
 
     state = module.params["state"]
     secret_state = module.params["secret_state"]
@@ -810,8 +818,11 @@ except ImportError as e:
     HAS_ORACLE_UTILS = False
     _ORACLE_UTILS_ERR = str(e)
 
-    def sanitize_string_params(module_params):
+    def sanitize_string_params(module_params, no_trim=None):
+        skip = set(no_trim) if no_trim else set()
         for key, value in module_params.items():
+            if key in skip:
+                continue
             if isinstance(value, str):
                 module_params[key] = value.strip()
 

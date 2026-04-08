@@ -63,9 +63,12 @@ def _ensure_fake_ansible_basic():
                     "set monkeypatch.setattr(mod, 'oracleConnection', FakeOC) in the test."
                 )
 
-        def _sanitize_string_params(module_params):
+        def _sanitize_string_params(module_params, no_trim=None):
             """Mirror production oracle_utils.sanitize_string_params; return dict for tests."""
+            skip = set(no_trim) if no_trim else set()
             for key, value in module_params.items():
+                if key in skip:
+                    continue
                 if isinstance(value, str):
                     module_params[key] = value.strip()
             return module_params
