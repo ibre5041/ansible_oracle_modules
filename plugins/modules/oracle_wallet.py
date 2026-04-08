@@ -678,6 +678,9 @@ def main():
         ],
         supports_check_mode=True,
     )
+    if not HAS_ORACLE_UTILS:
+        module.fail_json(msg='oracle_utils is required for oracle_wallet: %s' % _ORACLE_UTILS_ERR)
+
     sanitize_string_params(module.params)
 
     state = module.params["state"]
@@ -791,11 +794,26 @@ try:
         oracleConnection, sanitize_string_params,
         build_backup_clause, build_container_clause, build_force_clause,
     )
-except ImportError:
+except ImportError as e:
+    HAS_ORACLE_UTILS = False
+    _ORACLE_UTILS_ERR = str(e)
+
     def sanitize_string_params(module_params):
         for key, value in module_params.items():
             if isinstance(value, str):
                 module_params[key] = value.strip()
+
+    def _missing_oracle_utils(*_a, **_kw):
+        raise ImportError(
+            'oracle_utils is required for oracle_wallet: %s' % _ORACLE_UTILS_ERR
+        )
+
+    oracleConnection = _missing_oracle_utils  # noqa: F811
+    build_backup_clause = _missing_oracle_utils
+    build_container_clause = _missing_oracle_utils
+    build_force_clause = _missing_oracle_utils
+else:
+    HAS_ORACLE_UTILS = True
 
 if __name__ == '__main__':
     main()
