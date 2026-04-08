@@ -490,10 +490,10 @@ def _validate_dgmgrl_identifier(module, value, param_name):
         module.fail_json(msg='Invalid %s: must be an Oracle identifier' % param_name, changed=False)
 
 
-def _quote_dgmgrl_literal(value):
+def _quote_dgmgrl_literal(module, value):
     """Escape single quotes and reject injection characters in a DGMGRL string literal."""
     if ';' in value or '\n' in value or '\r' in value:
-        raise ValueError("DGMGRL literal must not contain semicolons or newlines: %r" % value)
+        module.fail_json(msg="DGMGRL literal must not contain semicolons or newlines: %r" % value, changed=False)
     return value.replace("'", "''")
 
 
@@ -513,7 +513,7 @@ def dgmgrl_create_configuration(module):
     _validate_dgmgrl_identifier(module, primary_db, 'primary_database')
 
     cmd = "CREATE CONFIGURATION %s AS PRIMARY DATABASE IS %s CONNECT IDENTIFIER IS '%s'" % (
-        config_name, primary_db, _quote_dgmgrl_literal(connect_id)
+        config_name, primary_db, _quote_dgmgrl_literal(module, connect_id)
     )
     rc, stdout, stderr = run_dgmgrl(module, [cmd])
     if rc != 0 and 'already exists' not in stdout.lower():
@@ -534,7 +534,7 @@ def dgmgrl_add_database(module):
 
     _validate_dgmgrl_identifier(module, db_name, 'database_name')
 
-    cmd = "ADD DATABASE %s AS CONNECT IDENTIFIER IS '%s'" % (db_name, _quote_dgmgrl_literal(connect_id))
+    cmd = "ADD DATABASE %s AS CONNECT IDENTIFIER IS '%s'" % (db_name, _quote_dgmgrl_literal(module, connect_id))
     rc, stdout, stderr = run_dgmgrl(module, [cmd])
     if rc != 0 and 'already' not in stdout.lower():
         module.fail_json(msg='Failed to add database: %s %s' % (stdout, stderr), changed=False)
@@ -633,7 +633,7 @@ def dgmgrl_set_properties(module, db_name, properties):
     commands = []
     for prop, value in properties.items():
         _validate_dgmgrl_identifier(module, prop, 'property name')
-        commands.append("EDIT DATABASE %s SET PROPERTY %s='%s'" % (db_name, prop, _quote_dgmgrl_literal(str(value))))
+        commands.append("EDIT DATABASE %s SET PROPERTY %s='%s'" % (db_name, prop, _quote_dgmgrl_literal(module, str(value))))
     rc, stdout, stderr = run_dgmgrl(module, commands)
     if rc != 0:
         module.fail_json(msg='Failed to set properties: %s %s' % (stdout, stderr), changed=False)
@@ -661,7 +661,7 @@ def dgmgrl_set_protection_mode(module, protection_mode):
 def dgmgrl_set_state(module, db_name, db_state):
     """Set database transport/apply state."""
     _validate_dgmgrl_identifier(module, db_name, 'database_name')
-    cmd = "EDIT DATABASE %s SET STATE='%s'" % (db_name, _quote_dgmgrl_literal(db_state.upper()))
+    cmd = "EDIT DATABASE %s SET STATE='%s'" % (db_name, _quote_dgmgrl_literal(module, db_state.upper()))
     rc, stdout, stderr = run_dgmgrl(module, [cmd])
     if rc != 0:
         module.fail_json(msg='Failed to set state: %s %s' % (stdout, stderr), changed=False)
@@ -709,7 +709,7 @@ def dgmgrl_add_far_sync(module):
 
     _validate_dgmgrl_identifier(module, fs_name, 'far_sync_name')
 
-    cmd = "ADD FAR_SYNC %s AS CONNECT IDENTIFIER IS '%s'" % (fs_name, _quote_dgmgrl_literal(fs_connect))
+    cmd = "ADD FAR_SYNC %s AS CONNECT IDENTIFIER IS '%s'" % (fs_name, _quote_dgmgrl_literal(module, fs_connect))
     rc, stdout, stderr = run_dgmgrl(module, [cmd])
     if rc != 0:
         if 'already' in stdout.lower():
@@ -732,7 +732,7 @@ def dgmgrl_validate(module, db_name):
 
 def _validate_dgmgrl_connect_string(module, value, param_name):
     """Validate a connect identifier is safe for DGMGRL (no injection)."""
-    if not value or ';' in value or '\n' in value:
+    if not value or ';' in value or '\n' in value or '\r' in value:
         module.fail_json(msg='Invalid %s: must not be empty or contain ; or newlines' % param_name, changed=False)
 
 
@@ -749,7 +749,7 @@ def dgmgrl_set_primary_database_candidates(module, candidates):
     for c in candidates:
         _validate_dgmgrl_identifier(module, c, 'primary_database_candidates member')
     value = ','.join(candidates)
-    cmd = "EDIT CONFIGURATION SET PROPERTY PrimaryDatabaseCandidates='%s'" % _quote_dgmgrl_literal(value)
+    cmd = "EDIT CONFIGURATION SET PROPERTY PrimaryDatabaseCandidates='%s'" % _quote_dgmgrl_literal(module, value)
     rc, stdout, stderr = run_dgmgrl(module, [cmd])
     if rc != 0:
         if 'not supported' in stdout.lower() or 'invalid property' in stdout.lower():
@@ -789,10 +789,10 @@ def dgmgrl_set_tags(module, tags):
         _validate_dgmgrl_tag_name(module, tag_name)
         if target_name:
             cmd = "EDIT %s %s SET TAG %s='%s'" % (
-                target_type, target_name, tag_name, _quote_dgmgrl_literal(str(tag_value)))
+                target_type, target_name, tag_name, _quote_dgmgrl_literal(module, str(tag_value)))
         else:
             cmd = "EDIT %s SET TAG %s='%s'" % (
-                target_type, tag_name, _quote_dgmgrl_literal(str(tag_value)))
+                target_type, tag_name, _quote_dgmgrl_literal(module, str(tag_value)))
         commands.append(cmd)
     rc, stdout, stderr = run_dgmgrl(module, commands)
     if rc != 0:
@@ -830,7 +830,7 @@ def dgmgrl_show_tags(module, output_format):
         cmd = 'SHOW %s %s TAG' % (target_type, target_name)
     else:
         cmd = 'SHOW %s TAG' % target_type
-    rc, stdout, stderr = run_dgmgrl(module, [cmd])
+    rc, stdout, stderr = run_dgmgrl(module, [cmd], output_format)
     if rc != 0:
         return None
     return stdout
