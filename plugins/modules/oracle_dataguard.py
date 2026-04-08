@@ -54,6 +54,7 @@ options:
     description:
       - Password for DGMGRL connection
       - If omitted (along with dgmgrl_user), OS authentication is used
+      - Credentials are passed via stdin (CONNECT command), never on the command line
     required: false
   dgmgrl_connect_identifier:
     description: Connect identifier for DGMGRL (e.g. host:port/service)
@@ -153,6 +154,7 @@ options:
     required: false
 notes:
   - Broker mode requires DGMGRL binary in ORACLE_HOME/bin
+  - "Broker mode uses dgmgrl /nolog and passes credentials via stdin (CONNECT command) to avoid exposing passwords in process listings"
   - "Broker mode supports OS authentication (/ AS SYSDG or / AS SYSDBA) when dgmgrl_user and dgmgrl_password are omitted"
   - "SQL mode supports OS authentication (mode: sysdba without user/password) when running as the oracle OS user"
   - SQL mode uses standard oracledb connection
@@ -178,7 +180,7 @@ EXAMPLES = '''
     dgmgrl_as: sysdba
     state: status
 
-# Password authentication
+# Password authentication (credentials are passed via stdin, not on the command line)
 - name: Get Data Guard status with password authentication
   oracle_dataguard:
     oracle_home: /u01/app/oracle/product/19c
@@ -368,7 +370,9 @@ def run_dgmgrl(module, commands, output_format='text'):
     if not os.path.exists(dgmgrl_bin):
         module.fail_json(msg='DGMGRL not found at %s' % dgmgrl_bin, changed=False)
 
-    # Build connect string
+    # Build connect string and pass it via stdin (CONNECT command) so that
+    # credentials never appear on the command line or in process listings.
+    # This mirrors how oracle_sqldba passes passwords to sqlplus via stdin.
     dgmgrl_user = module.params.get("dgmgrl_user")
     dgmgrl_password = module.params.get("dgmgrl_password")
     dgmgrl_connect_id = module.params.get("dgmgrl_connect_identifier")
@@ -381,17 +385,29 @@ def run_dgmgrl(module, commands, output_format='text'):
             connect_string = '%s/%s' % (dgmgrl_user, dgmgrl_password)
         if dgmgrl_as:
             connect_string += ' AS %s' % dgmgrl_as.upper()
+    elif dgmgrl_user:
+        # Wallet-based authentication (no password)
+        if dgmgrl_connect_id:
+            connect_string = '%s/@%s' % (dgmgrl_user, dgmgrl_connect_id)
+        else:
+            connect_string = '%s/' % dgmgrl_user
+        if dgmgrl_as:
+            connect_string += ' AS %s' % dgmgrl_as.upper()
     else:
+        # OS authentication
         connect_string = '/ AS %s' % dgmgrl_as.upper()
 
-    # Build command
+    # Use /nolog mode and issue CONNECT via stdin to keep credentials
+    # out of the process argument list visible in ps/proc.
     cmd = [dgmgrl_bin, '-silent']
     if output_format == 'json':
         cmd.extend(['-outputformat', 'json'])
-    cmd.append(connect_string)
+    cmd.append('/nolog')
 
-    # Build script from commands
-    script = ';\n'.join(commands) + ';\n'
+    # Build script: CONNECT first, then the actual commands
+    script_lines = ['CONNECT %s' % connect_string]
+    script_lines.extend(commands)
+    script = ';\n'.join(script_lines) + ';\n'
 
     rc, stdout, stderr = module.run_command(cmd, data=script)
 
@@ -605,9 +621,12 @@ def dgmgrl_convert_database(module, db_name, target_type):
 
 
 def dgmgrl_set_properties(module, db_name, properties):
-    """Set properties on a database."""
+    """Set properties on a database.
+
+    Returns True because DGMGRL does not report whether a value actually changed.
+    """
     if not db_name or not properties:
-        return
+        return False
     _validate_dgmgrl_identifier(module, db_name, 'database_name')
     commands = []
     for prop, value in properties.items():
@@ -616,6 +635,7 @@ def dgmgrl_set_properties(module, db_name, properties):
     rc, stdout, stderr = run_dgmgrl(module, commands)
     if rc != 0:
         module.fail_json(msg='Failed to set properties: %s %s' % (stdout, stderr), changed=False)
+    return True
 
 
 def dgmgrl_set_protection_mode(module, protection_mode):
@@ -689,7 +709,9 @@ def dgmgrl_add_far_sync(module):
 
     cmd = "ADD FAR_SYNC %s AS CONNECT IDENTIFIER IS '%s'" % (fs_name, _quote_dgmgrl_literal(fs_connect))
     rc, stdout, stderr = run_dgmgrl(module, [cmd])
-    if rc != 0 and 'already' not in stdout.lower():
+    if rc != 0:
+        if 'already' in stdout.lower():
+            return False
         module.fail_json(msg='Failed to add Far Sync: %s %s' % (stdout, stderr), changed=False)
     return True
 
@@ -1065,26 +1087,26 @@ def _broker_present(module, database_name, output_format):
             changed = True
 
     if module.params["far_sync_name"]:
-        dgmgrl_add_far_sync(module)
-        changed = True
+        if dgmgrl_add_far_sync(module):
+            changed = True
     if module.params["properties"] and database_name:
-        dgmgrl_set_properties(module, database_name, module.params["properties"])
-        changed = True
+        if dgmgrl_set_properties(module, database_name, module.params["properties"]):
+            changed = True
     if module.params["protection_mode"]:
-        dgmgrl_set_protection_mode(module, module.params["protection_mode"])
-        changed = True
+        if dgmgrl_set_protection_mode(module, module.params["protection_mode"]):
+            changed = True
     if module.params["database_state"] and database_name:
-        dgmgrl_set_state(module, database_name, module.params["database_state"])
-        changed = True
+        if dgmgrl_set_state(module, database_name, module.params["database_state"]):
+            changed = True
     if module.params["primary_database_candidates"]:
         if dgmgrl_set_primary_database_candidates(module, module.params["primary_database_candidates"]):
             changed = True
     if module.params["fsfo"]:
-        dgmgrl_manage_fsfo(module, module.params["fsfo"], module.params.get("fsfo_target"))
-        changed = True
+        if dgmgrl_manage_fsfo(module, module.params["fsfo"], module.params.get("fsfo_target")):
+            changed = True
     if module.params["observer_state"]:
-        dgmgrl_manage_observer(module, module.params["observer_state"])
-        changed = True
+        if dgmgrl_manage_observer(module, module.params["observer_state"]):
+            changed = True
     if module.params["tags"]:
         if dgmgrl_set_tags(module, module.params["tags"]):
             changed = True
@@ -1126,12 +1148,24 @@ def _broker_enable_disable(module, database_name, enable):
     module.exit_json(changed=changed, msg='%s successfully' % action)
 
 
+_SQL_SUPPORTED_STATES = frozenset(['status', 'present'])
+
+
 def _run_sql_mode(module):
     """Handle all SQL mode operations."""
     if oracleConnection is None:
         module.fail_json(msg='SQL mode requires oracledb module. Install via: pip install oracledb', changed=False)
     state = module.params["state"]
     protection_mode = module.params["protection_mode"]
+
+    if state not in _SQL_SUPPORTED_STATES:
+        module.fail_json(
+            msg="state '%s' is not supported in SQL mode. "
+                "Supported states: %s. Use mode_dg=broker for this operation."
+                % (state, ', '.join(sorted(_SQL_SUPPORTED_STATES))),
+            changed=False,
+        )
+
     conn = oracleConnection(module)
 
     if state == 'status':
