@@ -329,7 +329,11 @@ def test_orapki_add_trusted_cert(monkeypatch):
             cert_state="present", cert_type="trusted_cert",
             cert_file="/tmp/ca.crt",
         )
-        _orapki_responses = {'wallet add': (0, '', '')}
+        _orapki_responses = {
+            'cert display': (0, 'Subject: CN=ca.example.com', ''),
+            'wallet display': (0, WALLET_DISPLAY_EMPTY, ''),
+            'wallet add': (0, '', ''),
+        }
         _commands_run = []
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
@@ -351,7 +355,11 @@ def test_orapki_add_user_cert(monkeypatch):
             cert_state="present", cert_type="user_cert",
             cert_file="/tmp/server.crt",
         )
-        _orapki_responses = {'wallet add': (0, '', '')}
+        _orapki_responses = {
+            'cert display': (0, 'Subject: CN=server.example.com', ''),
+            'wallet display': (0, WALLET_DISPLAY_EMPTY, ''),
+            'wallet add': (0, '', ''),
+        }
         _commands_run = []
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
