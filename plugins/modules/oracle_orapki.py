@@ -610,7 +610,7 @@ def _manage_credential(module):
     exists = _credential_exists(module, lookup_key, credential_type)
 
     if credential_state == 'present':
-        return _upsert_credential(module, exists)
+        return _upsert_credential(module, exists, lookup_key)
 
     if credential_state == 'absent':
         if not exists:
@@ -633,8 +633,12 @@ def _manage_credential(module):
     return False
 
 
-def _upsert_credential(module, exists):
-    """Create or modify a credential/entry."""
+def _upsert_credential(module, exists, connect_key):
+    """Create or modify a credential/entry.
+
+    connect_key is the resolved identifier (credential_db or credential_alias
+    fallback) used as the -connect_string for credential operations.
+    """
     credential_type = module.params["credential_type"]
     credential_alias = module.params["credential_alias"]
     wallet_location = module.params["wallet_location"]
@@ -650,7 +654,7 @@ def _upsert_credential(module, exists):
         if exists:
             args = ['secretstore', 'modify_credential',
                     '-wallet', wallet_location,
-                    '-connect_string', credential_db]
+                    '-connect_string', connect_key]
             if credential_user:
                 args.extend(['-username', credential_user])
             if credential_password:
