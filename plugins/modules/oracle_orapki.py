@@ -554,16 +554,42 @@ def _manage_cert(module):
                 msg='cert_dn is required for certificate export',
                 changed=False,
             )
+        if not _cert_exists_in_wallet(module, dn=cert_dn):
+            module.fail_json(
+                msg='certificate with DN %s not found in wallet' % cert_dn,
+                changed=False,
+            )
+        # Export to a temporary location to compare with the existing file.
+        wallet_password = module.params["wallet_password"]
+        export_args = ['wallet', 'export', '-wallet', wallet_location,
+                       '-dn', cert_dn, '-cert', cert_export_file]
+        if _is_sso_only_wallet(wallet_location):
+            export_args.append('-auto_login_only')
+        elif wallet_password:
+            export_args.extend(['-pwd', wallet_password])
+        if os.path.isfile(cert_export_file):
+            # Export to a temp file and compare with the existing one.
+            import tempfile
+            tmp_fd, tmp_path = tempfile.mkstemp(suffix='.crt')
+            os.close(tmp_fd)
+            try:
+                tmp_args = list(export_args)
+                # Replace the cert_export_file with the temp path.
+                cert_idx = tmp_args.index('-cert') + 1
+                tmp_args[cert_idx] = tmp_path
+                _run_orapki(module, tmp_args)
+                with open(tmp_path, 'r') as f:
+                    new_content = f.read()
+                with open(cert_export_file, 'r') as f:
+                    existing_content = f.read()
+                if new_content == existing_content:
+                    return False
+            finally:
+                if os.path.exists(tmp_path):
+                    os.unlink(tmp_path)
         if module.check_mode:
             return True
-        wallet_password = module.params["wallet_password"]
-        args = ['wallet', 'export', '-wallet', wallet_location,
-                '-dn', cert_dn, '-cert', cert_export_file]
-        if _is_sso_only_wallet(wallet_location):
-            args.append('-auto_login_only')
-        elif wallet_password:
-            args.extend(['-pwd', wallet_password])
-        _run_orapki(module, args)
+        _run_orapki(module, export_args)
         return True
 
     return False

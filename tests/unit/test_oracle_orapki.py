@@ -71,11 +71,16 @@ LIST_ENTRIES_OUTPUT = """List secret store entries:
 class _OrapkiModule(BaseFakeModule):
     """Module that stubs run_command for orapki."""
 
-    _orapki_responses = {}
-    _commands_run = []
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        # Bind class-level containers as instance attributes so each
+        # instance references its own subclass's state (silences lint
+        # warnings about mutable class defaults on the base class).
+        self._orapki_responses = getattr(type(self), '_orapki_responses', {})
+        self._commands_run = getattr(type(self), '_commands_run', [])
 
     def run_command(self, command, **kwargs):
-        self.__class__._commands_run.append(command)
+        self._commands_run.append(command)
         # Match on subcommand keywords in the command list
         cmd_str = ' '.join(command) if isinstance(command, list) else command
         for key, response in self._orapki_responses.items():
@@ -347,6 +352,33 @@ def test_orapki_add_trusted_cert(monkeypatch):
     assert '-trusted_cert' in cmd_str
 
 
+def test_orapki_add_trusted_cert_with_alias(monkeypatch):
+    mod = _load()
+
+    class Mod(_OrapkiModule):
+        params = _orapki_params(
+            cert_state="present", cert_type="trusted_cert",
+            cert_file="/tmp/ca.crt", cert_alias="my_ca_alias",
+        )
+        _orapki_responses = {
+            'cert display': (0, 'Subject: CN=ca.example.com', ''),
+            'wallet display': (0, WALLET_DISPLAY_EMPTY, ''),
+            'wallet add': (0, '', ''),
+        }
+        _commands_run = []
+
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "os", _make_fake_os(orapki_exists=True))
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    result = exc.value.args[0]
+    assert result["changed"] is True
+    cmd_str = ' '.join(Mod._commands_run[-1])
+    assert '-alias' in cmd_str
+    assert 'my_ca_alias' in cmd_str
+
+
 def test_orapki_add_user_cert(monkeypatch):
     mod = _load()
 
@@ -472,10 +504,13 @@ def test_orapki_export_cert(monkeypatch):
     class Mod(_OrapkiModule):
         params = _orapki_params(
             cert_state="exported",
-            cert_dn="CN=myserver.example.com",
+            cert_dn="CN=myserver.example.com,O=MyCompany",
             cert_export_file="/tmp/export.crt",
         )
-        _orapki_responses = {'wallet export': (0, '', '')}
+        _orapki_responses = {
+            'wallet display': (0, WALLET_DISPLAY_OUTPUT, ''),
+            'wallet export': (0, '', ''),
+        }
         _commands_run = []
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
