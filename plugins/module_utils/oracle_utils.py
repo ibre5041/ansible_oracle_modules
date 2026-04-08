@@ -88,6 +88,15 @@ def _ensure_oracle_client(module, oracle_home=None, required=False):
 # Shared SQL clause builders (used by oracle_wallet, oracle_tde, etc.)
 # ---------------------------------------------------------------------------
 
+def sql_single_quoted_literal(value):
+    if value is None:
+        return ''
+    s = str(value)
+    if s.startswith("'") and s.endswith("'"):
+        s = s[1:-1]
+    return s.replace("'", "''")
+
+
 def build_force_clause(force_keystore):
     """Build FORCE KEYSTORE clause for ADMINISTER KEY MANAGEMENT."""
     if force_keystore:
@@ -108,8 +117,7 @@ def build_backup_clause(backup=True, backup_tag=None):
         return ''
     clause = ' WITH BACKUP'
     if backup_tag:
-        safe_tag = backup_tag.replace("'", "''")
-        clause += " USING '%s'" % safe_tag
+        clause += " USING '%s'" % sql_single_quoted_literal(backup_tag)
     return clause
 
 
@@ -326,22 +334,26 @@ class oracleConnection:
                 self.module.warn(error.message)
 
 
-    def execute_ddl(self, request, params=None, no_change=False, ignore_errors=None):
+    def execute_ddl(self, request, params=None, no_change=False, ignore_errors=None, ddls_entry=None):
         """Execute a DDL request and keep trace it in ddls attribute.
-        request -- SQL query, no bind parameter allowed on DDL request.
+        request -- SQL or anonymous PL/SQL block; optional bind parameters via params.
         In check mode, query is not executed.
+        ddls_entry -- If set, this string is recorded in ``ddls`` and shown for ``-vvv``
+            instead of ``request`` after success. Use to avoid returning secrets in the
+            module result while still executing ``request`` on the database.
         """
         if ignore_errors is None:
             ignore_errors = []
+        trace = ddls_entry if ddls_entry is not None else request
         try:
             if self.module._verbosity >= 3:
-                self.module.warn("SQL: --{}".format(request))
+                self.module.warn("SQL: --{}".format(trace))
             if not self.module.check_mode:
                 with self.conn.cursor() as cursor:
                     cursor.execute(request, params)
-                    self.ddls.append(request)
+                    self.ddls.append(trace)
             else:
-                self.ddls.append('--' + request)
+                self.ddls.append('--' + trace)
             if not no_change: # In case of alter session, do not set changed to True
                 self.changed = True
         except oracledb.DatabaseError as e:
@@ -404,7 +416,16 @@ class oracleConnection:
             return
         if not re.match(r'^[A-Za-z][A-Za-z0-9_$#]*$', pdb_name):
             self.module.fail_json(msg='Invalid pdb_name for alter session', changed=self.changed, ddls=self.ddls)
-        self.execute_ddl('ALTER SESSION SET CONTAINER = %s' % pdb_name, no_change=True)
+        # Execute directly instead of via execute_ddl so that the session
+        # container is switched even in check_mode — subsequent SELECT queries
+        # need to run against the correct PDB.
+        sql = 'ALTER SESSION SET CONTAINER = %s' % pdb_name
+        try:
+            with self.conn.cursor() as cursor:
+                cursor.execute(sql)
+        except oracledb.DatabaseError as e:
+            error = e.args[0]
+            self.module.fail_json(msg=error.message, code=error.code, ddls=self.ddls, changed=self.changed)
 
     def resolve_object_name(self, object_name):
         statement = """

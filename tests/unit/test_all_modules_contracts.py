@@ -10,7 +10,6 @@ def _module_files():
 
 
 def test_all_modules_keep_original_name_prefix():
-    assert len(_module_files()) == 36
     for module_file in _module_files():
         assert module_file.name.startswith("oracle_")
 

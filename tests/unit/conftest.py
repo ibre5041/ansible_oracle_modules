@@ -63,9 +63,15 @@ def _ensure_fake_ansible_basic():
                     "set monkeypatch.setattr(mod, 'oracleConnection', FakeOC) in the test."
                 )
 
+        def _sql_single_quoted_literal(value):
+            if value is None:
+                return ''
+            return str(value).replace("'", "''")
+
         _ou_mod = types.ModuleType(_ou_path)
         _ou_mod.oracleConnection = _StubOracleConnection
         _ou_mod.sanitize_string_params = lambda _params: None
+        _ou_mod.sql_single_quoted_literal = _sql_single_quoted_literal
         sys.modules[_ou_path] = _ou_mod
 
     ansible_mod = types.ModuleType("ansible")
