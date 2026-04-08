@@ -55,11 +55,17 @@ User Certificates:
 Trusted Certificates:
 """
 
-LIST_CREDENTIALS_OUTPUT = """oracle.security.client.connect_string1 = primary_db
-oracle.security.client.connect_string2 = standby_db
+LIST_CREDENTIALS_OUTPUT = """List credential (index: connect_string username)
+1: primary_db sys
+2: standby_db admin
 """
 
 LIST_CREDENTIALS_EMPTY = ""
+
+LIST_ENTRIES_OUTPUT = """List secret store entries:
+1: primary_db
+2: standby_db
+"""
 
 
 class _OrapkiModule(BaseFakeModule):
@@ -90,6 +96,8 @@ class _FakeOs:
     class path:
         _orapki_exists = True
         _wallet_exists = False
+        _p12_exists = False
+        _sso_exists = False
         _wallet_location = '/opt/oracle/wallets/test'
 
         @classmethod
@@ -100,8 +108,10 @@ class _FakeOs:
 
         @classmethod
         def isfile(cls, path_str):
-            if 'ewallet.p12' in path_str or 'cwallet.sso' in path_str:
-                return cls._wallet_exists
+            if 'ewallet.p12' in path_str:
+                return cls._p12_exists
+            if 'cwallet.sso' in path_str:
+                return cls._sso_exists
             return False
 
         @classmethod
@@ -109,11 +119,21 @@ class _FakeOs:
             return '/'.join(args)
 
 
-def _make_fake_os(orapki_exists=True, wallet_exists=False):
+def _make_fake_os(orapki_exists=True, wallet_exists=False, sso_only=False):
     """Create a _FakeOs with specific settings."""
     fake = _FakeOs(orapki_exists, wallet_exists)
     fake.path._orapki_exists = orapki_exists
     fake.path._wallet_exists = wallet_exists
+    if wallet_exists:
+        if sso_only:
+            fake.path._p12_exists = False
+            fake.path._sso_exists = True
+        else:
+            fake.path._p12_exists = True
+            fake.path._sso_exists = True
+    else:
+        fake.path._p12_exists = False
+        fake.path._sso_exists = False
     return fake
 
 
@@ -503,7 +523,7 @@ def test_orapki_modify_credential(monkeypatch):
     mod = _load()
 
     # Simulate a wallet where credential_db "PROD" already exists
-    existing_creds = "oracle.security.client.connect_string1 = PROD\n"
+    existing_creds = "List credential (index: connect_string username)\n1: PROD sys\n"
 
     class Mod(_OrapkiModule):
         params = _orapki_params(
@@ -545,6 +565,7 @@ def test_orapki_delete_credential(monkeypatch):
         params = _orapki_params(
             credential_state="absent",
             credential_alias="primary_db",
+            credential_db="primary_db",
         )
         _orapki_responses = {
             'list_credentials': (0, LIST_CREDENTIALS_OUTPUT, ''),
@@ -559,6 +580,9 @@ def test_orapki_delete_credential(monkeypatch):
         mod.main()
     result = exc.value.args[0]
     assert result["changed"] is True
+    cmd = Mod._commands_run[-1]
+    assert '-connect_string' in cmd
+    assert cmd[cmd.index('-connect_string') + 1] == 'primary_db'
 
 
 def test_orapki_delete_credential_idempotent(monkeypatch):
@@ -568,6 +592,7 @@ def test_orapki_delete_credential_idempotent(monkeypatch):
         params = _orapki_params(
             credential_state="absent",
             credential_alias="nonexistent",
+            credential_db="nonexistent",
         )
         _orapki_responses = {
             'list_credentials': (0, LIST_CREDENTIALS_EMPTY, ''),
@@ -619,7 +644,7 @@ def test_orapki_modify_entry(monkeypatch):
             credential_secret="new-secret-value",
         )
         _orapki_responses = {
-            'list_entries': (0, LIST_CREDENTIALS_OUTPUT, ''),
+            'list_entries': (0, LIST_ENTRIES_OUTPUT, ''),
             'modify_entry': (0, '', ''),
         }
         _commands_run = []
@@ -643,7 +668,7 @@ def test_orapki_delete_entry(monkeypatch):
             credential_alias="primary_db",
         )
         _orapki_responses = {
-            'list_entries': (0, LIST_CREDENTIALS_OUTPUT, ''),
+            'list_entries': (0, LIST_ENTRIES_OUTPUT, ''),
             'delete_entry': (0, '', ''),
         }
         _commands_run = []
@@ -655,6 +680,70 @@ def test_orapki_delete_entry(monkeypatch):
         mod.main()
     result = exc.value.args[0]
     assert result["changed"] is True
+
+
+def test_orapki_credential_requires_credential_db(monkeypatch):
+    """credential_type='credential' must have credential_db set."""
+    mod = _load()
+
+    class Mod(_OrapkiModule):
+        params = _orapki_params(
+            credential_state="present",
+            credential_alias="myalias",
+            credential_user="sys",
+            credential_password="pass",
+        )
+        _commands_run = []
+
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "os", _make_fake_os(orapki_exists=True))
+
+    with pytest.raises(FailJson) as exc:
+        mod.main()
+    assert 'credential_db is required' in exc.value.args[0]['msg']
+
+
+def test_orapki_wallet_delete_sso_only(monkeypatch):
+    """Deleting an SSO-only wallet should use -sso flag."""
+    mod = _load()
+
+    class Mod(_OrapkiModule):
+        params = _orapki_params(state="absent", wallet_password=None)
+        _orapki_responses = {'wallet delete': (0, '', '')}
+        _commands_run = []
+
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "os", _make_fake_os(orapki_exists=True, wallet_exists=True, sso_only=True))
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    result = exc.value.args[0]
+    assert result["changed"] is True
+    cmd = Mod._commands_run[-1]
+    assert '-sso' in cmd
+
+
+def test_orapki_wallet_add_auto_login_to_existing(monkeypatch):
+    """Adding auto-login to an existing PKCS#12 wallet (no cwallet.sso yet)."""
+    mod = _load()
+
+    class Mod(_OrapkiModule):
+        params = _orapki_params(auto_login="auto_login")
+        _orapki_responses = {'wallet create': (0, '', '')}
+        _commands_run = []
+
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    # Wallet exists with p12 but no sso
+    fake_os = _make_fake_os(orapki_exists=True, wallet_exists=True)
+    fake_os.path._sso_exists = False
+    monkeypatch.setattr(mod, "os", fake_os)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    result = exc.value.args[0]
+    assert result["changed"] is True
+    cmd_str = ' '.join(Mod._commands_run[-1])
+    assert '-auto_login' in cmd_str
 
 
 # ===========================================================================
@@ -705,4 +794,18 @@ def test_parse_list_credentials():
 def test_parse_list_credentials_empty():
     mod = _load()
     result = mod._parse_list_credentials(LIST_CREDENTIALS_EMPTY)
+    assert result == []
+
+
+def test_parse_list_entries():
+    mod = _load()
+    result = mod._parse_list_entries(LIST_ENTRIES_OUTPUT)
+    assert 'primary_db' in result
+    assert 'standby_db' in result
+    assert len(result) == 2
+
+
+def test_parse_list_entries_empty():
+    mod = _load()
+    result = mod._parse_list_entries('')
     assert result == []

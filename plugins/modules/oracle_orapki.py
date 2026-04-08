@@ -248,6 +248,7 @@ EXAMPLES = '''
 '''
 
 import os
+import re
 
 
 # ============================================================================
@@ -325,15 +326,40 @@ def _parse_wallet_display(stdout):
 def _parse_list_credentials(stdout):
     """Parse 'orapki secretstore list_credentials' output.
 
-    Returns list of alias strings extracted from output lines.
+    Expected format::
+
+        List credential (index: connect_string username)
+        1: PROD sys
+        2: DEV admin
+
+    Returns list of connect_string values.
     """
     aliases = []
     for line in stdout.split('\n'):
         line = line.strip()
-        if '=' in line and line.startswith('oracle.security.client'):
-            alias = line.split('=', 1)[1].strip()
-            if alias:
-                aliases.append(alias)
+        m = re.match(r'^\d+:\s+(\S+)', line)
+        if m:
+            aliases.append(m.group(1))
+    return aliases
+
+
+def _parse_list_entries(stdout):
+    """Parse 'orapki secretstore list_entries' output.
+
+    Expected format::
+
+        List secret store entries:
+        1: my_entry_alias
+        2: another_entry
+
+    Returns list of entry alias strings.
+    """
+    aliases = []
+    for line in stdout.split('\n'):
+        line = line.strip()
+        m = re.match(r'^\d+:\s+(\S+)', line)
+        if m:
+            aliases.append(m.group(1))
     return aliases
 
 
@@ -364,12 +390,32 @@ def _wallet_display(module):
 
 
 def _ensure_wallet_present(module):
-    """Create a wallet if it doesn't exist."""
+    """Create a wallet if it doesn't exist, or add auto-login to existing wallet."""
     wallet_location = module.params["wallet_location"]
     wallet_password = module.params["wallet_password"]
     auto_login = module.params["auto_login"]
 
+    p12 = os.path.join(wallet_location, 'ewallet.p12')
+    sso = os.path.join(wallet_location, 'cwallet.sso')
+
     if _wallet_exists(wallet_location):
+        # Wallet exists — check if auto-login needs to be added
+        if auto_login in ('auto_login', 'local_auto_login') and not os.path.isfile(sso):
+            if not wallet_password:
+                module.fail_json(
+                    msg='wallet_password is required to add auto-login to an existing wallet',
+                    changed=False,
+                )
+            if module.check_mode:
+                return True
+            args = ['wallet', 'create', '-wallet', wallet_location,
+                    '-pwd', wallet_password]
+            if auto_login == 'auto_login':
+                args.append('-auto_login')
+            else:
+                args.append('-auto_login_local')
+            _run_orapki(module, args)
+            return True
         return False
 
     if module.check_mode:
@@ -395,6 +441,13 @@ def _ensure_wallet_present(module):
     return True
 
 
+def _is_sso_only_wallet(wallet_location):
+    """Check if the wallet is SSO-only (cwallet.sso without ewallet.p12)."""
+    p12 = os.path.join(wallet_location, 'ewallet.p12')
+    sso = os.path.join(wallet_location, 'cwallet.sso')
+    return os.path.isfile(sso) and not os.path.isfile(p12)
+
+
 def _ensure_wallet_absent(module):
     """Delete a wallet if it exists."""
     wallet_location = module.params["wallet_location"]
@@ -406,8 +459,11 @@ def _ensure_wallet_absent(module):
     if module.check_mode:
         return True
 
+    sso_only = _is_sso_only_wallet(wallet_location)
     args = ['wallet', 'delete', '-wallet', wallet_location]
-    if wallet_password:
+    if sso_only:
+        args.append('-sso')
+    elif wallet_password:
         args.extend(['-pwd', wallet_password])
     _run_orapki(module, args)
     return True
@@ -441,10 +497,7 @@ def _change_wallet_password(module):
 
 def _cert_exists_in_wallet(module, dn=None, alias=None):
     """Check if a certificate with given DN or alias exists in the wallet."""
-    try:
-        parsed = _wallet_display(module)
-    except SystemExit:
-        return False
+    parsed = _wallet_display(module)
 
     if dn:
         all_certs = (parsed['trusted_certs']
@@ -515,7 +568,9 @@ def _add_cert(module):
         type_flag = '-trusted_cert' if cert_type == 'trusted_cert' else '-user_cert'
         args = ['wallet', 'add', '-wallet', wallet_location,
                 type_flag, '-cert', cert_file]
-        if wallet_password:
+        if _is_sso_only_wallet(wallet_location):
+            args.append('-auto_login_only')
+        elif wallet_password:
             args.extend(['-pwd', wallet_password])
         _run_orapki(module, args)
         return True
@@ -533,7 +588,9 @@ def _add_cert(module):
         args = ['wallet', 'add', '-wallet', wallet_location,
                 '-dn', cert_dn, '-keysize', str(cert_keysize),
                 '-self_signed', '-validity', str(cert_validity)]
-        if wallet_password:
+        if _is_sso_only_wallet(wallet_location):
+            args.append('-auto_login_only')
+        elif wallet_password:
             args.extend(['-pwd', wallet_password])
         _run_orapki(module, args)
         return True
@@ -564,7 +621,9 @@ def _remove_cert(module):
         args.extend(['-dn', cert_dn])
     elif cert_alias:
         args.extend(['-alias', cert_alias])
-    if wallet_password:
+    if _is_sso_only_wallet(wallet_location):
+        args.append('-auto_login_only')
+    elif wallet_password:
         args.extend(['-pwd', wallet_password])
 
     _run_orapki(module, args)
@@ -586,12 +645,12 @@ def _credential_exists(module, alias, credential_type='credential'):
     if wallet_password:
         args.extend(['-pwd', wallet_password])
 
-    try:
-        stdout, _stderr = _run_orapki(module, args)
-    except SystemExit:
-        return False
+    stdout, _stderr = _run_orapki(module, args)
 
-    aliases = _parse_list_credentials(stdout)
+    if credential_type == 'entry':
+        aliases = _parse_list_entries(stdout)
+    else:
+        aliases = _parse_list_credentials(stdout)
     return alias in aliases
 
 
@@ -606,7 +665,15 @@ def _manage_credential(module):
 
     # For credentials, Oracle identifies by connect_string (credential_db).
     # For entries, the identifier is the alias (credential_alias).
-    lookup_key = credential_db if credential_type == 'credential' and credential_db else credential_alias
+    if credential_type == 'credential':
+        if not credential_db:
+            module.fail_json(
+                msg='credential_db is required for credential operations',
+                changed=False,
+            )
+        lookup_key = credential_db
+    else:
+        lookup_key = credential_alias
     exists = _credential_exists(module, lookup_key, credential_type)
 
     if credential_state == 'present':
@@ -660,11 +727,6 @@ def _upsert_credential(module, exists, connect_key):
             if credential_password:
                 args.extend(['-password', credential_password])
         else:
-            if not credential_db:
-                module.fail_json(
-                    msg='credential_db is required to create a credential',
-                    changed=False,
-                )
             args = ['secretstore', 'create_credential',
                     '-wallet', wallet_location,
                     '-connect_string', credential_db]
