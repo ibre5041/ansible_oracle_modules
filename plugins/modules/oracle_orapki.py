@@ -698,13 +698,9 @@ def _manage_credential(module):
     wallet_password = module.params["wallet_password"]
 
     # For credentials, Oracle identifies by connect_string (credential_db).
+    # credential_alias is optional metadata (e.g. TNS alias label).
     # For entries, the identifier is the alias (credential_alias).
     if credential_type == 'credential':
-        if credential_alias:
-            module.fail_json(
-                msg='credential_alias is not supported for credential_type=credential; use credential_db instead',
-                changed=False,
-            )
         if not credential_db:
             module.fail_json(
                 msg='credential_db is required for credential operations',
