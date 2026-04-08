@@ -16,7 +16,7 @@ options:
     description:
       - The home where the database will be created
       - If not provided, environment variable ORACLE_HOME has to be set
-    required: False
+    required: false
     aliases: ['oh']
   sid:
     description:
@@ -24,20 +24,20 @@ options:
       - "NOTE: Database can have SID, DB_NAME, DB_UNIQUE_NAME and Cluster resource name. DBCA is quite cryptic when generating these names"
       - "When sid is omitted, db_name=TESTDB, db_unique_name=TESTDB_LA, ORACLE_SID becomes TESTDBLA1, Cluster resource name becomes testdb_la"
       - "db_unique_name has precedence over db_name when sid is not specified"
-    required: False
+    required: false
     aliases: ['oracle_sid']  
   db_name:
     description: The name of the database
-    required: True
+    required: true
     aliases: ['db', 'database_name', 'name']
   db_unique_name:
     description: The database db_unique_name
-    required: False
+    required: false
     default: None
     aliases: ['dbunqn', 'unique_name']
   sys_password:
     description: Password for the sys user
-    required: False
+    required: false
     default: None
     aliases: ['syspw', 'sysdbapassword', 'sysdbapw']
   system_password:
@@ -75,74 +75,74 @@ options:
       - "APEX: false"
       - "DV: false"
   listeners:
-    required: False
+    required: false
     default: None
     description: ...
   cdb:
     description: Should the database be a container database
-    required: False
-    default: False
+    required: false
+    default: false
     aliases: ['container']
     type: bool
   datafile_dest:
     description: Where the database files should be placed (ASM diskgroup or filesystem path)
-    required: True
+    required: true
     aliases: ['dfd']
   recoveryfile_dest:
     description: Where the database files should be placed (ASM diskgroup or filesystem path)
-    required: False
+    required: false
     default: None
     aliases: ['rfd']
   storage_type:
     description: Type of underlying storage (Filesystem or ASM)
-    required: False
+    required: false
     default: FS
     aliases: ['storage']
     choices: ['FS', 'ASM']
   omf:
     description: Use OMF (Oracle manageded files)
-    required: False
-    default: True
+    required: false
+    default: true
     type: bool
   dbconfig_type:
     description: Type of database (SI,RAC,RON)
-    required: False
+    required: false
     default: SI on standalone, RAC on clustered environment
     choices: ['SI', 'RAC', 'RACONENODE']
   db_type:
     description: Default Type of database (MULTIPURPOSE, OLTP, DATA_WAREHOUSING)
-    required: False
+    required: false
     default: MULTIPURPOSE
     choices: ['MULTIPURPOSE', 'OLTP', 'DATA_WAREHOUSING']
   racone_service:
     description:
       - If dbconfig_type = RACONENODE, a service has to be created along with the DB. This is the name of that service
       - If no name is defined, the service will be called "{{ db_name }}_ronserv"
-    required: False
+    required: false
     default: None
     aliases: ['ron_service']
   characterset:
     description: The database characterset
-    required: False
+    required: false
     default: AL32UTF8
   memory_percentage:
     description: The database total memory in % of available memory
-    required: False
+    required: false
   memory_totalmb:
     description: The database total memory in MB. Defaults to 2G
-    required: False
+    required: false
     default: ['2048']
   nodelist:
     description: The list of nodes a RAC DB should be created on
     default: On RAC cluster default value is a list of all nodes
-    required: False
+    required: false
   amm:
     description: Should Automatic Memory Management be used (memory_target, memory_max_target)
-    required: False
-    default: False
-    choices: ['True', 'False']
+    required: false
+    default: false
+    choices: [true, false]
   initparams:
-    required: False
+    required: false
     type: dict
     description:
       - "List of key=value pairs"
@@ -151,7 +151,7 @@ options:
     description:
       - "List of scripts to run after database is created"
       - "e.g customScripts: [/tmp/xxx.sql, /tmp/yyy.sql]"
-    required: False
+    required: false
   default_tablespace_type:
     description: Database default tablespace type (DEFAULT_TBS_TYPE)
     default: bigfile
@@ -159,34 +159,42 @@ options:
   default_tablespace:
     description: Database default permanent tablespace (DEFAULT_PERMANENT_TABLESPACE)
     default: None
-    required: False
+    required: false
   default_temp_tablespace:
     description: Database default temporary tablespace (DEFAULT_TEMP_TABLESPACE)
     default: None
-    required: False
+    required: false
   archivelog:
-    description: Puts the database is archivelog mode
-    required: False
-    default: False
-    choices: ['True', 'False']
+    description:
+      - Puts the database in archivelog/noarchivelog mode when true/false
+      - Leaves archivelog mode unchanged when omitted or set to None
+    required: false
+    default: None
+    choices: [None, true, false]
     type: bool
   force_logging:
-    description: Enables force logging for the Database
-    required: False
-    default: False
-    choices: ['True', 'False']
+    description:
+      - Enables/disables force logging for the Database when true/false
+      - Leaves force logging unchanged when omitted or set to None
+    required: false
+    default: None
+    choices: [None, true, false]
     type: bool
   supplemental_logging:
-    description: Enables supplemental (minimal) logging for the Database (basically 'add supplemental log data')
-    required: False
-    default: False
-    choices: ['True', 'False']
+    description:
+      - Enables/Disables supplemental (minimal) logging for the Database when true/false
+      - Leaves supplemental logging unchanged when omitted or set to None
+    required: false
+    default: None
+    choices: [None, true, false]
     type: bool
   flashback:
-    description: Enables flashback for the database
+    description:
+      - Enables/disables flashback for the database when true/false
+      - Leaves flashback unchanged when omitted or set to None
     required: False
-    default: False
-    choices: ['True', 'False']
+    default: None
+    choices: [None, true, false]
     type: bool
   state:
     description: The intended state of the database
@@ -553,6 +561,22 @@ def guess_oracle_sid(module, ohomes, fail=True):
         module.fail_json("Could not deduce ORACLE_SID for db_name: {}".format(db_name))
 
 
+def guess_db_unique_name(module, ohomes, fail=True):
+    sid = guess_oracle_sid(module, ohomes, fail=False)
+    if module.params['db_unique_name']:
+        return module.params['db_unique_name']
+
+    try:
+        db_unique_name = ohomes.facts_item[sid]['DB_UNIQUE_NAME']
+        return db_unique_name
+    except KeyError as e:
+        pass
+
+    if fail:
+        module.fail_json("Could not deduce DB_UNIQUE_NAME for db_name: {}".format(db_name))
+    return None
+
+
 def ensure_db_state(module, ohomes, newdb):
     # module.warn('ensure_db_state')
     db_name        = module.params["db_name"]
@@ -566,10 +590,14 @@ def ensure_db_state(module, ohomes, newdb):
     timezone       = module.params["timezone"]
 
     wanted_set = set()
-    wanted_set.add(('log_mode', "ARCHIVELOG" if archivelog else "NOARCHIVELOG"))
-    wanted_set.add(('force_logging', "YES" if force_logging else "NO"))
-    wanted_set.add(('flashback_on', "YES" if flashback else "NO"))
-    wanted_set.add(('supplemental_logging', "YES" if supplemental_logging else "NO"))
+    if archivelog is not None:
+        wanted_set.add(('log_mode', "ARCHIVELOG" if archivelog else "NOARCHIVELOG"))
+    if force_logging is not None:
+        wanted_set.add(('force_logging', "YES" if force_logging else "NO"))
+    if flashback is not None:
+        wanted_set.add(('flashback_on', "YES" if flashback else "NO"))
+    if supplemental_logging is not None:
+        wanted_set.add(('supplemental_logging', "YES" if supplemental_logging else "NO"))
     wanted_set.add(('DEFAULT_TBS_TYPE', default_tablespace_type))
     if default_tablespace:
         wanted_set.add(('DEFAULT_PERMANENT_TABLESPACE', default_tablespace_type))
@@ -578,6 +606,15 @@ def ensure_db_state(module, ohomes, newdb):
     if timezone:
         wanted_set.add(('timezone', timezone))
 
+    archcomp = None
+    archsql = None
+    if archivelog is not None:
+        if archivelog:
+            archcomp = 'ARCHIVELOG'
+            archsql = 'alter database archivelog'
+        else:
+            archcomp = 'NOARCHIVELOG'
+            archsql = 'alter database noarchivelog'
 
     sid = guess_oracle_sid(module, ohomes)
     if not ohomes.facts_item[sid]['running'] : # try to start DB if it is down
@@ -633,33 +670,29 @@ def ensure_db_state(module, ohomes, newdb):
     #supp_log_check_ = execute_sql_get(module, cursor, supp_log_check_sql)
     #log_check_ = execute_sql_get(module, cursor, log_check_sql)
 
-    if archivelog:
-        archcomp = 'ARCHIVELOG'
-        archsql = 'alter database archivelog'
-    else:
-        archcomp = 'NOARCHIVELOG'
-        archsql = 'alter database noarchivelog'
+    if force_logging is not None:
+        if force_logging:
+            flcomp = 'YES'
+            flsql = 'alter database force logging'
+        else:
+            flcomp = 'NO'
+            flsql = 'alter database no force logging'
 
-    if force_logging:
-        flcomp = 'YES'
-        flsql = 'alter database force logging'
-    else:
-        flcomp = 'NO'
-        flsql = 'alter database no force logging'
+    if flashback is not None:
+        if flashback:
+            fbcomp = 'YES'
+            fbsql = 'alter database flashback on'
+        else:
+            fbcomp = 'NO'
+            fbsql = 'alter database flashback off'
 
-    if flashback:
-        fbcomp = 'YES'
-        fbsql = 'alter database flashback on'
-    else:
-        fbcomp = 'NO'
-        fbsql = 'alter database flashback off'
-
-    if supplemental_logging:
-        slcomp = 'YES'
-        slsql = 'alter database add supplemental log data'
-    else:
-        slcomp = 'NO'
-        slsql = 'alter database drop supplemental log data'
+    if supplemental_logging is not None:
+        if supplemental_logging:
+            slcomp = 'YES'
+            slsql = 'alter database add supplemental log data'
+        else:
+            slcomp = 'NO'
+            slsql = 'alter database drop supplemental log data'
 
     if def_tbs_type != default_tablespace_type:
         deftbstypesql = 'alter database set default %s tablespace ' % default_tablespace_type
@@ -677,16 +710,16 @@ def ensure_db_state(module, ohomes, newdb):
         deftzsql = "alter database set time_zone = '%s'" % timezone
         change_db_sql.append(deftzsql)
 
-    if c_log_mode != archcomp:
+    if archivelog is not None and c_log_mode != archcomp:
         change_restart_sql.append(archsql)
 
-    if c_force_logging != flcomp:
+    if force_logging is not None and c_force_logging != flcomp:
         change_db_sql.append(flsql)
 
-    if c_flashback_on != fbcomp:
+    if flashback is not None and c_flashback_on != fbcomp:
         change_db_sql.append(fbsql)
 
-    if c_supplemental_log_data_min != slcomp:
+    if supplemental_logging is not None and c_supplemental_log_data_min != slcomp:
         change_db_sql.append(slsql)
 
     changes = wanted_set.difference(set(db_parameters.items()))
@@ -694,7 +727,7 @@ def ensure_db_state(module, ohomes, newdb):
     if change_db_sql or change_restart_sql:
         return_ddls = []
         # Flashback database needs to be turned off before archivelog is turned off
-        if c_log_mode == 'ARCHIVELOG' and c_flashback_on == 'YES' and not archivelog and not flashback:
+        if archivelog is not None and c_log_mode == 'ARCHIVELOG' and c_flashback_on == 'YES' and archivelog is False and flashback is False:
             # <- Apply changes that does not require a restart
             if change_db_sql:
                 ddls = apply_norestart_changes(module, change_db_sql)
@@ -719,7 +752,10 @@ def ensure_db_state(module, ohomes, newdb):
         module.exit_json(msg=msg, changed=True, ddls=return_ddls)
     else:
         if newdb:
-            msg = 'Database %s successfully created created (%s) ' % (db_name, archcomp)
+            if archcomp:
+                msg = 'Database %s successfully created (%s)' % (db_name, archcomp)
+            else:
+                msg = 'Database %s successfully created' % db_name
         else:
             msg = 'Database %s already exists and is in the intended state - Archivelog: %s, Force Logging: %s, Flashback: %s, Supplemental Logging: %s, Timezone: %s' %\
                     (db_name, archivelog, force_logging, flashback, supplemental_logging, timezone)
@@ -749,16 +785,11 @@ def apply_norestart_changes(module, change_db_sql):
 def stop_db(module, ohomes):
     oracle_home    = module.params["oracle_home"]
     db_name        = module.params["db_name"]
-    db_unique_name = module.params["db_unique_name"]
     sid = guess_oracle_sid(module, ohomes)
     if ohomes.oracle_gi_managed:
-        crsname = ohomes.facts_item[sid]['crsname']
-        if not crsname and db_unique_name:
-            crsname = db_unique_name
-        if not crsname:
-            crsname = db_name
+        db_unique_name = guess_db_unique_name(module, ohomes)
         srvctl = os.path.join(oracle_home, 'bin', 'srvctl')
-        command = [srvctl, 'stop', 'database', '-d', crsname, '-o', 'immediate']
+        command = [srvctl, 'stop', 'database', '-d', db_unique_name, '-o', 'immediate']
         (rc, stdout, stderr) = module.run_command(command)
         if rc != 0 or stdout.startswith('PRCD-') or stderr.startswith('PRCD-'):
             msg = 'Error - STDOUT: %s, STDERR: %s, COMMAND: %s' % (stdout, stderr, " ".join(command))
@@ -782,17 +813,12 @@ def stop_db(module, ohomes):
 def start_db(module, ohomes):
     oracle_home    = module.params["oracle_home"]
     db_name        = module.params["db_name"]
-    db_unique_name = module.params["db_unique_name"]
     sid = guess_oracle_sid(module, ohomes)
 
     if ohomes.oracle_gi_managed:
-        crsname = ohomes.facts_item[sid]['crsname']
-        if not crsname and db_unique_name:
-            crsname = db_unique_name
-        if not crsname:
-            crsname = db_name
+        db_unique_name = guess_db_unique_name(module, ohomes)
         srvctl = os.path.join(oracle_home, 'bin', 'srvctl')
-        command = [srvctl, 'start', 'database', '-d', crsname]
+        command = [srvctl, 'start', 'database', '-d', db_unique_name]
         (rc, stdout, stderr) = module.run_command(command)
         if rc != 0 or stdout.startswith('PRCD') or stderr.startswith('PRCD'):
             msg = 'Error - STDOUT: %s, STDERR: %s, COMMAND: %s' % (stdout, stderr, " ".join(command))
@@ -816,19 +842,13 @@ def start_db(module, ohomes):
 def start_instance(module, ohomes, open_mode, instance_name):
     oracle_home    = module.params["oracle_home"]
     db_name        = module.params["db_name"]
-    db_unique_name = module.params["db_unique_name"]
     sid = guess_oracle_sid(module, ohomes)
 
     if ohomes.oracle_gi_managed:
-        crsname = ohomes.facts_item[sid]['crsname']
-        if not crsname and db_unique_name:
-            crsname = db_unique_name
-        if not crsname:
-            crsname = db_name
-
+        db_unique_name = guess_db_unique_name(module, ohomes)
         srvctl = os.path.join(oracle_home, 'bin', 'srvctl')
         if ohomes.oracle_crs:
-            command = [srvctl, 'start', 'instance', '-d', crsname, '-i', instance_name]
+            command = [srvctl, 'start', 'instance', '-d', db_unique_name, '-i', instance_name]
         else:
             command = [srvctl, 'start', 'database', '-d', db_unique_name]
         if open_mode:
@@ -894,10 +914,10 @@ def main():
             default_tablespace_type = dict(default='bigfile', choices=['smallfile', 'bigfile']),
             default_tablespace  = dict(required=False),
             default_temp_tablespace = dict(required=False),
-            archivelog          = dict(default=False, type='bool'),
-            force_logging       = dict(default=False, type='bool'),
-            supplemental_logging = dict(default=False, type='bool'),
-            flashback           = dict(default=False, type='bool'),
+            archivelog          = dict(default=None, type='bool'),
+            force_logging       = dict(default=None, type='bool'),
+            supplemental_logging = dict(default=None, type='bool'),
+            flashback           = dict(default=None, type='bool'),
             domain              = dict(required=False),
             timezone            = dict(required=False),
             state               = dict(default="present", choices=["present", "absent", "started", "stopped", "restarted"])
