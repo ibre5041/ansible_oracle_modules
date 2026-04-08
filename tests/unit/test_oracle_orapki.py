@@ -502,6 +502,9 @@ def test_orapki_create_credential(monkeypatch):
 def test_orapki_modify_credential(monkeypatch):
     mod = _load()
 
+    # Simulate a wallet where credential_db "PROD" already exists
+    existing_creds = "oracle.security.client.connect_string1 = PROD\n"
+
     class Mod(_OrapkiModule):
         params = _orapki_params(
             credential_state="present",
@@ -511,7 +514,7 @@ def test_orapki_modify_credential(monkeypatch):
             credential_password="NewPass123",
         )
         _orapki_responses = {
-            'list_credentials': (0, LIST_CREDENTIALS_OUTPUT, ''),
+            'list_credentials': (0, existing_creds, ''),
             'modify_credential': (0, '', ''),
         }
         _commands_run = []
@@ -523,10 +526,10 @@ def test_orapki_modify_credential(monkeypatch):
         mod.main()
     result = exc.value.args[0]
     assert result["changed"] is True
-    # Verify correct orapki flags for modify
+    # Verify correct orapki flags for modify — uses credential_db (connect_string)
     cmd = Mod._commands_run[-1]
     assert '-connect_string' in cmd, "should use -connect_string for modify"
-    assert cmd[cmd.index('-connect_string') + 1] == 'primary_db'
+    assert cmd[cmd.index('-connect_string') + 1] == 'PROD'
     assert '-username' in cmd, "should use -username flag"
     assert cmd[cmd.index('-username') + 1] == 'newsys'
     assert '-password' in cmd

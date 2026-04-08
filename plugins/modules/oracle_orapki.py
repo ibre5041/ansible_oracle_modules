@@ -600,10 +600,14 @@ def _manage_credential(module):
     credential_state = module.params["credential_state"]
     credential_type = module.params["credential_type"]
     credential_alias = module.params["credential_alias"]
+    credential_db = module.params["credential_db"]
     wallet_location = module.params["wallet_location"]
     wallet_password = module.params["wallet_password"]
 
-    exists = _credential_exists(module, credential_alias, credential_type)
+    # For credentials, Oracle identifies by connect_string (credential_db).
+    # For entries, the identifier is the alias (credential_alias).
+    lookup_key = credential_db if credential_type == 'credential' and credential_db else credential_alias
+    exists = _credential_exists(module, lookup_key, credential_type)
 
     if credential_state == 'present':
         return _upsert_credential(module, exists)
@@ -616,7 +620,7 @@ def _manage_credential(module):
         if credential_type == 'credential':
             args = ['secretstore', 'delete_credential',
                     '-wallet', wallet_location,
-                    '-connect_string', credential_alias]
+                    '-connect_string', lookup_key]
         else:
             args = ['secretstore', 'delete_entry',
                     '-wallet', wallet_location,
@@ -646,7 +650,7 @@ def _upsert_credential(module, exists):
         if exists:
             args = ['secretstore', 'modify_credential',
                     '-wallet', wallet_location,
-                    '-connect_string', credential_alias]
+                    '-connect_string', credential_db]
             if credential_user:
                 args.extend(['-username', credential_user])
             if credential_password:
