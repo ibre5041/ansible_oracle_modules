@@ -51,7 +51,7 @@ oracle_install_space:
     oracle_db_name:     "TEST26C"
     oracle_unique_name: "TEST26C"
     oracle_gi_response_file: grid.no.comments.26ai.rsp
-    oracle_oh_response_file: db.no.comments.21c.rsp
+    oracle_oh_response_file: db.no.comments.19c.rsp
     oracle_db_response_file: dbca.no.comments.21c.rsp
     oracle_db_ver_release: 26ai
     oracle_db_ver_path: 23.26.0.0
@@ -63,7 +63,7 @@ oracle_install_space:
     oracle_db_name:     "TEST21C"
     oracle_unique_name: "TEST21C"
     oracle_gi_response_file: grid.no.comments.21c.rsp
-    oracle_oh_response_file: db.no.comments.21c.rsp
+    oracle_oh_response_file: db.no.comments.19c.rsp
     oracle_db_response_file: dbca.no.comments.21c.rsp
     oracle_db_ver_release: 21c
     oracle_db_ver_path: 21.3.0.0
