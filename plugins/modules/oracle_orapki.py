@@ -515,10 +515,14 @@ def _manage_cert(module):
             )
         if module.check_mode:
             return True
-        _run_orapki(module, [
-            'wallet', 'export', '-wallet', wallet_location,
-            '-dn', cert_dn, '-cert', cert_export_file,
-        ])
+        wallet_password = module.params["wallet_password"]
+        args = ['wallet', 'export', '-wallet', wallet_location,
+                '-dn', cert_dn, '-cert', cert_export_file]
+        if _is_sso_only_wallet(wallet_location):
+            args.append('-auto_login_only')
+        elif wallet_password:
+            args.extend(['-pwd', wallet_password])
+        _run_orapki(module, args)
         return True
 
     return False
@@ -695,14 +699,6 @@ def _upsert_credential(module, exists, connect_key):
     wallet_location = module.params["wallet_location"]
     wallet_password = module.params["wallet_password"]
 
-    if credential_type == 'entry':
-        credential_secret = module.params["credential_secret"]
-        if not credential_secret:
-            module.fail_json(
-                msg='credential_secret is required for entry type',
-                changed=False,
-            )
-
     if credential_type == 'credential':
         credential_db = module.params["credential_db"]
         credential_user = module.params["credential_user"]
@@ -737,7 +733,13 @@ def _upsert_credential(module, exists, connect_key):
         _run_orapki(module, args)
         return True
 
-    if credential_type == 'entry':
+    elif credential_type == 'entry':
+        credential_secret = module.params["credential_secret"]
+        if not credential_secret:
+            module.fail_json(
+                msg='credential_secret is required for entry type',
+                changed=False,
+            )
 
         if module.check_mode:
             return True
