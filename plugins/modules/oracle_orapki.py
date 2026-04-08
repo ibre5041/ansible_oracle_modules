@@ -285,7 +285,7 @@ def _run_orapki(module, args):
         else:
             safe_args.append(arg)
 
-    cmd = [_get_orapki_bin(module)] + args
+    cmd = [_get_orapki_bin(module), *args]
     rc, stdout, stderr = module.run_command(cmd)
     if rc != 0:
         module.fail_json(
@@ -565,7 +565,15 @@ def _add_cert(module):
                 changed=False,
             )
         dn_from_file = cert_dn or _get_cert_dn(module, cert_file)
-        if dn_from_file and _cert_exists_in_wallet(module, dn=dn_from_file):
+        if not dn_from_file:
+            module.warn(
+                'Could not extract DN from %s; supply cert_dn to enable idempotency checks' % cert_file
+            )
+            module.fail_json(
+                msg='cert_dn is required when DN cannot be extracted from cert_file',
+                changed=False,
+            )
+        if _cert_exists_in_wallet(module, dn=dn_from_file):
             return False
         if module.check_mode:
             return True
@@ -877,7 +885,7 @@ def main():
         _handle_wallet(module)
 
 
-from ansible.module_utils.basic import *  # noqa: F403
+from ansible.module_utils.basic import AnsibleModule
 
 if __name__ == '__main__':
     main()
