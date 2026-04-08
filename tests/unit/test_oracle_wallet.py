@@ -553,6 +553,70 @@ def test_wallet_open_container_all_idempotent_when_all_open(monkeypatch):
     assert exc.value.args[0]["changed"] is False
 
 
+def test_aggregate_wallet_rows_autologin_uses_open_row():
+    """When open rows are all autologin, wallet_type should come from an open row, not first."""
+    mod = _load()
+    rows = [
+        {
+            'wrl_type': 'FILE', 'wrl_parameter': '/a', 'status': 'CLOSED',
+            'wallet_type': '', 'wallet_order': 'SINGLE', 'keystore_mode': 'UNITED',
+        },
+        {
+            'wrl_type': 'FILE', 'wrl_parameter': '/b', 'status': 'OPEN',
+            'wallet_type': 'AUTOLOGIN', 'wallet_order': 'SINGLE', 'keystore_mode': 'UNITED',
+        },
+    ]
+    result = mod._aggregate_wallet_rows(rows)
+    assert result['wallet_type'] == 'AUTOLOGIN'
+
+
+def test_aggregate_wallet_rows_all_not_available():
+    """All-NOT_AVAILABLE rows must aggregate to NOT_AVAILABLE, not CLOSED."""
+    mod = _load()
+    rows = [
+        {
+            'wrl_type': 'FILE', 'wrl_parameter': '/a', 'status': 'NOT_AVAILABLE',
+            'wallet_type': '', 'wallet_order': 'SINGLE', 'keystore_mode': 'NONE',
+        },
+        {
+            'wrl_type': 'FILE', 'wrl_parameter': '/b', 'status': 'NOT_AVAILABLE',
+            'wallet_type': '', 'wallet_order': 'SINGLE', 'keystore_mode': 'NONE',
+        },
+    ]
+    result = mod._aggregate_wallet_rows(rows)
+    assert result['status'] == 'NOT_AVAILABLE'
+
+
+def test_wallet_present_container_all_not_available_creates(monkeypatch):
+    """state=present with container=all and all NOT_AVAILABLE should create the keystore."""
+    mod = _load()
+    rows = [
+        {
+            'wrl_type': 'FILE', 'wrl_parameter': '/a', 'status': 'NOT_AVAILABLE',
+            'wallet_type': '', 'wallet_order': 'SINGLE', 'keystore_mode': 'NONE',
+        },
+        {
+            'wrl_type': 'FILE', 'wrl_parameter': '/b', 'status': 'NOT_AVAILABLE',
+            'wallet_type': '', 'wallet_order': 'SINGLE', 'keystore_mode': 'NONE',
+        },
+    ]
+
+    class Mod(BaseFakeModule):
+        params = _wallet_params(state="present", container="all")
+
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(
+        mod, "oracleConnection",
+        lambda m: _WalletConn(m, wallet_rows=rows),
+        raising=False,
+    )
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    assert exc.value.args[0]["changed"] is True
+    assert any("CREATE KEYSTORE" in d for d in exc.value.args[0]["ddls"])
+
+
 # ===========================================================================
 # Tests: state=absent
 # ===========================================================================

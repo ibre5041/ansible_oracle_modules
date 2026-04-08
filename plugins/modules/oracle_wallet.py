@@ -319,8 +319,13 @@ def _aggregate_wallet_rows(rows):
 
     all_open = bool(statuses) and all(_is_open(s) for s in statuses)
     all_closed = bool(statuses) and all(_is_closed(s) for s in statuses)
+    all_not_available = bool(statuses) and all(
+        s in ('NOT_AVAILABLE', '') or not s for s in statuses
+    )
     if all_open:
         agg_status = 'OPEN'
+    elif all_not_available:
+        agg_status = 'NOT_AVAILABLE'
     elif all_closed:
         agg_status = 'CLOSED'
     else:
@@ -335,6 +340,8 @@ def _aggregate_wallet_rows(rows):
 
     if open_rows and not all(_wtype(r) in auto_types for r in open_rows):
         rep_wallet_type = 'PASSWORD'
+    elif open_rows:
+        rep_wallet_type = _vwallet_field(open_rows[0], 'WALLET_TYPE')
     else:
         rep_wallet_type = _vwallet_field(first, 'WALLET_TYPE')
 

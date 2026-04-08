@@ -70,6 +70,12 @@ def _ensure_fake_ansible_basic():
                     module_params[key] = value.strip()
             return module_params
 
+        def _sql_single_quoted_literal(value):
+            """Match oracle_utils.sql_single_quoted_literal for unit tests (no package import)."""
+            if value is None:
+                return ''
+            return str(value).replace("'", "''")
+
         _ou_mod = types.ModuleType(_ou_path)
         _ou_mod.oracleConnection = _StubOracleConnection
         _ou_mod.sanitize_string_params = _sanitize_string_params
@@ -78,14 +84,6 @@ def _ensure_fake_ansible_basic():
         # Shared SQL clause builders used by oracle_tde, oracle_wallet, etc.
         _ou_mod.build_force_clause = lambda fk: 'FORCE KEYSTORE ' if fk else ''
         _ou_mod.build_container_clause = lambda c: ' CONTAINER = ALL' if c == 'all' else ''
-
-        def _sql_single_quoted_literal(value):
-            """Match oracle_utils.sql_single_quoted_literal for unit tests (no package import)."""
-            if value is None:
-                return ''
-            return str(value).replace("'", "''")
-
-        _ou_mod.sql_single_quoted_literal = _sql_single_quoted_literal
 
         def _build_backup(backup=True, backup_tag=None):
             if not backup:
