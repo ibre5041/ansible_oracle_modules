@@ -430,8 +430,7 @@ def parse_show_configuration(stdout):
             result['name'] = line.split('-', 1)[1].strip()
         elif line.startswith('Protection Mode:'):
             result['protection_mode'] = line.split(':', 1)[1].strip()
-        elif any(role in line for role in (
-                'Primary database', 'Physical standby', 'Snapshot standby', 'Logical standby')):
+        elif re.search(r'(?i)\b(primary|physical\s+standby|snapshot\s+standby|logical\s+standby)\b', line):
             parts = line.split('-')
             if len(parts) >= 2:
                 db_info = {
@@ -440,14 +439,12 @@ def parse_show_configuration(stdout):
                     'status': '',
                 }
                 desc = parts[1].strip()
-                if 'Primary' in desc:
-                    db_info['role'] = 'PRIMARY'
-                elif 'Physical standby' in desc:
-                    db_info['role'] = 'PHYSICAL STANDBY'
-                elif 'Snapshot standby' in desc:
-                    db_info['role'] = 'SNAPSHOT STANDBY'
-                elif 'Logical standby' in desc:
-                    db_info['role'] = 'LOGICAL STANDBY'
+                role_match = re.search(
+                    r'(?i)\b(physical\s+standby|snapshot\s+standby|logical\s+standby|primary)\b',
+                    desc,
+                )
+                if role_match:
+                    db_info['role'] = re.sub(r'\s+', ' ', role_match.group(1)).upper()
                 result['databases'].append(db_info)
         elif line.startswith('Fast-Start Failover:'):
             result['fast_start_failover'] = line.split(':', 1)[1].strip()
@@ -623,17 +620,24 @@ def dgmgrl_convert_database(module, db_name, target_type):
 
 
 def dgmgrl_set_properties(module, db_name, properties):
-    """Set properties on a database.
-
-    Returns True because DGMGRL does not report whether a value actually changed.
-    """
+    """Set properties on a database. Returns True only when a value changed."""
     if not db_name or not properties:
         return False
     _validate_dgmgrl_identifier(module, db_name, 'database_name')
     commands = []
     for prop, value in properties.items():
         _validate_dgmgrl_identifier(module, prop, 'property name')
-        commands.append("EDIT DATABASE %s SET PROPERTY %s='%s'" % (db_name, prop, _quote_dgmgrl_literal(module, str(value))))
+        desired = str(value)
+        # Query current value to avoid unnecessary EDIT commands.
+        rc, stdout, _ = run_dgmgrl(module, ['SHOW DATABASE %s %s' % (db_name, prop)])
+        if rc == 0:
+            # DGMGRL output is typically "  <prop> = '<value>'" or similar.
+            m = re.search(r"=\s*'?([^'\n]*)'?", stdout)
+            if m and m.group(1).strip().upper() == desired.upper():
+                continue
+        commands.append("EDIT DATABASE %s SET PROPERTY %s='%s'" % (db_name, prop, _quote_dgmgrl_literal(module, desired)))
+    if not commands:
+        return False
     rc, stdout, stderr = run_dgmgrl(module, commands)
     if rc != 0:
         module.fail_json(msg='Failed to set properties: %s %s' % (stdout, stderr), changed=False)
@@ -641,7 +645,7 @@ def dgmgrl_set_properties(module, db_name, properties):
 
 
 def dgmgrl_set_protection_mode(module, protection_mode):
-    """Set the protection mode."""
+    """Set the protection mode. Returns True only when the mode changed."""
     mode_map = {
         'maximum_protection': 'MAXPROTECTION',
         'maximum_availability': 'MAXAVAILABILITY',
@@ -651,6 +655,13 @@ def dgmgrl_set_protection_mode(module, protection_mode):
     if not mode:
         module.fail_json(msg='Invalid protection mode: %s' % protection_mode, changed=False)
 
+    # Check current protection mode to avoid unnecessary changes.
+    rc, stdout, _ = run_dgmgrl(module, ['SHOW CONFIGURATION'])
+    if rc == 0:
+        m = re.search(r'(?i)protection\s+mode:\s*(\S+)', stdout)
+        if m and m.group(1).upper() == mode.upper():
+            return False
+
     cmd = 'EDIT CONFIGURATION SET PROTECTION MODE AS %s' % mode
     rc, stdout, stderr = run_dgmgrl(module, [cmd])
     if rc != 0:
@@ -659,9 +670,18 @@ def dgmgrl_set_protection_mode(module, protection_mode):
 
 
 def dgmgrl_set_state(module, db_name, db_state):
-    """Set database transport/apply state."""
+    """Set database transport/apply state. Returns True only when the state changed."""
     _validate_dgmgrl_identifier(module, db_name, 'database_name')
-    cmd = "EDIT DATABASE %s SET STATE='%s'" % (db_name, _quote_dgmgrl_literal(module, db_state.upper()))
+    desired = db_state.upper()
+
+    # Check current state to avoid unnecessary changes.
+    rc, stdout, _ = run_dgmgrl(module, ['SHOW DATABASE %s StateName' % db_name])
+    if rc == 0:
+        m = re.search(r"=\s*'?([^'\n]*)'?", stdout)
+        if m and m.group(1).strip().upper() == desired:
+            return False
+
+    cmd = "EDIT DATABASE %s SET STATE='%s'" % (db_name, _quote_dgmgrl_literal(module, desired))
     rc, stdout, stderr = run_dgmgrl(module, [cmd])
     if rc != 0:
         module.fail_json(msg='Failed to set state: %s %s' % (stdout, stderr), changed=False)
@@ -830,7 +850,7 @@ def dgmgrl_show_tags(module, output_format):
         cmd = 'SHOW %s %s TAG' % (target_type, target_name)
     else:
         cmd = 'SHOW %s TAG' % target_type
-    rc, stdout, stderr = run_dgmgrl(module, [cmd], output_format)
+    rc, stdout, _ = run_dgmgrl(module, [cmd], output_format)
     if rc != 0:
         return None
     return stdout

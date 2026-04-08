@@ -69,11 +69,13 @@ Configuration details cannot be determined by DGMGRL
 class _DgBrokerModule(BaseFakeModule):
     """Module that stubs run_command for DGMGRL."""
 
-    _dgmgrl_responses = {}
-    _run_command_calls = []
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self._dgmgrl_responses = getattr(type(self), '_dgmgrl_responses', {})
+        self._run_command_calls = getattr(type(self), '_run_command_calls', [])
 
     def run_command(self, command, **kwargs):
-        type(self)._run_command_calls.append((command, kwargs))
+        self._run_command_calls.append((command, kwargs))
         data = kwargs.get('data', '')
         # Check which commands are in the script
         for key, (rc, stdout, stderr) in self._dgmgrl_responses.items():
