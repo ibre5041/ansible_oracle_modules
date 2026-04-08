@@ -378,6 +378,12 @@ def run_dgmgrl(module, commands, output_format='text'):
     dgmgrl_connect_id = module.params.get("dgmgrl_connect_identifier")
     dgmgrl_as = module.params.get("dgmgrl_as")
 
+    # Reject command separators in credentials to prevent DGMGRL injection.
+    if dgmgrl_password:
+        _validate_dgmgrl_connect_string(module, dgmgrl_password, 'dgmgrl_password')
+    if dgmgrl_connect_id:
+        _validate_dgmgrl_connect_string(module, dgmgrl_connect_id, 'dgmgrl_connect_identifier')
+
     if dgmgrl_user and dgmgrl_password:
         if dgmgrl_connect_id:
             connect_string = '%s/%s@%s' % (dgmgrl_user, dgmgrl_password, dgmgrl_connect_id)
