@@ -395,3 +395,19 @@ def test_tde_set_encryption_policy_idempotent(monkeypatch):
         mod.main()
     result = exc.value.args[0]
     assert result["changed"] is False
+
+
+def test_tde_set_encryption_policy_container_all(monkeypatch):
+    mod = _load()
+
+    class Mod(BaseFakeModule):
+        params = _tde_params(tablespace_encryption_policy="AUTO_ENABLE", container="all")
+
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "oracleConnection", lambda m: _TdeConn(m, param_value='DDL'), raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    result = exc.value.args[0]
+    assert result["changed"] is True
+    assert any("CONTAINER = ALL" in d and "TABLESPACE_ENCRYPTION" in d for d in result["ddls"])
