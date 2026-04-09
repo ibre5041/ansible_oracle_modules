@@ -441,8 +441,10 @@ def set_encryption_parameter(conn, module):
 
     container = module.params["container"]
 
-    # Check current value
-    sql = "SELECT VALUE FROM V$PARAMETER WHERE NAME = 'tablespace_encryption'"
+    # Check the SPFILE value, not the in-memory value.  TABLESPACE_ENCRYPTION
+    # is a static parameter so V$PARAMETER keeps the old value until restart.
+    sql = ("SELECT VALUE FROM V$SPPARAMETER"
+           " WHERE NAME = 'tablespace_encryption' AND ISSPECIFIED = 'TRUE'")
     r = conn.execute_select_to_dict(sql, fetchone=True)
     current = r.get('value', '') if r else ''
 

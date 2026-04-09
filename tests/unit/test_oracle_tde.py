@@ -70,7 +70,7 @@ class _TdeConn(BaseFakeConn):
                         return ts if fetchone else [ts]
                 return {} if fetchone else []
             return self._encrypted_tablespaces
-        if 'V$PARAMETER' in sql_upper:
+        if 'V$SPPARAMETER' in sql_upper or 'V$PARAMETER' in sql_upper:
             row = {'value': self._param_value}
             return row if fetchone else [row]
         return {} if fetchone else []
