@@ -439,6 +439,8 @@ def set_encryption_parameter(conn, module):
     if not policy:
         return
 
+    container = module.params["container"]
+
     # Check current value
     sql = "SELECT VALUE FROM V$PARAMETER WHERE NAME = 'tablespace_encryption'"
     r = conn.execute_select_to_dict(sql, fetchone=True)
@@ -447,7 +449,8 @@ def set_encryption_parameter(conn, module):
     if current and current.upper() == policy.upper():
         return  # Already set, idempotent
 
-    conn.execute_ddl("ALTER SYSTEM SET TABLESPACE_ENCRYPTION = '%s' SCOPE=SPFILE" % policy)
+    container_clause = build_container_clause(container)
+    conn.execute_ddl("ALTER SYSTEM SET TABLESPACE_ENCRYPTION = '%s' SCOPE=SPFILE%s" % (policy, container_clause))
 
 
 def main():
