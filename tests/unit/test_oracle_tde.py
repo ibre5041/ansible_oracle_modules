@@ -210,6 +210,42 @@ def test_tde_encrypt_tablespace(monkeypatch):
     assert any("ENCRYPT" in d and "USERS" in d for d in result["ddls"])
 
 
+def test_tde_encrypt_tablespace_offline_includes_algorithm(monkeypatch):
+    mod = _load()
+
+    class Mod(BaseFakeModule):
+        params = _tde_params(tablespace="USERS", tablespace_state="encrypted", online=False, algorithm="AES256")
+
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "oracleConnection", lambda m: _TdeConn(m), raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    result = exc.value.args[0]
+    assert result["changed"] is True
+    ddl = [d for d in result["ddls"] if "ENCRYPT" in d and "USERS" in d][0]
+    assert "OFFLINE" in ddl
+    assert "AES256" in ddl
+
+
+def test_tde_rekey_tablespace_offline_includes_algorithm(monkeypatch):
+    mod = _load()
+
+    class Mod(BaseFakeModule):
+        params = _tde_params(tablespace="USERS", tablespace_state="rekeyed", online=False, algorithm="AES256")
+
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "oracleConnection", lambda m: _TdeConn(m), raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    result = exc.value.args[0]
+    assert result["changed"] is True
+    ddl = [d for d in result["ddls"] if "REKEY" in d and "USERS" in d][0]
+    assert "OFFLINE" in ddl
+    assert "AES256" in ddl
+
+
 def test_tde_encrypt_tablespace_idempotent(monkeypatch):
     mod = _load()
 

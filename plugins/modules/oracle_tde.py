@@ -370,7 +370,7 @@ def encrypt_tablespace(conn, module):
 
     safe_ts = '"%s"' % tablespace.upper().replace('"', '""')
     sql = "ALTER TABLESPACE %s ENCRYPTION %s" % (safe_ts, mode)
-    if algorithm and online:
+    if algorithm:
         sql += " USING '%s'" % algorithm
     sql += " ENCRYPT"
 
@@ -422,7 +422,7 @@ def rekey_tablespace(conn, module):
 
     safe_ts = '"%s"' % tablespace.upper().replace('"', '""')
     sql = "ALTER TABLESPACE %s ENCRYPTION %s" % (safe_ts, mode)
-    if algorithm and online:
+    if algorithm:
         sql += " USING '%s'" % algorithm
     sql += " REKEY"
 
