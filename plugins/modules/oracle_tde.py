@@ -254,12 +254,12 @@ def set_master_key(conn, module):
     force = build_force_clause(force_keystore)
     container_clause = build_container_clause(container)
 
-    sql = "ADMINISTER KEY MANAGEMENT %sSET KEY" % force
+    sql = "ADMINISTER KEY MANAGEMENT SET KEY"
     if algorithm:
         sql += " USING ALGORITHM '%s'" % algorithm
     if key_tag:
         sql += " USING TAG '%s'" % key_tag.replace("'", "''")
-    sql += " IDENTIFIED BY \"%s\"" % keystore_password.replace('"', '""')
+    sql += " %sIDENTIFIED BY \"%s\"" % (force, keystore_password.replace('"', '""'))
     sql += build_backup_clause()
     sql += container_clause
 
@@ -281,12 +281,12 @@ def create_master_key(conn, module):
     force = build_force_clause(force_keystore)
     container_clause = build_container_clause(container)
 
-    sql = "ADMINISTER KEY MANAGEMENT %sCREATE KEY" % force
+    sql = "ADMINISTER KEY MANAGEMENT CREATE KEY"
     if algorithm:
         sql += " USING ALGORITHM '%s'" % algorithm
     if key_tag:
         sql += " USING TAG '%s'" % key_tag.replace("'", "''")
-    sql += " IDENTIFIED BY \"%s\"" % keystore_password.replace('"', '""')
+    sql += " %sIDENTIFIED BY \"%s\"" % (force, keystore_password.replace('"', '""'))
     sql += build_backup_clause()
     sql += container_clause
 
@@ -312,8 +312,8 @@ def export_keys(conn, module):
 
     safe_secret = export_secret.replace("'", "''")
     safe_file = export_file.replace("'", "''")
-    sql = "ADMINISTER KEY MANAGEMENT %sEXPORT KEYS WITH SECRET '%s' TO '%s' IDENTIFIED BY \"%s\"" % (
-        force, safe_secret, safe_file, keystore_password.replace('"', '""')
+    sql = "ADMINISTER KEY MANAGEMENT EXPORT KEYS WITH SECRET '%s' TO '%s' %sIDENTIFIED BY \"%s\"" % (
+        safe_secret, safe_file, force, keystore_password.replace('"', '""')
     )
     conn.execute_ddl(sql, ddls_entry=_redact_ddls([sql])[0])
 
@@ -337,8 +337,8 @@ def import_keys(conn, module):
 
     safe_secret = export_secret.replace("'", "''")
     safe_file = export_file.replace("'", "''")
-    sql = "ADMINISTER KEY MANAGEMENT %sIMPORT KEYS WITH SECRET '%s' FROM '%s' IDENTIFIED BY \"%s\"%s" % (
-        force, safe_secret, safe_file, keystore_password.replace('"', '""'), build_backup_clause()
+    sql = "ADMINISTER KEY MANAGEMENT IMPORT KEYS WITH SECRET '%s' FROM '%s' %sIDENTIFIED BY \"%s\"%s" % (
+        safe_secret, safe_file, force, keystore_password.replace('"', '""'), build_backup_clause()
     )
     conn.execute_ddl(sql, ddls_entry=_redact_ddls([sql])[0])
 

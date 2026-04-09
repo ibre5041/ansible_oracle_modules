@@ -411,3 +411,84 @@ def test_tde_set_encryption_policy_container_all(monkeypatch):
     result = exc.value.args[0]
     assert result["changed"] is True
     assert any("CONTAINER = ALL" in d and "TABLESPACE_ENCRYPTION" in d for d in result["ddls"])
+
+
+# ===========================================================================
+# Tests: FORCE KEYSTORE clause placement (must appear before IDENTIFIED BY)
+# ===========================================================================
+
+def _assert_force_before_identified(ddls):
+    """Verify FORCE KEYSTORE appears immediately before IDENTIFIED BY in any DDL."""
+    for d in ddls:
+        if 'FORCE KEYSTORE' in d:
+            assert 'FORCE KEYSTORE IDENTIFIED BY' in d, (
+                "FORCE KEYSTORE must appear immediately before IDENTIFIED BY, got: %s" % d
+            )
+            return
+    pytest.fail("No DDL contains FORCE KEYSTORE")
+
+
+def test_tde_set_key_force_keystore_placement(monkeypatch):
+    mod = _load()
+
+    class Mod(BaseFakeModule):
+        params = _tde_params(master_key_action="set_key", force_keystore=True)
+
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "oracleConnection", lambda m: _TdeConn(m), raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    _assert_force_before_identified(exc.value.args[0]["ddls"])
+
+
+def test_tde_create_key_force_keystore_placement(monkeypatch):
+    mod = _load()
+
+    class Mod(BaseFakeModule):
+        params = _tde_params(master_key_action="create_key", force_keystore=True)
+
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "oracleConnection", lambda m: _TdeConn(m), raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    _assert_force_before_identified(exc.value.args[0]["ddls"])
+
+
+def test_tde_export_keys_force_keystore_placement(monkeypatch):
+    mod = _load()
+
+    class Mod(BaseFakeModule):
+        params = _tde_params(
+            master_key_action="export_keys",
+            export_file="/tmp/keys.exp",
+            export_secret="ExportPass123",
+            force_keystore=True,
+        )
+
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "oracleConnection", lambda m: _TdeConn(m), raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    _assert_force_before_identified(exc.value.args[0]["ddls"])
+
+
+def test_tde_import_keys_force_keystore_placement(monkeypatch):
+    mod = _load()
+
+    class Mod(BaseFakeModule):
+        params = _tde_params(
+            master_key_action="import_keys",
+            export_file="/tmp/keys.exp",
+            export_secret="ExportPass123",
+            force_keystore=True,
+        )
+
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "oracleConnection", lambda m: _TdeConn(m), raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    _assert_force_before_identified(exc.value.args[0]["ddls"])
