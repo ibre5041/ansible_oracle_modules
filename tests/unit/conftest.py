@@ -52,7 +52,16 @@ def _ensure_fake_oracle_utils():
 
         _ou_mod = types.ModuleType(_OU_PATH)
         _ou_mod.oracleConnection = _StubOracleConnection
-        _ou_mod.sanitize_string_params = lambda _params: None
+        def _sanitize_string_params(module_params, no_trim=None):
+            skip = set(no_trim) if no_trim else set()
+            for key, value in module_params.items():
+                if key in skip:
+                    continue
+                if isinstance(value, str):
+                    module_params[key] = value.strip()
+            return module_params
+
+        _ou_mod.sanitize_string_params = _sanitize_string_params
         _ou_mod.sql_single_quoted_literal = _sql_single_quoted_literal_stub
         _ou_mod.build_force_clause = lambda fk: 'FORCE KEYSTORE ' if fk else ''
         _ou_mod.build_container_clause = lambda c: ' CONTAINER = ALL' if c == 'all' else ''
