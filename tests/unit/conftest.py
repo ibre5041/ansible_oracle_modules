@@ -30,7 +30,67 @@ def module_path(*parts):
     return REPO_ROOT.joinpath(*parts)
 
 
+_OU_PATH = "ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_utils"
+
+
+def _sql_single_quoted_literal_stub(value):
+    if value is None:
+        return ''
+    return str(value).replace("'", "''")
+
+
+def _ensure_fake_oracle_utils():
+    """Register (or patch) the collection shim so dynamic module loads always see required symbols."""
+    if _OU_PATH not in sys.modules:
+        class _StubOracleConnection:
+            """Stub that raises RuntimeError — tests must monkeypatch mod.oracleConnection."""
+            def __init__(self, module):
+                raise RuntimeError(
+                    "oracleConnection called without monkeypatching — "
+                    "set monkeypatch.setattr(mod, 'oracleConnection', FakeOC) in the test."
+                )
+
+        _ou_mod = types.ModuleType(_OU_PATH)
+        _ou_mod.oracleConnection = _StubOracleConnection
+        _ou_mod.sanitize_string_params = lambda _params: None
+        _ou_mod.sql_single_quoted_literal = _sql_single_quoted_literal_stub
+        _ou_mod.build_force_clause = lambda fk: 'FORCE KEYSTORE ' if fk else ''
+        _ou_mod.build_container_clause = lambda c: ' CONTAINER = ALL' if c == 'all' else ''
+
+        def _build_backup(backup=True, backup_tag=None):
+            if not backup:
+                return ''
+            clause = ' WITH BACKUP'
+            if backup_tag:
+                clause += " USING '%s'" % backup_tag
+            return clause
+
+        _ou_mod.build_backup_clause = _build_backup
+        sys.modules[_OU_PATH] = _ou_mod
+        return
+
+    ou = sys.modules[_OU_PATH]
+    if not hasattr(ou, 'sql_single_quoted_literal'):
+        ou.sql_single_quoted_literal = _sql_single_quoted_literal_stub
+    if not hasattr(ou, 'build_force_clause'):
+        ou.build_force_clause = lambda fk: 'FORCE KEYSTORE ' if fk else ''
+    if not hasattr(ou, 'build_container_clause'):
+        ou.build_container_clause = lambda c: ' CONTAINER = ALL' if c == 'all' else ''
+
+    if not hasattr(ou, 'build_backup_clause'):
+        def _build_backup(backup=True, backup_tag=None):
+            if not backup:
+                return ''
+            clause = ' WITH BACKUP'
+            if backup_tag:
+                clause += " USING '%s'" % backup_tag
+            return clause
+        ou.build_backup_clause = _build_backup
+
+
 def _ensure_fake_ansible_basic():
+    _ensure_fake_oracle_utils()
+
     if "ansible.module_utils.basic" in sys.modules:
         return
 
