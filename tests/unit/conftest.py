@@ -63,15 +63,40 @@ def _ensure_fake_ansible_basic():
                     "set monkeypatch.setattr(mod, 'oracleConnection', FakeOC) in the test."
                 )
 
+        def _sanitize_string_params(module_params, no_trim=None):
+            """Mirror production oracle_utils.sanitize_string_params; return dict for tests."""
+            skip = set(no_trim) if no_trim else set()
+            for key, value in module_params.items():
+                if key in skip:
+                    continue
+                if isinstance(value, str):
+                    module_params[key] = value.strip()
+            return module_params
+
         def _sql_single_quoted_literal(value):
+            """Match oracle_utils.sql_single_quoted_literal for unit tests (no package import)."""
             if value is None:
                 return ''
             return str(value).replace("'", "''")
 
         _ou_mod = types.ModuleType(_ou_path)
         _ou_mod.oracleConnection = _StubOracleConnection
-        _ou_mod.sanitize_string_params = lambda _params: None
+        _ou_mod.sanitize_string_params = _sanitize_string_params
         _ou_mod.sql_single_quoted_literal = _sql_single_quoted_literal
+
+        # Shared SQL clause builders used by oracle_tde, oracle_wallet, etc.
+        _ou_mod.build_force_clause = lambda fk: 'FORCE KEYSTORE ' if fk else ''
+        _ou_mod.build_container_clause = lambda c: ' CONTAINER = ALL' if c == 'all' else ''
+
+        def _build_backup(backup=True, backup_tag=None):
+            if not backup:
+                return ''
+            clause = ' WITH BACKUP'
+            if backup_tag:
+                clause += " USING '%s'" % _sql_single_quoted_literal(backup_tag)
+            return clause
+
+        _ou_mod.build_backup_clause = _build_backup
         sys.modules[_ou_path] = _ou_mod
 
     ansible_mod = types.ModuleType("ansible")

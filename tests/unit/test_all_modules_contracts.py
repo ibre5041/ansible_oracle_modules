@@ -10,7 +10,9 @@ def _module_files():
 
 
 def test_all_modules_keep_original_name_prefix():
-    for module_file in _module_files():
+    files = _module_files()
+    assert files, "expected at least one plugins/modules/oracle_*.py module"
+    for module_file in files:
         assert module_file.name.startswith("oracle_")
 
 
