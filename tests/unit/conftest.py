@@ -109,6 +109,56 @@ def _ensure_fake_ansible_basic():
         _fake_oracledb.makedsn = lambda **kw: "fake_dsn"
         sys.modules["oracledb"] = _fake_oracledb
 
+    # Inject a minimal fake oracle_utils so modules that do
+    #   from ansible_collections...oracle_utils import oracleConnection
+    # get a stub oracleConnection.  Individual tests monkeypatch mod.oracleConnection
+    # to control behaviour.
+    _ou_path = "ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_utils"
+    if _ou_path not in sys.modules:
+        class _StubOracleConnection:
+            """Stub that raises RuntimeError — tests must monkeypatch mod.oracleConnection."""
+            def __init__(self, module):
+                raise RuntimeError(
+                    "oracleConnection called without monkeypatching — "
+                    "set monkeypatch.setattr(mod, 'oracleConnection', FakeOC) in the test."
+                )
+
+        def _sanitize_string_params(module_params, no_trim=None):
+            """Mirror production oracle_utils.sanitize_string_params; return dict for tests."""
+            skip = set(no_trim) if no_trim else set()
+            for key, value in module_params.items():
+                if key in skip:
+                    continue
+                if isinstance(value, str):
+                    module_params[key] = value.strip()
+            return module_params
+
+        def _sql_single_quoted_literal(value):
+            """Match oracle_utils.sql_single_quoted_literal for unit tests (no package import)."""
+            if value is None:
+                return ''
+            return str(value).replace("'", "''")
+
+        _ou_mod = types.ModuleType(_ou_path)
+        _ou_mod.oracleConnection = _StubOracleConnection
+        _ou_mod.sanitize_string_params = _sanitize_string_params
+        _ou_mod.sql_single_quoted_literal = _sql_single_quoted_literal
+
+        # Shared SQL clause builders used by oracle_tde, oracle_wallet, etc.
+        _ou_mod.build_force_clause = lambda fk: 'FORCE KEYSTORE ' if fk else ''
+        _ou_mod.build_container_clause = lambda c: ' CONTAINER = ALL' if c == 'all' else ''
+
+        def _build_backup(backup=True, backup_tag=None):
+            if not backup:
+                return ''
+            clause = ' WITH BACKUP'
+            if backup_tag:
+                clause += " USING '%s'" % _sql_single_quoted_literal(backup_tag)
+            return clause
+
+        _ou_mod.build_backup_clause = _build_backup
+        sys.modules[_ou_path] = _ou_mod
+
     ansible_mod = types.ModuleType("ansible")
     module_utils_mod = types.ModuleType("ansible.module_utils")
     basic_mod = types.ModuleType("ansible.module_utils.basic")

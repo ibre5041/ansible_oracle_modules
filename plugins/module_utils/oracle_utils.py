@@ -89,6 +89,11 @@ def _ensure_oracle_client(module, oracle_home=None, required=False):
 # ---------------------------------------------------------------------------
 
 def sql_single_quoted_literal(value):
+    """Escape *value* for use inside a single-quoted Oracle SQL string literal.
+
+    ``None`` yields ``''``. Other values are coerced with ``str()`` so callers
+    (e.g. unified audit condition text) stay compatible; single quotes are doubled.
+    """
     if value is None:
         return ''
     s = str(value)
@@ -121,14 +126,21 @@ def build_backup_clause(backup=True, backup_tag=None):
     return clause
 
 
-def sanitize_string_params(module_params):
+def sanitize_string_params(module_params, no_trim=None):
     """Strip leading/trailing whitespace from every string value in module.params.
 
     Mutates the dict in place so all downstream reads of module.params are
     automatically cleaned without changing any call site. Non-string values
     (None, int, bool, list, dict) are left untouched.
+
+    Keys listed in *no_trim* (a set or sequence) are skipped so that
+    passwords and secrets whose leading/trailing whitespace is significant
+    are not silently altered.
     """
+    skip = set(no_trim) if no_trim else set()
     for key, value in module_params.items():
+        if key in skip:
+            continue
         if isinstance(value, str):
             module_params[key] = value.strip()
 
@@ -416,7 +428,16 @@ class oracleConnection:
             return
         if not re.match(r'^[A-Za-z][A-Za-z0-9_$#]*$', pdb_name):
             self.module.fail_json(msg='Invalid pdb_name for alter session', changed=self.changed, ddls=self.ddls)
-        self.execute_ddl('ALTER SESSION SET CONTAINER = %s' % pdb_name, no_change=True)
+        # Execute directly instead of via execute_ddl so that the session
+        # container is switched even in check_mode — subsequent SELECT queries
+        # need to run against the correct PDB.
+        sql = 'ALTER SESSION SET CONTAINER = %s' % pdb_name
+        try:
+            with self.conn.cursor() as cursor:
+                cursor.execute(sql)
+        except oracledb.DatabaseError as e:
+            error = e.args[0]
+            self.module.fail_json(msg=error.message, code=error.code, ddls=self.ddls, changed=self.changed)
 
     def resolve_object_name(self, object_name):
         statement = """

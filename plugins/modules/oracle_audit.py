@@ -519,17 +519,24 @@ def main():
 
 from ansible.module_utils.basic import AnsibleModule
 
+# In this case we do import from local project sub-directory <project-dir>/module_utils
+# While this file is placed in <project-dir>/library
+# No collections are used
+#try:
+#    from ansible.module_utils.oracle_utils import oracleConnection, sanitize_string_params, sql_single_quoted_literal
+#except:
+#    pass
+
+# In this case we do import from collections
 try:
     from ansible_collections.ibre5041.ansible_oracle_modules.plugins.module_utils.oracle_utils import (  # noqa: E501
         oracleConnection,
         sanitize_string_params,
         sql_single_quoted_literal,
     )
-except ImportError as _oracle_audit_import_err:  # pragma: no cover
-    raise ImportError(
-        'oracle_audit requires ansible_collections.ibre5041.ansible_oracle_modules '
-        'plugins.module_utils.oracle_utils (install the collection and invoke the module by FQCN).'
-    ) from _oracle_audit_import_err
+except ImportError:
+    def sanitize_string_params(_params):
+        pass
 
 if __name__ == '__main__':
     main()
