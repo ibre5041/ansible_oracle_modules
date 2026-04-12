@@ -1,8 +1,8 @@
-# Oracle Free 23ai — Docker integration config
+# Oracle Free — Docker integration config
 # Usage: make test-docker
 #        (ou manuellement : make integration-config-docker && make test ROLE=xxx)
 #
-# Image: gvenzl/oracle-free:23-slim
+# Image: gvenzl/oracle-free:23-full
 # Démarrer avec: docker compose up -d
 # Le conteneur est prêt quand le healthcheck passe (~90s)
 

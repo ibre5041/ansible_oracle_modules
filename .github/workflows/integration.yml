@@ -9,7 +9,7 @@ jobs:
 
     services:
       oracle:
-        image: gvenzl/oracle-free:23-slim
+        image: gvenzl/oracle-free:23-full
         env:
           ORACLE_PASSWORD: Oracle_4U
         ports:
@@ -19,7 +19,7 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 50
-          --health-start-period 90s
+          --health-start-period 300s
 
     steps:
       - uses: actions/checkout@v4

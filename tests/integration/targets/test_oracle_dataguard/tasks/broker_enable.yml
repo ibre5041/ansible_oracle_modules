@@ -5,23 +5,87 @@
     oracle_home: "{{ oracle_home }}"
     state: present
     enabled: true
-  register: _
-  failed_when: _.failed
+  register: _enable
+  failed_when: _enable.failed
+
+- name: "verify configuration is enabled"
+  oracle_dataguard:
+    oracle_home: "{{ oracle_home }}"
+    state: status
+  register: _status_enabled
+  failed_when: _status_enabled.failed
+
+- name: "assert enabled status"
+  assert:
+    that:
+      - _status_enabled.configuration is defined
+      - _status_enabled.configuration.status != 'DISABLED'
+
+- name: "enable again (idempotent)"
+  oracle_dataguard:
+    oracle_home: "{{ oracle_home }}"
+    state: present
+    enabled: true
+  register: _enable_again
+  failed_when: _enable_again.failed
+
+- name: "assert idempotent enable"
+  assert:
+    that:
+      - _enable_again.changed == false
 
 - name: "disable configuration with enabled=false"
   oracle_dataguard:
     oracle_home: "{{ oracle_home }}"
     state: present
     enabled: false
-  register: _
-  failed_when: _.failed
+  register: _disable
+  failed_when: _disable.failed
+
+- name: "verify configuration is disabled"
+  oracle_dataguard:
+    oracle_home: "{{ oracle_home }}"
+    state: status
+  register: _status_disabled
+  failed_when: _status_disabled.failed
+
+- name: "assert disabled status"
+  assert:
+    that:
+      - _status_disabled.configuration is defined
+      - _status_disabled.configuration.status == 'DISABLED'
+
+- name: "disable again (idempotent)"
+  oracle_dataguard:
+    oracle_home: "{{ oracle_home }}"
+    state: present
+    enabled: false
+  register: _disable_again
+  failed_when: _disable_again.failed
+
+- name: "assert idempotent disable"
+  assert:
+    that:
+      - _disable_again.changed == false
 
 - name: "re-enable for cleanup"
   oracle_dataguard:
     oracle_home: "{{ oracle_home }}"
     state: present
     enabled: true
-  register: _
-  failed_when: _.failed
+  register: _reenable
+  failed_when: _reenable.failed
+
+- name: "verify re-enabled"
+  oracle_dataguard:
+    oracle_home: "{{ oracle_home }}"
+    state: status
+  register: _status_reenabled
+  failed_when: _status_reenabled.failed
+
+- name: "assert re-enabled status"
+  assert:
+    that:
+      - _status_reenabled.configuration.status != 'DISABLED'
 
 ...

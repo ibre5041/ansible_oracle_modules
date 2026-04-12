@@ -26,7 +26,7 @@ integration-config-ee: install
 	   ~/.ansible/collections/ansible_collections/ibre5041/ansible_oracle_modules/tests/integration/integration_config.yml
 
 # Lancer tous les tests compatibles conteneur Oracle XE
-# Pré-requis : docker compose up -d  (avec gvenzl/oracle-xe:21-slim)
+# Pré-requis : docker compose up -d  (avec gvenzl/oracle-free:23-full)
 test-docker: build integration-config-docker
 	@FAILED=""; \
 	for ROLE in \

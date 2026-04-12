@@ -31,6 +31,7 @@
   assert:
     that:
       - wallet_info.changed == false
-      - wallet_info.wallet_type is defined
+      - wallet_info.raw_output is defined
+      - wallet_info.trusted_certs is defined
 
 ...

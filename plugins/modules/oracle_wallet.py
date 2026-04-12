@@ -264,10 +264,6 @@ def validate_wallet_inputs_before_connect(module):
             if not module.params.get('keystore_password'):
                 module.fail_json(msg='keystore_password is required when auto_login is set', changed=False)
             _assert_sql_embeddable_str(module, module.params.get('keystore_password'), '"')
-        if open_param is True:
-            if not module.params.get('keystore_password'):
-                module.fail_json(msg='keystore_password is required when open=true', changed=False)
-            _assert_sql_embeddable_str(module, module.params.get('keystore_password'), '"')
         if open_param is False:
             ks = module.params.get('keystore_password')
             if ks:
@@ -493,7 +489,8 @@ def ensure_keystore_open(conn, module):
         return status
 
     if not keystore_password:
-        module.fail_json(msg='keystore_password is required to open the keystore', changed=False)
+        module.fail_json(msg='keystore_password is required when open=true', changed=False)
+    _assert_sql_embeddable_str(module, keystore_password, '"')
 
     force = build_force_clause(force_keystore)
     container_clause = build_container_clause(container)
