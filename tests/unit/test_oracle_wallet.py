@@ -764,6 +764,20 @@ def test_wallet_open_rejected_with_status_state(monkeypatch):
     assert "only valid with state='present'" in exc.value.args[0]["msg"]
 
 
+def test_wallet_open_rejected_with_secret_state(monkeypatch):
+    mod = _load()
+
+    class Mod(BaseFakeModule):
+        params = _wallet_params(state="present", open=True, secret_state="present",
+                                secret_client="APP", secret="val", keystore_password="pass")
+
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+
+    with pytest.raises(FailJson) as exc:
+        mod.main()
+    assert "cannot be combined with secret_state" in exc.value.args[0]["msg"]
+
+
 def test_wallet_open_true_requires_password(monkeypatch):
     mod = _load()
 

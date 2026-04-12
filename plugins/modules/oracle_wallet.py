@@ -219,7 +219,19 @@ def validate_wallet_inputs_before_connect(module):
     backup_tag = module.params['backup_tag']
     backup_location = module.params['backup_location']
 
+    open_param = module.params.get('open')
+    if open_param is not None and state != 'present':
+        module.fail_json(
+            msg="'open' parameter is only valid with state='present'",
+            changed=False,
+        )
+
     if secret_state:
+        if open_param is not None:
+            module.fail_json(
+                msg="'open' parameter cannot be combined with secret_state",
+                changed=False,
+            )
         if not module.params.get('secret_client'):
             module.fail_json(msg='secret_client is required for secret management', changed=False)
         if not module.params.get('keystore_password'):
@@ -243,13 +255,6 @@ def validate_wallet_inputs_before_connect(module):
         module.fail_json(
             msg='Oracle does not support dropping a keystore via SQL. '
                 'Remove the keystore files manually from the filesystem.',
-            changed=False,
-        )
-
-    open_param = module.params.get('open')
-    if open_param is not None and state != 'present':
-        module.fail_json(
-            msg="'open' parameter is only valid with state='present'",
             changed=False,
         )
 

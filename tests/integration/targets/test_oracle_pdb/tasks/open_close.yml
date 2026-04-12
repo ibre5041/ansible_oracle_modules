@@ -58,7 +58,7 @@
     pdb_name: "TESTPDB2"
     state: "status"
   register: _
-  failed_when: _.state != 'opened' and _.read_only
+  failed_when: _.state != 'opened' or _.read_only
 
 - name: close PDB
   oracle_pdb:
@@ -82,7 +82,7 @@
     pdb_name: "TESTPDB2"
     state: "status"
   register: _
-  failed_when: _.state != 'opened' and not _.read_only
+  failed_when: _.state != 'opened' or not _.read_only
   
 - name: drop PDB
   oracle_pdb:
