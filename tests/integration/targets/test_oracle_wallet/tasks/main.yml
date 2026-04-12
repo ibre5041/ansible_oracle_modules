@@ -1,5 +1,9 @@
 ---
 
+- name: Skip wallet tests on XE (no TDE support)
+  meta: end_play
+  when: running_on_xe | default(false) | bool
+
 - name: Wallet integration tests
   block:
     - include_tasks: "create.yml"

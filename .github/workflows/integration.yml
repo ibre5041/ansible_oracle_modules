@@ -57,7 +57,10 @@ jobs:
               test_oracle_tablespace \
               test_oracle_parameter \
               test_oracle_pdb \
-              test_oracle_facts; do
+              test_oracle_facts \
+              test_oracle_wallet \
+              test_oracle_orapki \
+              test_oracle_dataguard; do
             echo ""
             echo "════════════════════════════════════════"
             echo "  Running: $ROLE"
