@@ -38,6 +38,11 @@ oracle_normal_username:     SYSTEM
 oracle_normal_password:     Oracle_4U
 oracle_normal_mode:         normal
 
+# ── Chemins et noms dérivés ────────────────────────────────────────────────────
+oracle_datadir: /opt/oracle/oradata/ORCLCDB
+oracle_pdb_name: ORCLPDB1
+oracle_pdbseed_path: "/opt/oracle/oradata/ORCLCDB/pdbseed"
+
 # ── Flags d'environnement ─────────────────────────────────────────────────────
 running_on_client:     true    # connexion TCP distante
 running_on_server:     false   # pas d'accès OS Oracle

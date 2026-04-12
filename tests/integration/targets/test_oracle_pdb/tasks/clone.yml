@@ -17,37 +17,37 @@
 - name: create an opened PDB
   oracle_pdb:
     <<: *con_param
-    pdb_name: "XEPDB2"
+    pdb_name: "TESTPDB2"
     state: "opened"
     pdb_admin_username: foo
     pdb_admin_password: bar
     file_name_convert:
-      "/opt/oracle/oradata/XE/pdbseed": "/opt/oracle/oradata/XE/XEPDB2"
+      "{{ oracle_pdbseed_path }}": "{{ oracle_datadir }}/TESTPDB2"
 
 - name: open PDB source in read only
   oracle_pdb:
     <<: *con_param
-    pdb_name: "XEPDB2"
+    pdb_name: "TESTPDB2"
     state: "read_only"
 
 - name: create a clone PDB
   oracle_pdb:
     <<: *con_param
-    pdb_name: "XESNAP1"
+    pdb_name: "TESTSNAP1"
     state: "opened"
-    clone_from: "XEPDB2"
+    clone_from: "TESTPDB2"
     file_name_convert:
-      "/opt/oracle/oradata/XE/XEPDB2": "/opt/oracle/oradata/XE/XESNAP1"
+      "{{ oracle_datadir }}/TESTPDB2": "{{ oracle_datadir }}/TESTSNAP1"
 
 - name: drop clone PDB
   oracle_pdb:
     <<: *con_param
-    pdb_name: "XESNAP1"
+    pdb_name: "TESTSNAP1"
     state: "absent"
 
 - name: drop source PDB
   oracle_pdb:
     <<: *con_param
-    pdb_name: "XEPDB2"
+    pdb_name: "TESTPDB2"
     state: "absent"
 ...

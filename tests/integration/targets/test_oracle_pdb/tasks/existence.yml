@@ -17,17 +17,17 @@
 - name: create PDB
   oracle_pdb:
     <<: *con_param
-    pdb_name: "XEPDB2"
+    pdb_name: "TESTPDB2"
     state: "opened"
     pdb_admin_username: foo
     pdb_admin_password: bar
     file_name_convert:
-      "/opt/oracle/oradata/XE/pdbseed": "/opt/oracle/oradata/XE/XEPDB2"
+      "{{ oracle_pdbseed_path }}": "{{ oracle_datadir }}/TESTPDB2"
 
 - name: check an existing PDB is present
   oracle_pdb:
     <<: *con_param
-    pdb_name: "XEPDB2"
+    pdb_name: "TESTPDB2"
     state: "status"
   register: _
   failed_when: _.failed or not _.state
@@ -35,13 +35,13 @@
 - name: drop PDB
   oracle_pdb:
     <<: *con_param
-    pdb_name: "XEPDB2"
+    pdb_name: "TESTPDB2"
     state: "absent"
 
 - name: check an inexistent PDB raises error with state=status
   oracle_pdb:
     <<: *con_param
-    pdb_name: "XEPDB3"
+    pdb_name: "TESTPDB3"
     state: "status"
   register: _
   failed_when: not _.failed
@@ -49,28 +49,28 @@
 - name: create PDB with state=present (from seed)
   oracle_pdb:
     <<: *con_param
-    pdb_name: "XEPDB3"
+    pdb_name: "TESTPDB3"
     state: "present"
     pdb_admin_username: foo
     pdb_admin_password: bar
     file_name_convert:
-      "/opt/oracle/oradata/XE/pdbseed": "/opt/oracle/oradata/XE/XEPDB3"
+      "{{ oracle_pdbseed_path }}": "{{ oracle_datadir }}/TESTPDB3"
   register: _
   failed_when: _.failed or not _.changed
 
 - name: state=present on existing PDB is idempotent
   oracle_pdb:
     <<: *con_param
-    pdb_name: "XEPDB3"
+    pdb_name: "TESTPDB3"
     state: "present"
     pdb_admin_username: foo
     pdb_admin_password: bar
   register: _
   failed_when: _.failed or _.changed
 
-- name: drop XEPDB3
+- name: drop TESTPDB3
   oracle_pdb:
     <<: *con_param
-    pdb_name: "XEPDB3"
+    pdb_name: "TESTPDB3"
     state: "absent"
 ...

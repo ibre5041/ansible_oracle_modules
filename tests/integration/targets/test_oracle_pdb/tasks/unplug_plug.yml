@@ -10,60 +10,60 @@
 - name: create an opened PDB2
   oracle_pdb:
     <<: *con_param
-    pdb_name: "XEPDB2"
+    pdb_name: "TESTPDB2"
     state: "opened"
     pdb_admin_username: foo
     pdb_admin_password: bar
     file_name_convert:
-      "/opt/oracle/oradata/XE/pdbseed": "/tmp/xepdb2/dbf01"
+      "{{ oracle_pdbseed_path }}": "/tmp/testpdb2/dbf01"
 
 - name: XML file doesn't exist
   file:
-    path: "/tmp/xepdb2.xml"
+    path: "/tmp/testpdb2.xml"
     state: "absent"
 
 - name: unplug PDB2
   oracle_pdb:
     <<: *con_param
-    pdb_name: "XEPDB2"
+    pdb_name: "TESTPDB2"
     state: "absent"
-    unplug_file: "/tmp/xepdb2.xml"
+    unplug_file: "/tmp/testpdb2.xml"
 
 - name: XML file was created exists
   file:
-    path: "/tmp/xepdb2.xml"
+    path: "/tmp/testpdb2.xml"
     state: "file"
 
 - name: DBF file still exists (check only one DBF)
   file:
-    path: "/tmp/xepdb2/dbf01/system01.dbf"
+    path: "/tmp/testpdb2/dbf01/system01.dbf"
     state: "file"
 
 - name: plug in a PDB3
   oracle_pdb:
     <<: *con_param
-    pdb_name: "XEPDB3"
+    pdb_name: "TESTPDB3"
     state: "opened"
-    plug_file: "/tmp/xepdb2.xml"
+    plug_file: "/tmp/testpdb2.xml"
     file_name_convert:
-      "/tmp/xepdb2/dbf01": "/tmp/xepdb3/dbf01"
+      "/tmp/testpdb2/dbf01": "/tmp/testpdb3/dbf01"
 
 - name: drop PDB3
   oracle_pdb:
     <<: *con_param
-    pdb_name: "XEPDB3"
+    pdb_name: "TESTPDB3"
     state: "absent"
 
 - name: replug the PDB2
   oracle_pdb:
     <<: *con_param
-    pdb_name: "XEPDB2"
+    pdb_name: "TESTPDB2"
     state: "opened"
-    plug_file: "/tmp/xepdb2.xml"
+    plug_file: "/tmp/testpdb2.xml"
 
 - name: drop PDB2
   oracle_pdb:
     <<: *con_param
-    pdb_name: "XEPDB2"
+    pdb_name: "TESTPDB2"
     state: "absent"
 ...
