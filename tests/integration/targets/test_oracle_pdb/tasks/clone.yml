@@ -21,8 +21,7 @@
     state: "opened"
     pdb_admin_username: foo
     pdb_admin_password: bar
-    file_name_convert:
-      "{{ oracle_pdbseed_path }}": "{{ oracle_datadir }}/TESTPDB2"
+    file_name_convert: "{{ {pdbseed_path: oracle_datadir + '/TESTPDB2'} }}"
 
 - name: open PDB source in read only
   oracle_pdb:
@@ -36,8 +35,7 @@
     pdb_name: "TESTSNAP1"
     state: "opened"
     clone_from: "TESTPDB2"
-    file_name_convert:
-      "{{ oracle_datadir }}/TESTPDB2": "{{ oracle_datadir }}/TESTSNAP1"
+    file_name_convert: "{{ {oracle_datadir + '/TESTPDB2': oracle_datadir + '/TESTSNAP1'} }}"
 
 - name: drop clone PDB
   oracle_pdb:

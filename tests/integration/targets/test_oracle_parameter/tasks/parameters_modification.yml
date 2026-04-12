@@ -87,38 +87,29 @@
   oracle_parameter:
     <<: *pdb_con_param
     name: "pga_aggregate_target"
-    value: "500M"
-    state: "present"
-    scope: both
-  when: not running_on_adb and not (running_on_xe | default(false) | bool)
-
-- name: "change pga_aggregate_target +1(change)"
-  oracle_parameter:
-    <<: *pdb_con_param
-    name: "pga_aggregate_target"
-    value: "500M"
+    value: "600M"
     state: "present"
     scope: both
   register: _
   failed_when: not _.changed
   when: not running_on_adb and not (running_on_xe | default(false) | bool)
 
-- name: "change pga_aggregate_target +1(no change)"
+- name: "change pga_aggregate_target (idempotent)"
   oracle_parameter:
     <<: *pdb_con_param
     name: "pga_aggregate_target"
-    value: "501M"
+    value: "600M"
     state: "present"
     scope: both
   register: _
   failed_when: _.changed
   when: not running_on_adb and not (running_on_xe | default(false) | bool)
 
-- name: "change pga_aggregate_target +2(change in memory)"
+- name: "change pga_aggregate_target (change in memory)"
   oracle_parameter:
     <<: *pdb_con_param
     name: "pga_aggregate_target"
-    value: "502M"
+    value: "601M"
     state: "present"
     scope: memory
   register: _

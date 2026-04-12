@@ -21,8 +21,7 @@
     state: "opened"
     pdb_admin_username: foo
     pdb_admin_password: bar
-    file_name_convert:
-      "{{ oracle_pdbseed_path }}": "{{ oracle_datadir }}/TESTPDB2"
+    file_name_convert: "{{ {pdbseed_path: oracle_datadir + '/TESTPDB2'} }}"
 
 - name: check an existing PDB is present
   oracle_pdb:
@@ -53,8 +52,7 @@
     state: "present"
     pdb_admin_username: foo
     pdb_admin_password: bar
-    file_name_convert:
-      "{{ oracle_pdbseed_path }}": "{{ oracle_datadir }}/TESTPDB3"
+    file_name_convert: "{{ {pdbseed_path: oracle_datadir + '/TESTPDB3'} }}"
   register: _
   failed_when: _.failed or not _.changed
 

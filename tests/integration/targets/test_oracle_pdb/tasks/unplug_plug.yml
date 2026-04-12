@@ -14,8 +14,7 @@
     state: "opened"
     pdb_admin_username: foo
     pdb_admin_password: bar
-    file_name_convert:
-      "{{ oracle_pdbseed_path }}": "/tmp/testpdb2/dbf01"
+    file_name_convert: "{{ {pdbseed_path: '/tmp/testpdb2/dbf01'} }}"
 
 - name: XML file doesn't exist
   file:
@@ -45,8 +44,7 @@
     pdb_name: "TESTPDB3"
     state: "opened"
     plug_file: "/tmp/testpdb2.xml"
-    file_name_convert:
-      "/tmp/testpdb2/dbf01": "/tmp/testpdb3/dbf01"
+    file_name_convert: "{{ {'/tmp/testpdb2/dbf01': '/tmp/testpdb3/dbf01'} }}"
 
 - name: drop PDB3
   oracle_pdb:

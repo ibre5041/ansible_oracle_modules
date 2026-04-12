@@ -40,7 +40,7 @@ oracle_normal_mode:         normal
 # ── Chemins et noms dérivés ────────────────────────────────────────────────────
 oracle_datadir: /opt/oracle/oradata/FREE
 oracle_pdb_name: FREEPDB1
-oracle_pdbseed_path: "/opt/oracle/oradata/FREE/pdbseed"
+oracle_wallet_location: /opt/oracle/admin/FREE/wallet
 
 # ── Flags d'environnement ─────────────────────────────────────────────────────
 running_on_client:     true    # connexion TCP distante

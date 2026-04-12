@@ -10,6 +10,7 @@
       dsn: "{{ oracle_dsn }}"
       oracle_home: "{{ oracle_home }}"
       mode: "{{ mode }}"
+      keystore_location: "{{ oracle_wallet_location }}"
 
 - name: "open keystore"
   oracle_wallet:

@@ -17,8 +17,7 @@
     state: "closed"
     pdb_admin_username: foo
     pdb_admin_password: bar
-    file_name_convert:
-      "{{ oracle_pdbseed_path }}": "{{ oracle_datadir }}/TESTPDB2"
+    file_name_convert: "{{ {pdbseed_path: oracle_datadir + '/TESTPDB2'} }}"
 
 - name: close PDB
   oracle_pdb:
