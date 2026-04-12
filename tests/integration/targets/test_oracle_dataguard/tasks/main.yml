@@ -1,0 +1,28 @@
+---
+
+- name: Check Data Guard availability
+  oracle_dataguard:
+    oracle_home: "{{ oracle_home }}"
+    state: status
+  register: dg_check
+  ignore_errors: true
+  when: oracle_home is defined and oracle_home | length > 0
+
+- name: Skip if Data Guard not available
+  meta: end_play
+  when: >
+    oracle_home is not defined or
+    oracle_home | length == 0 or
+    dg_check is failed
+
+- name: Data Guard integration tests
+  block:
+    - include_tasks: "broker_status.yml"
+    - include_tasks: "broker_config.yml"
+    - include_tasks: "broker_enable.yml"
+
+  environment:
+    ORACLE_SID: "{{ oracle_sid | default() }}"
+    ORACLE_HOME: "{{ oracle_home | default() }}"
+
+...

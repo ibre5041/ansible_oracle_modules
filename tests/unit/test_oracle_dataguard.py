@@ -16,6 +16,7 @@ def _dg_params(**overrides):
         **BASE_CONN_PARAMS,
         "mode_dg": "broker",
         "state": "status",
+        "enabled": None,
         "dgmgrl_user": None,
         "dgmgrl_password": None,
         "dgmgrl_connect_identifier": None,
@@ -249,8 +250,9 @@ def test_dg_broker_enable_configuration(monkeypatch):
     mod = _load()
 
     class Mod(_DgBrokerModule):
-        params = _dg_params(oracle_home="/fake/oracle", state="enabled")
+        params = _dg_params(oracle_home="/fake/oracle", state="present", enabled=True)
         _dgmgrl_responses = {
+            'SHOW CONFIGURATION': (0, SHOW_CONFIG_OUTPUT, ''),
             'ENABLE CONFIGURATION': (0, 'Succeeded.', ''),
         }
 
@@ -267,8 +269,9 @@ def test_dg_broker_disable_database(monkeypatch):
     mod = _load()
 
     class Mod(_DgBrokerModule):
-        params = _dg_params(oracle_home="/fake/oracle", state="disabled", database_name="STDBY")
+        params = _dg_params(oracle_home="/fake/oracle", state="present", enabled=False, database_name="STDBY")
         _dgmgrl_responses = {
+            'SHOW CONFIGURATION': (0, SHOW_CONFIG_OUTPUT, ''),
             'DISABLE DATABASE': (0, 'Succeeded.', ''),
         }
 
@@ -864,3 +867,54 @@ class _FakeOs:
     def __getattr__(self, name):
         import os as _os
         return getattr(_os, name)
+
+
+# ===========================================================================
+# Tests: enabled parameter validation
+# ===========================================================================
+
+def test_dg_enabled_rejected_with_non_present_state(monkeypatch):
+    mod = _load()
+
+    class Mod(_DgBrokerModule):
+        params = _dg_params(oracle_home="/fake/oracle", state="status", enabled=True)
+
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "os", _FakeOs("/fake/oracle"))
+
+    with pytest.raises(FailJson) as exc:
+        mod.main()
+    assert "only valid with state='present'" in exc.value.args[0]["msg"]
+
+
+def test_dg_enabled_rejected_in_sql_mode(monkeypatch):
+    mod = _load()
+
+    class Mod(BaseFakeModule):
+        params = _dg_params(mode_dg="sql", state="present", enabled=True)
+
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "oracleConnection", lambda m: BaseFakeConn(m), raising=False)
+
+    with pytest.raises(FailJson) as exc:
+        mod.main()
+    assert "only supported in broker mode" in exc.value.args[0]["msg"]
+
+
+def test_dg_broker_present_enabled_none_no_enable(monkeypatch):
+    """enabled=None should not call enable or disable."""
+    mod = _load()
+
+    class Mod(_DgBrokerModule):
+        params = _dg_params(oracle_home="/fake/oracle", state="present", enabled=None)
+        _dgmgrl_responses = {
+            'SHOW CONFIGURATION': (0, SHOW_CONFIG_OUTPUT, ''),
+        }
+
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "os", _FakeOs("/fake/oracle"))
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    result = exc.value.args[0]
+    assert result["changed"] is False

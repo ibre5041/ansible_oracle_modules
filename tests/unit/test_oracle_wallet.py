@@ -40,6 +40,7 @@ def _wallet_params(**overrides):
     base = {
         **BASE_CONN_PARAMS,
         "state": "present",
+        "open": None,
         "keystore_location": "/opt/oracle/wallets/tde",
         "keystore_password": "TestKeystorePass123",
         "new_password": None,
@@ -170,14 +171,14 @@ def test_wallet_present_idempotent_without_password_when_already_exists(monkeypa
 
 
 # ===========================================================================
-# Tests: state=open
+# Tests: open=True (open keystore)
 # ===========================================================================
 
 def test_wallet_open_when_closed(monkeypatch):
     mod = _load()
 
     class Mod(BaseFakeModule):
-        params = _wallet_params(state="open")
+        params = _wallet_params(state="present", open=True)
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
     monkeypatch.setattr(mod, "oracleConnection", lambda m: _WalletConn(m, 'CLOSED', 'PASSWORD'), raising=False)
@@ -193,7 +194,7 @@ def test_wallet_open_idempotent_when_already_open(monkeypatch):
     mod = _load()
 
     class Mod(BaseFakeModule):
-        params = _wallet_params(state="open")
+        params = _wallet_params(state="present", open=True)
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
     monkeypatch.setattr(mod, "oracleConnection", lambda m: _WalletConn(m, 'OPEN', 'PASSWORD'), raising=False)
@@ -208,7 +209,7 @@ def test_wallet_open_with_container_all(monkeypatch):
     mod = _load()
 
     class Mod(BaseFakeModule):
-        params = _wallet_params(state="open", container="all")
+        params = _wallet_params(state="present", open=True, container="all")
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
     monkeypatch.setattr(mod, "oracleConnection", lambda m: _WalletConn(m, 'CLOSED', 'PASSWORD'), raising=False)
@@ -221,14 +222,14 @@ def test_wallet_open_with_container_all(monkeypatch):
 
 
 # ===========================================================================
-# Tests: state=closed
+# Tests: open=False (close keystore)
 # ===========================================================================
 
 def test_wallet_close_when_open(monkeypatch):
     mod = _load()
 
     class Mod(BaseFakeModule):
-        params = _wallet_params(state="closed")
+        params = _wallet_params(state="present", open=False)
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
     monkeypatch.setattr(mod, "oracleConnection", lambda m: _WalletConn(m, 'OPEN', 'PASSWORD'), raising=False)
@@ -244,7 +245,7 @@ def test_wallet_close_idempotent_when_already_closed(monkeypatch):
     mod = _load()
 
     class Mod(BaseFakeModule):
-        params = _wallet_params(state="closed")
+        params = _wallet_params(state="present", open=False)
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
     monkeypatch.setattr(mod, "oracleConnection", lambda m: _WalletConn(m, 'CLOSED'), raising=False)
@@ -512,7 +513,7 @@ def test_wallet_open_container_all_mixed_runs_open(monkeypatch):
     ]
 
     class Mod(BaseFakeModule):
-        params = _wallet_params(state="open", container="all")
+        params = _wallet_params(state="present", open=True, container="all")
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
     monkeypatch.setattr(
@@ -541,7 +542,7 @@ def test_wallet_open_container_all_idempotent_when_all_open(monkeypatch):
     ]
 
     class Mod(BaseFakeModule):
-        params = _wallet_params(state="open", container="all")
+        params = _wallet_params(state="present", open=True, container="all")
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
     monkeypatch.setattr(
@@ -743,3 +744,53 @@ def test_wallet_create_without_password_fails(monkeypatch):
     with pytest.raises(FailJson) as exc:
         mod.main()
     assert "keystore_password" in exc.value.args[0]["msg"]
+
+
+# ===========================================================================
+# Tests: open parameter validation
+# ===========================================================================
+
+def test_wallet_open_rejected_with_status_state(monkeypatch):
+    mod = _load()
+
+    class Mod(BaseFakeModule):
+        params = _wallet_params(state="status", open=True)
+
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "oracleConnection", lambda m: _WalletConn(m, 'OPEN'), raising=False)
+
+    with pytest.raises(FailJson) as exc:
+        mod.main()
+    assert "only valid with state='present'" in exc.value.args[0]["msg"]
+
+
+def test_wallet_open_true_requires_password(monkeypatch):
+    mod = _load()
+
+    class Mod(BaseFakeModule):
+        params = _wallet_params(state="present", open=True, keystore_password=None)
+
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "oracleConnection", lambda m: _WalletConn(m, 'CLOSED'), raising=False)
+
+    with pytest.raises(FailJson) as exc:
+        mod.main()
+    assert "keystore_password" in exc.value.args[0]["msg"]
+
+
+def test_wallet_present_open_none_does_not_open_or_close(monkeypatch):
+    """open=None (default) should not open or close the keystore."""
+    mod = _load()
+
+    class Mod(BaseFakeModule):
+        params = _wallet_params(state="present", open=None)
+
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "oracleConnection", lambda m: _WalletConn(m, 'CLOSED', 'PASSWORD'), raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    result = exc.value.args[0]
+    assert result["changed"] is False
+    assert not any("SET KEYSTORE OPEN" in d for d in result.get("ddls", []))
+    assert not any("SET KEYSTORE CLOSE" in d for d in result.get("ddls", []))

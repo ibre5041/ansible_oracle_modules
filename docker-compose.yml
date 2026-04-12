@@ -1,18 +1,21 @@
 services:
   oracle:
-    image: gvenzl/oracle-xe:21-slim
+    image: container-registry.oracle.com/database/enterprise:latest
     environment:
-      ORACLE_PASSWORD: Oracle_4U
+      ORACLE_PWD: Oracle_4U
+      ORACLE_SID: ORCLCDB
+      ORACLE_PDB: ORCLPDB1
     ports:
       - "1521:1521"
+      - "5500:5500"
     volumes:
       - oracle-data:/opt/oracle/oradata
     healthcheck:
-      test: ["CMD", "healthcheck.sh"]
-      interval: 10s
-      timeout: 5s
-      retries: 50
-      start_period: 90s
+      test: ["CMD", "/opt/oracle/checkDBStatus.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 30
+      start_period: 300s
 
 volumes:
   oracle-data:

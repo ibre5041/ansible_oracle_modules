@@ -1,0 +1,36 @@
+---
+
+- name: "create TLS wallet with auto-login"
+  oracle_orapki:
+    oracle_home: "{{ oracle_home }}"
+    state: present
+    wallet_location: "{{ wallet_location }}"
+    wallet_password: "{{ wallet_password }}"
+    auto_login: auto_login
+  register: _
+  failed_when: not _.changed
+
+- name: "create wallet (idempotent)"
+  oracle_orapki:
+    oracle_home: "{{ oracle_home }}"
+    state: present
+    wallet_location: "{{ wallet_location }}"
+    wallet_password: "{{ wallet_password }}"
+  register: _
+  failed_when: _.changed
+
+- name: "display wallet contents"
+  oracle_orapki:
+    oracle_home: "{{ oracle_home }}"
+    state: status
+    wallet_location: "{{ wallet_location }}"
+  register: wallet_info
+  failed_when: wallet_info.failed
+
+- name: "verify wallet status fields"
+  assert:
+    that:
+      - wallet_info.changed == false
+      - wallet_info.wallet_type is defined
+
+...

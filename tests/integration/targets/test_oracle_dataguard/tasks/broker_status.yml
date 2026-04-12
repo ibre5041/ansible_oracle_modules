@@ -1,0 +1,16 @@
+---
+
+- name: "get Data Guard status"
+  oracle_dataguard:
+    oracle_home: "{{ oracle_home }}"
+    state: status
+  register: dg_status
+  failed_when: dg_status.failed
+
+- name: "verify status fields"
+  assert:
+    that:
+      - dg_status.changed == false
+      - dg_status.configuration is defined
+
+...

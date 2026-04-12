@@ -1,0 +1,29 @@
+---
+- name: "define connection parameters"
+  set_fact:
+    connection_parameters: &con_param
+      hostname: "{{ oracle_hostname }}"
+      port: "{{ oracle_port }}"
+      service_name: "{{ oracle_service_name }}"
+      username: "{{ oracle_username }}"
+      password: "{{ oracle_password }}"
+      dsn: "{{ oracle_dsn }}"
+      oracle_home: "{{ oracle_home }}"
+      mode: "{{ mode }}"
+
+- name: "get keystore status"
+  oracle_wallet:
+    <<: *con_param
+    state: status
+  register: wallet_status
+  failed_when: wallet_status.failed
+
+- name: "verify status fields are present"
+  assert:
+    that:
+      - wallet_status.wallet_status is defined
+      - wallet_status.wallet_type is defined
+      - wallet_status.keystore_mode is defined
+      - wallet_status.changed == false
+
+...

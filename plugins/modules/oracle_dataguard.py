@@ -8,7 +8,7 @@ short_description: Manage Oracle Data Guard configurations
 description:
   - Manage Oracle Data Guard via the Broker (DGMGRL) or via SQL direct
   - Create, enable, disable, and remove Data Guard configurations
-  - Add, remove, enable, and disable standby databases
+  - Add, remove, and manage standby databases
   - Perform switchover and failover operations
   - Convert databases between physical/snapshot standby
   - Manage Data Guard properties
@@ -34,13 +34,20 @@ options:
     choices:
       - present
       - absent
-      - enabled
-      - disabled
       - status
       - switchover
       - failover
       - snapshot_standby
       - physical_standby
+  enabled:
+    description:
+      - Whether the configuration or database should be enabled or disabled.
+      - Only meaningful when C(state=present) and C(mode_dg=broker).
+      - C(true) ensures the resource is enabled after creating/configuring.
+      - C(false) ensures the resource is disabled after creating/configuring.
+      - When omitted the enabled state is not changed.
+    type: bool
+    required: false
   oracle_home:
     description: ORACLE_HOME path (required for DGMGRL in broker mode)
     required: false
@@ -204,10 +211,14 @@ EXAMPLES = '''
     database_name: STDBY
     connect_identifier: "stdby-host:1521/STDBY"
 
-- name: Enable the configuration
+- name: Create configuration and enable it
   oracle_dataguard:
     oracle_home: /u01/app/oracle/product/19c
-    state: enabled
+    state: present
+    configuration_name: my_dg_config
+    primary_database: PROD
+    connect_identifier: "prod-host:1521/PROD"
+    enabled: true
 
 - name: Set database properties
   oracle_dataguard:
@@ -249,7 +260,8 @@ EXAMPLES = '''
 - name: Disable the configuration
   oracle_dataguard:
     oracle_home: /u01/app/oracle/product/19c
-    state: disabled
+    state: present
+    enabled: false
 
 - name: Remove a standby database
   oracle_dataguard:
@@ -977,8 +989,9 @@ def main():
             # Data Guard mode
             mode_dg=dict(default='broker', choices=['broker', 'sql']),
             state=dict(default='status',
-                       choices=['present', 'absent', 'enabled', 'disabled', 'status',
+                       choices=['present', 'absent', 'status',
                                 'switchover', 'failover', 'snapshot_standby', 'physical_standby']),
+            enabled=dict(required=False, type='bool', default=None),
 
             # DGMGRL connection
             dgmgrl_user=dict(required=False),
@@ -1047,6 +1060,13 @@ def _run_broker_mode(module):
     state = module.params["state"]
     database_name = module.params["database_name"]
     output_format = module.params["output_format"]
+    enabled_param = module.params.get("enabled")
+
+    if enabled_param is not None and state != 'present':
+        module.fail_json(
+            msg="'enabled' parameter is only valid with state='present'",
+            changed=False,
+        )
 
     if state == 'status':
         # Status is read-only, allow it even in check mode.
@@ -1059,10 +1079,6 @@ def _run_broker_mode(module):
         _broker_present(module, database_name, output_format)
     elif state == 'absent':
         _broker_absent(module, database_name)
-    elif state == 'enabled':
-        _broker_enable_disable(module, database_name, enable=True)
-    elif state == 'disabled':
-        _broker_enable_disable(module, database_name, enable=False)
     elif state == 'switchover':
         dgmgrl_switchover(module, database_name)
         module.exit_json(changed=True, msg='Switchover to %s completed' % database_name)
@@ -1146,6 +1162,14 @@ def _broker_present(module, database_name, output_format):
         if dgmgrl_reset_tags(module, module.params["reset_tags"]):
             changed = True
 
+    enabled_param = module.params.get("enabled")
+    if enabled_param is True:
+        if _do_enable_disable(module, database_name, enable=True):
+            changed = True
+    elif enabled_param is False:
+        if _do_enable_disable(module, database_name, enable=False):
+            changed = True
+
     config = dgmgrl_show_configuration(module, output_format)
     module.exit_json(changed=changed, configuration=config, msg='Data Guard configuration updated')
 
@@ -1169,15 +1193,12 @@ def _broker_absent(module, database_name):
     module.exit_json(changed=changed, msg='Data Guard resources removed')
 
 
-def _broker_enable_disable(module, database_name, enable):
-    """Handle broker enable/disable operations."""
+def _do_enable_disable(module, database_name, enable):
+    """Enable or disable a configuration or database. Returns True if changed."""
     func = dgmgrl_enable if enable else dgmgrl_disable
     if database_name:
-        changed = func(module, 'database', database_name)
-    else:
-        changed = func(module, 'configuration')
-    action = 'Enabled' if enable else 'Disabled'
-    module.exit_json(changed=changed, msg='%s successfully' % action)
+        return func(module, 'database', database_name)
+    return func(module, 'configuration')
 
 
 _SQL_SUPPORTED_STATES = frozenset(['status', 'present'])
@@ -1189,6 +1210,12 @@ def _run_sql_mode(module):
         module.fail_json(msg='SQL mode requires oracledb module. Install via: pip install oracledb', changed=False)
     state = module.params["state"]
     protection_mode = module.params["protection_mode"]
+
+    if module.params.get("enabled") is not None:
+        module.fail_json(
+            msg="'enabled' parameter is only supported in broker mode (mode_dg=broker)",
+            changed=False,
+        )
 
     if state not in _SQL_SUPPORTED_STATES:
         module.fail_json(

@@ -1,0 +1,27 @@
+---
+
+- name: "enable configuration with enabled=true"
+  oracle_dataguard:
+    oracle_home: "{{ oracle_home }}"
+    state: present
+    enabled: true
+  register: _
+  failed_when: _.failed
+
+- name: "disable configuration with enabled=false"
+  oracle_dataguard:
+    oracle_home: "{{ oracle_home }}"
+    state: present
+    enabled: false
+  register: _
+  failed_when: _.failed
+
+- name: "re-enable for cleanup"
+  oracle_dataguard:
+    oracle_home: "{{ oracle_home }}"
+    state: present
+    enabled: true
+  register: _
+  failed_when: _.failed
+
+...
