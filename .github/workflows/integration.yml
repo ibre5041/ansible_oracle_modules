@@ -37,6 +37,12 @@ jobs:
           VERSION=$(grep ^version: galaxy.yml | cut -d" " -f2)
           ansible-galaxy collection install --force ibre5041-ansible_oracle_modules-${VERSION}.tar.gz
 
+      - name: Prepare Oracle container directories
+        run: |
+          CONTAINER_ID=$(docker ps -q --filter "ancestor=gvenzl/oracle-free:23-full")
+          docker exec "$CONTAINER_ID" mkdir -p /opt/oracle/admin/FREE/wallet
+          docker exec "$CONTAINER_ID" chown oracle:oinstall /opt/oracle/admin/FREE/wallet
+
       - name: Configure integration config (Docker)
         run: |
           cp tests/integration/integration_config.yml.docker \

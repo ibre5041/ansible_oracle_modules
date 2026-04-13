@@ -87,7 +87,7 @@
   oracle_parameter:
     <<: *pdb_con_param
     name: "pga_aggregate_target"
-    value: "600M"
+    value: "300M"
     state: "present"
     scope: both
   register: _
@@ -98,7 +98,7 @@
   oracle_parameter:
     <<: *pdb_con_param
     name: "pga_aggregate_target"
-    value: "600M"
+    value: "300M"
     state: "present"
     scope: both
   register: _
