@@ -255,11 +255,11 @@ def set_master_key(conn, module):
     container_clause = build_container_clause(container)
 
     sql = "ADMINISTER KEY MANAGEMENT SET KEY"
+    sql += " %sIDENTIFIED BY \"%s\"" % (force, keystore_password.replace('"', '""'))
     if algorithm:
         sql += " USING ALGORITHM '%s'" % algorithm
     if key_tag:
         sql += " USING TAG '%s'" % key_tag.replace("'", "''")
-    sql += " %sIDENTIFIED BY \"%s\"" % (force, keystore_password.replace('"', '""'))
     sql += build_backup_clause()
     sql += container_clause
 
@@ -282,11 +282,12 @@ def create_master_key(conn, module):
     container_clause = build_container_clause(container)
 
     sql = "ADMINISTER KEY MANAGEMENT CREATE KEY"
+    sql += " %sIDENTIFIED BY \"%s\"" % (force, keystore_password.replace('"', '""'))
     if algorithm:
         sql += " USING ALGORITHM '%s'" % algorithm
     if key_tag:
         sql += " USING TAG '%s'" % key_tag.replace("'", "''")
-    sql += " %sIDENTIFIED BY \"%s\"" % (force, keystore_password.replace('"', '""'))
+
     sql += build_backup_clause()
     sql += container_clause
 
