@@ -1,0 +1,3 @@
+---
+keystore_password: "TestTdePass123"
+test_tablespace: "USERS"

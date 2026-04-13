@@ -1,0 +1,57 @@
+---
+- name: "define connection parameters"
+  set_fact:
+    con_param: &con_param
+      hostname: "{{ oracle_hostname }}"
+      port: "{{ oracle_port }}"
+      service_name: "{{ oracle_pdb_service_name }}"
+      username: "{{ oracle_pdb_username | default(oracle_username) }}"
+      password: "{{ oracle_pdb_password | default(oracle_password) }}"
+      dsn: "{{ oracle_dsn }}"
+      oracle_home: "{{ oracle_home }}"
+      mode: "{{ mode }}"
+
+- name: "set master key on PDB"
+  oracle_tde:
+    <<: *con_param
+    state: present
+    master_key_action: set_key
+    keystore_password: "{{ keystore_password }}"
+  register: _
+  failed_when: not _.changed
+
+- name: "encrypt tablespace {{ test_tablespace }}"
+  oracle_tde:
+    <<: *con_param
+    state: present
+    tablespace_state: encrypted
+    tablespace: "{{ test_tablespace }}"
+    keystore_password: "{{ keystore_password }}"
+    online: true
+  register: _
+  failed_when: not _.changed
+
+- name: "encrypt tablespace {{ test_tablespace }} (idempotent)"
+  oracle_tde:
+    <<: *con_param
+    state: present
+    tablespace_state: encrypted
+    tablespace: "{{ test_tablespace }}"
+    keystore_password: "{{ keystore_password }}"
+    online: true
+  register: _
+  failed_when: _.changed
+
+- name: "verify encryption via status"
+  oracle_tde:
+    <<: *con_param
+    state: status
+  register: tde_status
+  failed_when: tde_status.failed
+
+- name: "assert {{ test_tablespace }} is encrypted"
+  assert:
+    that:
+      - tde_status.encrypted_tablespaces | length > 0
+
+...

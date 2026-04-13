@@ -1,0 +1,16 @@
+---
+
+- name: TDE integration tests
+  block:
+    - include_tasks: "setup_keystore.yml"
+    - include_tasks: "master_key.yml"
+    - include_tasks: "tablespace_encrypt.yml"
+    - include_tasks: "tablespace_decrypt.yml"
+    - include_tasks: "status.yml"
+    - include_tasks: "cleanup.yml"
+
+  environment:
+    ORACLE_SID: "{{ oracle_sid | default() }}"
+    ORACLE_HOME: "{{ oracle_home | default() }}"
+
+...

@@ -35,7 +35,7 @@ test-docker: build integration-config-docker
 	    test_oracle_role test_oracle_user test_oracle_tablespace \
 	    test_oracle_parameter test_oracle_grant test_oracle_pdb \
 	    test_oracle_facts \
-	    test_oracle_wallet test_oracle_orapki \
+	    test_oracle_wallet test_oracle_tde test_oracle_orapki \
 	    test_oracle_dataguard; do \
 	  echo ""; \
 	  echo "=== $$ROLE ==="; \
@@ -53,7 +53,7 @@ test-docker-ee: build integration-config-ee
 	    test_oracle_role test_oracle_user test_oracle_tablespace \
 	    test_oracle_parameter test_oracle_grant test_oracle_pdb \
 	    test_oracle_facts \
-	    test_oracle_wallet test_oracle_orapki \
+	    test_oracle_wallet test_oracle_tde test_oracle_orapki \
 	    test_oracle_dataguard; do \
 	  echo ""; \
 	  echo "=== $$ROLE ==="; \
