@@ -17,6 +17,7 @@
     state: present
     master_key_action: set_key
     keystore_password: "{{ keystore_password }}"
+    force_keystore: true
   register: _
   failed_when: not _.changed
 
@@ -26,7 +27,6 @@
     state: present
     tablespace_state: encrypted
     tablespace: "{{ test_tablespace }}"
-    keystore_password: "{{ keystore_password }}"
     online: true
   register: _
   failed_when: not _.changed
@@ -37,7 +37,6 @@
     state: present
     tablespace_state: encrypted
     tablespace: "{{ test_tablespace }}"
-    keystore_password: "{{ keystore_password }}"
     online: true
   register: _
   failed_when: _.changed

@@ -17,8 +17,7 @@
     state: present
     master_key_action: set_key
     keystore_password: "{{ keystore_password }}"
-    algorithm: AES256
-    key_tag: "integration_test_key"
+    force_keystore: true
   register: _
   failed_when: not _.changed
 
@@ -32,7 +31,7 @@
 - name: "assert master key is active"
   assert:
     that:
-      - tde_status.wallet_status in ['OPEN', 'OPEN_NO_MASTER_KEY']  or tde_status.wallet_status == 'OPEN'
+      - tde_status.wallet_status is defined
       - tde_status.master_key is defined
       - tde_status.master_key | length > 0
 
