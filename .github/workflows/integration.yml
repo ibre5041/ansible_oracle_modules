@@ -29,7 +29,9 @@ jobs:
           python-version: "3.11"
 
       - name: Install dependencies
-        run: pip install ansible oracledb
+        run: |
+          pip install ansible oracledb
+          ansible-galaxy collection install community.docker
 
       - name: Build and install collection
         run: |
