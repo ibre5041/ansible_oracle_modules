@@ -10,7 +10,8 @@ fi
 
 # Detect Python interpreter inside the container
 PYTHON_INTERP=""
-for p in /usr/bin/python3 /usr/libexec/platform-python; do
+ORACLE_HOME_VAL=$(docker exec "$ORACLE_CONTAINER" bash -c 'echo $ORACLE_HOME' 2>/dev/null || true)
+for p in /usr/bin/python3 /usr/libexec/platform-python "${ORACLE_HOME_VAL}/python/bin/python3"; do
     if docker exec "$ORACLE_CONTAINER" "$p" --version &>/dev/null; then
         PYTHON_INTERP="$p"
         break

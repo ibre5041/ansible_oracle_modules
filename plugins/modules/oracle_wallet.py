@@ -576,7 +576,11 @@ def create_auto_login(conn, module):
     sql = "ADMINISTER KEY MANAGEMENT CREATE %sAUTO_LOGIN KEYSTORE FROM KEYSTORE '%s' IDENTIFIED BY \"%s\"" % (
         local_clause, loc_esc, pwd_esc
     )
-    conn.execute_ddl(sql, ddls_entry=_redact_ddl(sql))
+    # ORA-46630: auto-login keystore file (cwallet.sso) already exists at this
+    # location.  V$ENCRYPTION_WALLET.WALLET_TYPE shows the *currently active*
+    # access method (e.g. PASSWORD when opened with a password), so the earlier
+    # type-based idempotency check can miss an existing auto-login file.
+    conn.execute_ddl(sql, ddls_entry=_redact_ddl(sql), ignore_errors=[46630])
 
 
 def backup_keystore(conn, module, identified_by_password=None):
