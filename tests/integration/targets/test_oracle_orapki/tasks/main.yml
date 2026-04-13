@@ -1,7 +1,7 @@
 ---
 
 - name: Check orapki availability
-  command: "{{ oracle_home }}/bin/orapki version"
+  command: "{{ oracle_home }}/bin/orapki help"
   register: orapki_check
   ignore_errors: true
   when: oracle_home is defined and oracle_home | length > 0
