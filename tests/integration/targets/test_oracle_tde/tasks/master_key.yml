@@ -41,7 +41,7 @@
     state: present
     master_key_action: set_key
     keystore_password: "{{ keystore_password }}"
-    algorithm: AES128
+    algorithm: AES256
     key_tag: "integration_test_tagged"
     force_keystore: true
   register: _

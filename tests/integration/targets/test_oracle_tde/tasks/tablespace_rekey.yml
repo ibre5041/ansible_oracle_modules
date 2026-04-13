@@ -17,7 +17,7 @@
     state: present
     tablespace_state: rekeyed
     tablespace: "{{ test_tablespace }}"
-    algorithm: AES128
+    algorithm: AES256
     online: true
   register: _
   failed_when: not _.changed

@@ -36,7 +36,17 @@
   register: _
   failed_when: _.failed
 
-- name: "remove certificate by DN"
+- name: "remove certificate by DN (user cert)"
+  oracle_orapki:
+    oracle_home: "{{ oracle_home }}"
+    wallet_location: "{{ wallet_location }}"
+    wallet_password: "{{ wallet_password }}"
+    cert_state: absent
+    cert_dn: "{{ cert_dn }}"
+  register: _
+  failed_when: not _.changed
+
+- name: "remove certificate by DN (certificate request)"
   oracle_orapki:
     oracle_home: "{{ oracle_home }}"
     wallet_location: "{{ wallet_location }}"
