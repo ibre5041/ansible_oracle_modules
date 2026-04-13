@@ -13,17 +13,16 @@
 - name: create a closed PDB
   oracle_pdb:
     <<: *con_param
-    pdb_name: "XEPDB2"
+    pdb_name: "TESTPDB2"
     state: "closed"
     pdb_admin_username: foo
     pdb_admin_password: bar
-    file_name_convert:
-      "/opt/oracle/oradata/XE/pdbseed": "/opt/oracle/oradata/XE/XEPDB2"
+    file_name_convert: "{{ {pdbseed_path: oracle_datadir + '/TESTPDB2'} }}"
 
 - name: close PDB
   oracle_pdb:
     <<: *con_param
-    pdb_name: "XEPDB2"
+    pdb_name: "TESTPDB2"
     state: "closed"
     save_state: false
   register: _
@@ -32,7 +31,7 @@
 - name: check PDB state I
   oracle_pdb:
     <<: *con_param
-    pdb_name: "XEPDB2"
+    pdb_name: "TESTPDB2"
     state: "status"
   register: _
   failed_when: _.state != 'closed'
@@ -40,7 +39,7 @@
 - name: open PDB
   oracle_pdb:
     <<: *con_param
-    pdb_name: "XEPDB2"
+    pdb_name: "TESTPDB2"
     state: "opened"
   register: _
   failed_when: _.failed or not _.changed
@@ -48,7 +47,7 @@
 - name: reopen PDB => no change
   oracle_pdb:
     <<: *con_param
-    pdb_name: "XEPDB2"
+    pdb_name: "TESTPDB2"
     state: "opened"
   register: _
   failed_when: _.failed or _.changed
@@ -56,15 +55,15 @@
 - name: check PDB state II
   oracle_pdb:
     <<: *con_param
-    pdb_name: "XEPDB2"
+    pdb_name: "TESTPDB2"
     state: "status"
   register: _
-  failed_when: _.state != 'opened' and _.read_only
+  failed_when: _.state != 'open' or _.read_only
 
 - name: close PDB
   oracle_pdb:
     <<: *con_param
-    pdb_name: "XEPDB2"
+    pdb_name: "TESTPDB2"
     state: "closed"
   register: _
   failed_when: _.failed or not _.changed
@@ -72,7 +71,7 @@
 - name: open PDB read only
   oracle_pdb:
     <<: *con_param
-    pdb_name: "XEPDB2"
+    pdb_name: "TESTPDB2"
     state: "read_only"
   register: _
   failed_when: _.failed or not _.changed
@@ -80,14 +79,14 @@
 - name: check PDB state III
   oracle_pdb:
     <<: *con_param
-    pdb_name: "XEPDB2"
+    pdb_name: "TESTPDB2"
     state: "status"
   register: _
-  failed_when: _.state != 'opened' and not _.read_only
+  failed_when: _.state != 'open' or not _.read_only
   
 - name: drop PDB
   oracle_pdb:
     <<: *con_param
-    pdb_name: "XEPDB2"
+    pdb_name: "TESTPDB2"
     state: "absent"
 ...

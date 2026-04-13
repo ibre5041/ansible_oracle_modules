@@ -1,0 +1,16 @@
+---
+
+- name: "delete test wallet"
+  oracle_orapki:
+    oracle_home: "{{ oracle_home }}"
+    state: absent
+    wallet_location: "{{ wallet_location }}"
+  register: _
+  failed_when: false
+
+- name: "remove exported cert file"
+  file:
+    path: /tmp/test_orapki_cert.crt
+    state: absent
+
+...

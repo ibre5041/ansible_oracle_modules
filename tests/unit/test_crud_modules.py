@@ -832,7 +832,7 @@ def test_tablespace_creates_with_datafile(monkeypatch):
         mod.main()
     payload = exc.value.args[0]
     assert payload["changed"] is True
-    assert any("create tablespace" in d.lower() for d in payload["ddls"])
+    assert any("create smallfile tablespace" in d.lower() for d in payload["ddls"])
 
 
 def test_tablespace_drops_existing(monkeypatch):

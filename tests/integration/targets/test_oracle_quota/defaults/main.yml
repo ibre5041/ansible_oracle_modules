@@ -1,5 +1,5 @@
 ---
-service_name: "XEPDB1"
+service_name: "{{ oracle_pdb_service_name }}"
 sys_password: "password"
 user: "u_quota"
 ts_1: "ts_quota_1"

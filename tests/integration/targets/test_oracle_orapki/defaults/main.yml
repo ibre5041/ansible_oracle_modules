@@ -1,0 +1,6 @@
+---
+wallet_password: "TestOrapkiPass123"
+wallet_location: "/tmp/test_orapki_wallet"
+cert_dn: "CN=testserver.local,O=TestOrg"
+cert_validity: 365
+cert_keysize: 2048

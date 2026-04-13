@@ -1,0 +1,61 @@
+---
+
+- name: "create self-signed certificate"
+  oracle_orapki:
+    oracle_home: "{{ oracle_home }}"
+    wallet_location: "{{ wallet_location }}"
+    wallet_password: "{{ wallet_password }}"
+    cert_state: present
+    cert_type: self_signed
+    cert_dn: "{{ cert_dn }}"
+    cert_keysize: "{{ cert_keysize }}"
+    cert_validity: "{{ cert_validity }}"
+  register: _
+  failed_when: not _.changed
+
+- name: "create self-signed certificate (idempotent)"
+  oracle_orapki:
+    oracle_home: "{{ oracle_home }}"
+    wallet_location: "{{ wallet_location }}"
+    wallet_password: "{{ wallet_password }}"
+    cert_state: present
+    cert_type: self_signed
+    cert_dn: "{{ cert_dn }}"
+    cert_keysize: "{{ cert_keysize }}"
+    cert_validity: "{{ cert_validity }}"
+  register: _
+  failed_when: _.changed
+
+- name: "export certificate to file"
+  oracle_orapki:
+    oracle_home: "{{ oracle_home }}"
+    wallet_location: "{{ wallet_location }}"
+    cert_state: exported
+    cert_dn: "{{ cert_dn }}"
+    cert_export_file: /tmp/test_orapki_cert.crt
+  register: _
+  failed_when: _.failed
+
+- name: "remove all certificate entries by DN"
+  oracle_orapki:
+    oracle_home: "{{ oracle_home }}"
+    wallet_location: "{{ wallet_location }}"
+    wallet_password: "{{ wallet_password }}"
+    cert_state: absent
+    cert_dn: "{{ cert_dn }}"
+  register: _
+  until: not _.changed
+  retries: 5
+  delay: 1
+
+- name: "remove certificate (idempotent)"
+  oracle_orapki:
+    oracle_home: "{{ oracle_home }}"
+    wallet_location: "{{ wallet_location }}"
+    wallet_password: "{{ wallet_password }}"
+    cert_state: absent
+    cert_dn: "{{ cert_dn }}"
+  register: _
+  failed_when: _.changed
+
+...

@@ -1,0 +1,4 @@
+---
+# Must match the wallet test password (same keystore location)
+keystore_password: "TestWalletPass123"
+test_tablespace: "USERS"

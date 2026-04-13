@@ -20,7 +20,16 @@ options:
   state:
     description: The intended state of the keystore
     default: present
-    choices: ['present', 'absent', 'open', 'closed', 'status']
+    choices: ['present', 'absent', 'status']
+  open:
+    description:
+      - Whether the keystore should be open or closed after ensuring it exists.
+      - Only meaningful when C(state=present).
+      - C(true) ensures the keystore exists and is open.
+      - C(false) ensures the keystore exists and is closed.
+      - When omitted the open/close state is not changed.
+    type: bool
+    required: false
   keystore_location:
     description:
       - Path where the keystore files are stored
@@ -88,24 +97,28 @@ EXAMPLES = '''
     keystore_location: /opt/oracle/admin/wallets/tde
     keystore_password: "MyKeystorePass123"
 
-- name: Open the keystore
+- name: Create keystore and open it
   oracle_wallet:
     mode: sysdba
-    state: open
+    state: present
+    keystore_location: /opt/oracle/admin/wallets/tde
     keystore_password: "MyKeystorePass123"
+    open: true
 
 - name: Open the keystore for all PDBs
   oracle_wallet:
     mode: sysdba
-    state: open
+    state: present
     keystore_password: "MyKeystorePass123"
+    open: true
     container: all
 
 - name: Close the keystore
   oracle_wallet:
     mode: sysdba
-    state: closed
+    state: present
     keystore_password: "MyKeystorePass123"
+    open: false
 
 - name: Create auto-login keystore
   oracle_wallet:
@@ -206,7 +219,19 @@ def validate_wallet_inputs_before_connect(module):
     backup_tag = module.params['backup_tag']
     backup_location = module.params['backup_location']
 
+    open_param = module.params.get('open')
+    if open_param is not None and state != 'present':
+        module.fail_json(
+            msg="'open' parameter is only valid with state='present'",
+            changed=False,
+        )
+
     if secret_state:
+        if open_param is not None:
+            module.fail_json(
+                msg="'open' parameter cannot be combined with secret_state",
+                changed=False,
+            )
         if not module.params.get('secret_client'):
             module.fail_json(msg='secret_client is required for secret management', changed=False)
         if not module.params.get('keystore_password'):
@@ -244,6 +269,10 @@ def validate_wallet_inputs_before_connect(module):
             if not module.params.get('keystore_password'):
                 module.fail_json(msg='keystore_password is required when auto_login is set', changed=False)
             _assert_sql_embeddable_str(module, module.params.get('keystore_password'), '"')
+        if open_param is False:
+            ks = module.params.get('keystore_password')
+            if ks:
+                _assert_sql_embeddable_str(module, ks, '"')
         if change_password_flag:
             _assert_sql_embeddable_str(module, module.params.get('keystore_password'), '"')
             _assert_sql_embeddable_str(module, module.params.get('new_password'), '"')
@@ -254,17 +283,6 @@ def validate_wallet_inputs_before_connect(module):
                     changed=False,
                 )
         return
-
-    if state == 'open':
-        ks = module.params.get('keystore_password')
-        if ks:
-            _assert_sql_embeddable_str(module, ks, '"')
-        return
-
-    if state == 'closed':
-        ks = module.params.get('keystore_password')
-        if ks:
-            _assert_sql_embeddable_str(module, ks, '"')
 
 
 def _redact_ddl(ddl):
@@ -476,7 +494,8 @@ def ensure_keystore_open(conn, module):
         return status
 
     if not keystore_password:
-        module.fail_json(msg='keystore_password is required to open the keystore', changed=False)
+        module.fail_json(msg='keystore_password is required when open=true', changed=False)
+    _assert_sql_embeddable_str(module, keystore_password, '"')
 
     force = build_force_clause(force_keystore)
     container_clause = build_container_clause(container)
@@ -557,7 +576,11 @@ def create_auto_login(conn, module):
     sql = "ADMINISTER KEY MANAGEMENT CREATE %sAUTO_LOGIN KEYSTORE FROM KEYSTORE '%s' IDENTIFIED BY \"%s\"" % (
         local_clause, loc_esc, pwd_esc
     )
-    conn.execute_ddl(sql, ddls_entry=_redact_ddl(sql))
+    # ORA-46630: auto-login keystore file (cwallet.sso) already exists at this
+    # location.  V$ENCRYPTION_WALLET.WALLET_TYPE shows the *currently active*
+    # access method (e.g. PASSWORD when opened with a password), so the earlier
+    # type-based idempotency check can miss an existing auto-login file.
+    conn.execute_ddl(sql, ddls_entry=_redact_ddl(sql), ignore_errors=[46630])
 
 
 def backup_keystore(conn, module, identified_by_password=None):
@@ -676,7 +699,8 @@ def main():
             session_container=dict(required=False),
 
             state=dict(default="present",
-                       choices=["present", "absent", "open", "closed", "status"]),
+                       choices=["present", "absent", "status"]),
+            open=dict(required=False, type='bool', default=None),
             keystore_location=dict(required=False),
             keystore_password=dict(required=False, no_log=True),
             new_password=dict(required=False, no_log=True),
@@ -754,6 +778,13 @@ def main():
     if state == 'present':
         status = ensure_keystore_present(conn, module)
 
+        # Handle open/close
+        open_param = module.params.get("open")
+        if open_param is True:
+            ensure_keystore_open(conn, module)
+        elif open_param is False:
+            ensure_keystore_closed(conn, module)
+
         # Handle auto-login creation
         if auto_login != 'none':
             create_auto_login(conn, module)
@@ -779,30 +810,6 @@ def main():
             changed=conn.changed,
             ddls=_redact_ddls(conn.ddls),
             msg='Keystore managed successfully',
-            wallet_status=status.get('status', '') if status else '',
-            wallet_type=status.get('wallet_type', '') if status else '',
-            keystore_mode=status.get('keystore_mode', '') if status else '',
-        )
-
-    elif state == 'open':
-        ensure_keystore_open(conn, module)
-        status = get_wallet_status(conn, module.params["container"])
-        module.exit_json(
-            changed=conn.changed,
-            ddls=_redact_ddls(conn.ddls),
-            msg='Keystore is open',
-            wallet_status=status.get('status', '') if status else '',
-            wallet_type=status.get('wallet_type', '') if status else '',
-            keystore_mode=status.get('keystore_mode', '') if status else '',
-        )
-
-    elif state == 'closed':
-        ensure_keystore_closed(conn, module)
-        status = get_wallet_status(conn, module.params["container"])
-        module.exit_json(
-            changed=conn.changed,
-            ddls=_redact_ddls(conn.ddls),
-            msg='Keystore is closed',
             wallet_status=status.get('status', '') if status else '',
             wallet_type=status.get('wallet_type', '') if status else '',
             keystore_mode=status.get('keystore_mode', '') if status else '',

@@ -17,14 +17,13 @@
 - name: create a PDB from seed, XML and clone
   oracle_pdb:
     <<: *con_param
-    pdb_name: "XEPDB2"
+    pdb_name: "TESTPDB2"
     state: "opened"
     pdb_admin_username: "foo"
     pdb_admin_password: "bar"
-    clone_from: "XEPDB1"
-    plug_file: "/tmp/xepdb2.xml"
-    file_name_convert:
-      "/opt/oracle/oradata/XE/pdbseed": "/tmp/xepdb2/dbf01"
+    clone_from: "{{ oracle_pdb_name }}"
+    plug_file: "/tmp/testpdb2.xml"
+    file_name_convert: "{{ {pdbseed_path: '/tmp/testpdb2/dbf01'} }}"
   register: _
   failed_when: not _.failed
 ...

@@ -362,9 +362,44 @@ def _parse_numbered_list(stdout):
     return aliases
 
 
+def _parse_secretstore_list(stdout):
+    """Parse orapki secretstore list_entries / list_credentials output.
+
+    Oracle 23ai outputs entries as plain lines (no numbering) after a
+    header section.  Older versions may use ``N: value`` format.
+    Handles both by skipping the orapki banner/header lines and collecting
+    the remaining non-empty tokens.
+    """
+    aliases = []
+    # First try the numbered format.
+    for line in stdout.split('\n'):
+        line = line.strip()
+        m = re.match(r'^\d+:\s+(\S+)', line)
+        if m:
+            aliases.append(m.group(1))
+    if aliases:
+        return aliases
+
+    # Fall back to plain-text format (Oracle 23ai):
+    # skip banner/header lines, collect remaining non-empty lines.
+    skip_prefixes = ('Oracle PKI Tool', 'Version ', 'Copyright ')
+    for line in stdout.split('\n'):
+        line = line.strip()
+        if not line:
+            continue
+        if any(line.startswith(p) for p in skip_prefixes):
+            continue
+        # Skip the "Oracle Secret Store entries:" header line
+        if line.lower().startswith('oracle secret store'):
+            continue
+        # Remaining lines are entry/credential names
+        aliases.append(line.split()[0])
+    return aliases
+
+
 # Convenience aliases so call sites stay descriptive.
-_parse_list_credentials = _parse_numbered_list
-_parse_list_entries = _parse_numbered_list
+_parse_list_credentials = _parse_secretstore_list
+_parse_list_entries = _parse_secretstore_list
 
 
 # ============================================================================

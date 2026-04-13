@@ -19,7 +19,7 @@
     <<: *con_param
     gather_subset: "instance"
   register: _
-  failed_when: _.oracle_facts.instance.instance_name != 'XE'
+  failed_when: _.oracle_facts.instance.instance_name != oracle_sid
 
 - name: get option facts
   oracle_facts:
@@ -45,7 +45,7 @@
   failed_when: |
     _.oracle_facts.pdbs | length == 0 or
     _.oracle_facts.pdbs[0].name != 'PDB$SEED' or
-    _.oracle_facts.pdbs[1].name != 'XEPDB1'
+    _.oracle_facts.pdbs[1].name != oracle_pdb_name
 
 - name: get rac facts
   oracle_facts:
@@ -54,7 +54,7 @@
   register: _
   failed_when: |
     _.oracle_facts.racs | length == 0 or
-    _.oracle_facts.racs[0].instance_name != 'XE'
+    _.oracle_facts.racs[0].instance_name != oracle_sid
 
 - name: get redolog facts
   oracle_facts:
