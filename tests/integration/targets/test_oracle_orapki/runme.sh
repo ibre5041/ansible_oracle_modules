@@ -29,4 +29,5 @@ cat > "$INVENTORY" <<EOF
 oracle ansible_connection=community.docker.docker ansible_host=$ORACLE_CONTAINER ansible_python_interpreter=$PYTHON_INTERP
 EOF
 
-ansible-playbook runme.yml -i "$INVENTORY" -e @../../integration_config.yml -v
+ROLES_PATH="$(cd .. && pwd)"
+ansible-playbook runme.yml -i "$INVENTORY" -e @../../integration_config.yml -e "ansible_roles_path=$ROLES_PATH" -v
