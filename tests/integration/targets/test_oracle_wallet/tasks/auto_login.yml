@@ -21,13 +21,13 @@
   register: _
   failed_when: _.failed
 
-- name: "create local auto-login keystore"
+- name: "create auto-login keystore (idempotent)"
   oracle_wallet:
     <<: *con_param
     state: present
-    auto_login: local_auto_login
+    auto_login: auto_login
     keystore_password: "{{ keystore_password }}"
   register: _
-  failed_when: _.failed
+  failed_when: _.failed or _.changed
 
 ...

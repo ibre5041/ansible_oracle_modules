@@ -109,7 +109,7 @@
   oracle_parameter:
     <<: *pdb_con_param
     name: "pga_aggregate_target"
-    value: "601M"
+    value: "350M"
     state: "present"
     scope: memory
   register: _
