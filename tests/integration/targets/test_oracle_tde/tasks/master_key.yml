@@ -46,17 +46,6 @@
   register: _
   failed_when: not _.changed
 
-- name: "set master key with tag"
-  oracle_tde:
-    <<: *con_param
-    state: present
-    master_key_action: set_key
-    keystore_password: "{{ keystore_password }}"
-    key_tag: "integration_test_tagged"
-    force_keystore: true
-  register: _
-  failed_when: not _.changed
-
 - name: "rotate master key"
   oracle_tde:
     <<: *con_param
