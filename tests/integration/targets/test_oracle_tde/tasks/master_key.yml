@@ -35,4 +35,26 @@
       - tde_status.master_key is defined
       - tde_status.master_key | length > 0
 
+- name: "set master key with tag and algorithm"
+  oracle_tde:
+    <<: *con_param
+    state: present
+    master_key_action: set_key
+    keystore_password: "{{ keystore_password }}"
+    algorithm: AES128
+    key_tag: "integration_test_tagged"
+    force_keystore: true
+  register: _
+  failed_when: not _.changed
+
+- name: "rotate master key"
+  oracle_tde:
+    <<: *con_param
+    state: present
+    master_key_action: rotate_key
+    keystore_password: "{{ keystore_password }}"
+    force_keystore: true
+  register: _
+  failed_when: not _.changed
+
 ...
