@@ -1,0 +1,32 @@
+---
+
+- name: "create Data Guard configuration"
+  oracle_dataguard:
+    oracle_home: "{{ oracle_home }}"
+    state: present
+    configuration_name: "{{ dg_configuration_name }}"
+    primary_database: "{{ dg_primary_database }}"
+    connect_identifier: "{{ dg_primary_connect_identifier }}"
+  register: _
+  failed_when: _.failed
+
+- name: "add standby database"
+  oracle_dataguard:
+    oracle_home: "{{ oracle_home }}"
+    state: present
+    database_name: "{{ dg_standby_database }}"
+    connect_identifier: "{{ dg_standby_connect_identifier }}"
+  register: _
+  failed_when: _.failed
+
+- name: "set database properties"
+  oracle_dataguard:
+    oracle_home: "{{ oracle_home }}"
+    state: present
+    database_name: "{{ dg_standby_database }}"
+    properties:
+      LogXptMode: SYNC
+  register: _
+  failed_when: _.failed
+
+...

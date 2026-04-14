@@ -284,6 +284,14 @@ except ImportError:
     def sanitize_string_params(_params):
         pass
 
+    def sql_single_quoted_literal(value):
+        if value is None:
+            return ''
+        s = str(value)
+        if s.startswith("'") and s.endswith("'"):
+            s = s[1:-1]
+        return s.replace("'", "''")
+
 
 if __name__ == '__main__':
     main()

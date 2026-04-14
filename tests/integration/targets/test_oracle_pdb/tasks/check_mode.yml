@@ -17,12 +17,11 @@
 - name: create a PDB
   oracle_pdb:
     <<: *con_param
-    pdb_name: "XEPDB2"
+    pdb_name: "TESTPDB2"
     state: "opened"
     pdb_admin_username: "foo"
     pdb_admin_password: "bar"
-    file_name_convert:
-      "/opt/oracle/oradata/XE/pdbseed": "/tmp/xepdb2/dbf01"
+    file_name_convert: "{{ {pdbseed_path: '/tmp/testpdb2/dbf01'} }}"
   check_mode: yes
   register: _
   failed_when: _.failed or not _.changed or _.diff['before']['state'] != 'absent'
@@ -30,7 +29,7 @@
 - name: check a PDB
   oracle_pdb:
     <<: *con_param
-    pdb_name: "XEPDB2"
+    pdb_name: "TESTPDB2"
     state: "present"
   register: _
   failed_when: not _.failed

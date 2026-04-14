@@ -9,7 +9,7 @@ jobs:
 
     services:
       oracle:
-        image: gvenzl/oracle-xe:21-slim
+        image: gvenzl/oracle-free:23-full
         env:
           ORACLE_PASSWORD: Oracle_4U
         ports:
@@ -19,7 +19,7 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 50
-          --health-start-period 90s
+          --health-start-period 300s
 
     steps:
       - uses: actions/checkout@v4
@@ -29,13 +29,21 @@ jobs:
           python-version: "3.11"
 
       - name: Install dependencies
-        run: pip install ansible oracledb
+        run: |
+          pip install ansible oracledb
+          ansible-galaxy collection install community.docker
 
       - name: Build and install collection
         run: |
           make build
           VERSION=$(grep ^version: galaxy.yml | cut -d" " -f2)
           ansible-galaxy collection install --force ibre5041-ansible_oracle_modules-${VERSION}.tar.gz
+
+      - name: Prepare Oracle container directories
+        run: |
+          CONTAINER_ID=$(docker ps -q --filter "ancestor=gvenzl/oracle-free:23-full")
+          docker exec "$CONTAINER_ID" mkdir -p /opt/oracle/admin/FREE/wallet
+          docker exec "$CONTAINER_ID" chown oracle:oinstall /opt/oracle/admin/FREE/wallet
 
       - name: Configure integration config (Docker)
         run: |
@@ -57,7 +65,11 @@ jobs:
               test_oracle_tablespace \
               test_oracle_parameter \
               test_oracle_pdb \
-              test_oracle_facts; do
+              test_oracle_facts \
+              test_oracle_wallet \
+              test_oracle_tde \
+              test_oracle_orapki \
+              test_oracle_dataguard; do
             echo ""
             echo "════════════════════════════════════════"
             echo "  Running: $ROLE"
