@@ -69,8 +69,8 @@
   oracle_pdb:
     <<: *con_cdb
     pdb_name: TESTPDB2
-    state: absent
-    unplug_file: "/tmp/testpdb2_unplug.xml"
+    state: unplugged
+    plug_file: "/tmp/testpdb2_unplug.xml"
   register: _
   failed_when: _.failed or _.changed == false
 
