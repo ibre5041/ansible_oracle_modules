@@ -101,21 +101,25 @@ def get_plan_directives(conn, plan_name):
     versions (ORA-00904 on Oracle Free / Standard Edition). Fall back to
     a query without those columns when the full query fails.
     """
-    try:
-        sql = """SELECT PLAN, GROUP_OR_SUBPLAN, TYPE, CPU_P1,
-                        PARALLEL_DEGREE_LIMIT_P1, ACTIVE_SESS_POOL_P1,
-                        MAX_IDLE_TIME, MAX_IDLE_BLOCKER_TIME,
-                        MAX_IOPS, MAX_MBPS
-                 FROM DBA_RSRC_PLAN_DIRECTIVES
-                 WHERE PLAN = UPPER(:name)"""
-        return conn.execute_select_to_dict(sql, {'name': plan_name})
-    except Exception:
-        sql = """SELECT PLAN, GROUP_OR_SUBPLAN, TYPE, CPU_P1,
-                        PARALLEL_DEGREE_LIMIT_P1, ACTIVE_SESS_POOL_P1,
-                        MAX_IDLE_TIME, MAX_IDLE_BLOCKER_TIME
-                 FROM DBA_RSRC_PLAN_DIRECTIVES
-                 WHERE PLAN = UPPER(:name)"""
-        return conn.execute_select_to_dict(sql, {'name': plan_name})
+    # execute_select_to_dict calls module.fail_json() on DB errors (raises SystemExit),
+    # so a bare except Exception cannot catch it. Use fail_on_error=False to get None
+    # back on error, then fall back to the edition-safe query without MAX_IOPS/MAX_MBPS.
+    sql = """SELECT PLAN, GROUP_OR_SUBPLAN, TYPE, CPU_P1,
+                    PARALLEL_DEGREE_LIMIT_P1, ACTIVE_SESS_POOL_P1,
+                    MAX_IDLE_TIME, MAX_IDLE_BLOCKER_TIME,
+                    MAX_IOPS, MAX_MBPS
+             FROM DBA_RSRC_PLAN_DIRECTIVES
+             WHERE PLAN = UPPER(:name)"""
+    result = conn.execute_select_to_dict(sql, {'name': plan_name}, fail_on_error=False)
+    if result is not None:
+        return result
+    # Fallback: MAX_IOPS/MAX_MBPS columns absent on this Oracle edition
+    sql = """SELECT PLAN, GROUP_OR_SUBPLAN, TYPE, CPU_P1,
+                    PARALLEL_DEGREE_LIMIT_P1, ACTIVE_SESS_POOL_P1,
+                    MAX_IDLE_TIME, MAX_IDLE_BLOCKER_TIME
+             FROM DBA_RSRC_PLAN_DIRECTIVES
+             WHERE PLAN = UPPER(:name)"""
+    return conn.execute_select_to_dict(sql, {'name': plan_name})
 
 
 def plan_exists(conn, plan_name):

@@ -197,6 +197,8 @@ def unplug_pdb(conn, module):
     run_sql.append(close_sql)
     run_sql.append(unplug_sql)
     run_sql.append(drop_sql)
+    # close/unplug/drop must run from CDB root, not from inside a PDB (ORA-65040)
+    conn.set_container("CDB$ROOT")
     for sql in run_sql:
         conn.execute_ddl(sql)
     msg = "Pluggable database %s successfully unplugged into '%s'" % (pdb_name, plug_file)

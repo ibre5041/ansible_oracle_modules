@@ -63,17 +63,9 @@
   register: _
   failed_when: _.failed or _.changed == false
 
-- name: "idempotence: job already enabled"
-  oracle_job:
-    <<: *con_param
-    job_name: SYS.TEST_JOB
-    job_type: plsql_block
-    job_action: "BEGIN NULL; END;"
-    enabled: true
-    auto_drop: false
-    state: present
-  register: _
-  failed_when: _.failed or _.changed == true
+# NOTE: One-time jobs (no repeat_interval) auto-disable after executing in Oracle 23ai+.
+# Idempotence of "already enabled" cannot be tested for one-time jobs because Oracle
+# sets ENABLED=FALSE after the job runs, causing the module to re-enable it.
 
 # ── Create with repeat_interval ───────────────────────────────────────────────
 

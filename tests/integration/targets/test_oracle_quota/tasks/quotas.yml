@@ -99,9 +99,11 @@
     sql: >
       SELECT count(*) AS cnt FROM dba_ts_quotas
       WHERE username = '{{ user | upper }}' AND tablespace_name = '{{ ts_1 | upper }}'
-      AND max_bytes = 0
+      AND (max_bytes = -1 OR max_bytes > 0)
   register: quota_result
-  failed_when: quota_result.failed or (quota_result.data | first)['cnt'] | int != 1
+  # Oracle may delete the row entirely or set max_bytes=0 when quota is revoked.
+  # Either way, there should be no row with a positive or unlimited (=-1) quota.
+  failed_when: quota_result.failed or (quota_result.data | first)['cnt'] | int != 0
 
 # ── Multiple tablespace quotas ────────────────────────────────────────────────
 

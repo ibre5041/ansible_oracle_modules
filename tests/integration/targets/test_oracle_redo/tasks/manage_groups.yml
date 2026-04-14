@@ -20,7 +20,7 @@
       user: "{{ oracle_username }}"
       password: "{{ oracle_password }}"
       mode: "{{ mode }}"
-      oracle_home: "{{ oracle_home | default() }}"
+      # oracle_redo does not accept oracle_home in its argument_spec
 
 - name: "define new-style CDB connection for oracle_sql"
   set_fact:

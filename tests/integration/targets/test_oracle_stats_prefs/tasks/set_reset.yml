@@ -55,7 +55,7 @@
   oracle_stats_prefs:
     <<: *con_param
     preference_name: ESTIMATE_PERCENT
-    preference_value: "AUTO_SAMPLE_SIZE"
+    preference_value: "100"
     state: present
   register: _
   failed_when: _.failed
@@ -84,7 +84,7 @@
   oracle_stats_prefs:
     <<: *con_param
     preference_name: ESTIMATE_PERCENT
-    preference_value: "AUTO_SAMPLE_SIZE"
+    preference_value: "100"
     state: absent
   register: _
   failed_when: _.failed

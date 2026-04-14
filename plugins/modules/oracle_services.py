@@ -240,7 +240,8 @@ def ensure_service_state(oc, module, msg):
         if preferred_instances and preferred_instances is not None:
             _wanted_pi = preferred_instances.split(',')
 
-        _curr_config,_curr_config_ai,_curr_config_pi = _get_service_config(oc, module, msg, oracle_home, name, database_name)
+        # _get_service_config uses run_command internally; cursor param is unused
+        _curr_config,_curr_config_ai,_curr_config_pi = _get_service_config(None, module, msg, name, database_name)
 
         # Compare instance configurations
         if _wanted_pi != _curr_config_pi:
