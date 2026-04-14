@@ -43,6 +43,7 @@ def _svc_params(**overrides):
         "clbgoal": None,
         "rlbgoal": None,
         "force": False,
+        "gi_managed": None,
     }
     base.update(overrides)
     return base

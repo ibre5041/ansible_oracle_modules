@@ -34,6 +34,34 @@
       mode: "{{ mode }}"
       oracle_home: "{{ oracle_home | default() }}"
 
+# ── Ensure OMF is configured so Oracle can auto-name the new redo log ─────────
+# Oracle 26ai requires db_create_file_dest (or db_create_online_log_dest_n)
+# to generate a file path when none is supplied to ALTER DATABASE ADD LOGFILE.
+
+- name: "query current db_create_file_dest value"
+  oracle_sql:
+    <<: *con_new
+    sql: "SELECT value AS val FROM v$parameter WHERE name = 'db_create_file_dest'"
+  register: omf_check
+
+- name: "record whether OMF destination was already set"
+  set_fact:
+    omf_was_empty: "{{ (omf_check.data | first)['val'] | default('') == '' }}"
+
+- name: "derive data directory from an existing datafile (used as OMF root)"
+  oracle_sql:
+    <<: *con_new
+    sql: "SELECT REGEXP_REPLACE(MAX(name), '[^/]+$', '') AS dir FROM v$datafile"
+  register: df_dir_result
+  when: omf_was_empty
+
+- name: "set db_create_file_dest so Oracle can place the new redo log"
+  oracle_sql:
+    <<: *con_new
+    sql: "ALTER SYSTEM SET db_create_file_dest = '{{ (df_dir_result.data | first)['dir'] }}' SCOPE=MEMORY"
+  when: omf_was_empty
+  failed_when: false
+
 # ── Read current state ────────────────────────────────────────────────────────
 
 - name: "query current redo log group count and size"
@@ -100,5 +128,14 @@
   debug:
     msg: "WARNING: Could not restore original redo group count — manual cleanup may be needed"
   when: restore_result.failed | default(false) or restore_result.changed == false
+
+# ── Restore db_create_file_dest if we set it ──────────────────────────────────
+
+- name: "reset db_create_file_dest if we set it for this test"
+  oracle_sql:
+    <<: *con_new
+    sql: "ALTER SYSTEM RESET db_create_file_dest SCOPE=MEMORY"
+  when: omf_was_empty | default(false)
+  failed_when: false
 
 ...

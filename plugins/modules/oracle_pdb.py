@@ -222,9 +222,12 @@ def create_pdb(conn, module):
     createsql = 'create pluggable database %s' % pdb_name
     #opensql = 'alter pluggable database %s open instances=all' % pdb_name
 
+    nocopy = module.params.get('nocopy', False)
+
     if plug_file:
-        # TODO: copy/nocopy tempfile reuse
         createsql += " using '%s'" % plug_file
+        if nocopy:
+            createsql += " NOCOPY"
     elif sourcedb:
         createsql += " from %s" % sourcedb
         if snapshot_copy:
@@ -414,6 +417,7 @@ def main():
             #unplug_dest            = dict(required=False, aliases=['plug_dest', 'upd', 'pd']),
             file_name_convert      = dict(type='dict', required=False, aliases=['fnc']),
             service_name_convert   = dict(type='dict', required=False, aliases=['snc']),
+            nocopy                 = dict(type='bool', default=False),
             default_tablespace_type = dict(default=None, choices=['smallfile', 'bigfile']),
             default_tablespace  = dict(required=False),
             default_temp_tablespace = dict(required=False),

@@ -527,7 +527,8 @@ def main():
             role                = dict(required=False, choices=["primary", "physical_standby", "logical_standby", "snapshot_standby"]),
             clbgoal             = dict(required=False, aliases=['clb']),
             rlbgoal             = dict(required=False, aliases=['rlb']),
-            force               = dict(default=False, type='bool')
+            force               = dict(default=False, type='bool'),
+            gi_managed          = dict(required=False, type='bool', default=None),
         ),
     )
     sanitize_string_params(module.params)
@@ -559,7 +560,11 @@ def main():
     ohomes.list_crs_instances()
     ohomes.list_processes()
     ohomes.parse_oratab()
-    gimanaged = ohomes.oracle_gi_managed
+    gi_managed_override = module.params.get('gi_managed')
+    if gi_managed_override is not None:
+        gimanaged = gi_managed_override
+    else:
+        gimanaged = ohomes.oracle_gi_managed
 
     # Decide whether to use srvctl or sqlplus
     if gimanaged:

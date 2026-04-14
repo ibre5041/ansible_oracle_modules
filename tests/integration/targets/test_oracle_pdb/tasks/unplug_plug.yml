@@ -122,6 +122,7 @@
     pdb_name: TESTPDB2
     state: opened
     plug_file: "/tmp/testpdb2_unplug.xml"
+    nocopy: true
   register: _
   failed_when: _.failed or _.changed == false
 

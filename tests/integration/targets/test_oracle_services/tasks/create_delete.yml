@@ -15,6 +15,7 @@
       oracle_home: "{{ oracle_home | default() }}"
       database_name: "{{ oracle_sid }}"
       pdb: "{{ oracle_pdb_service_name }}"
+      gi_managed: false
 
 # ── Setup ─────────────────────────────────────────────────────────────────────
 
