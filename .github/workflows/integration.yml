@@ -81,7 +81,6 @@ jobs:
               test_oracle_quota \
               test_oracle_privs \
               test_oracle_acl \
-              test_oracle_redo \
               test_oracle_stats_prefs \
               test_oracle_rsrc_consgroup \
               test_oracle_rsrc_plan \

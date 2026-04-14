@@ -84,7 +84,7 @@ Ces modules n'ont actuellement **aucune** cible d'intégration et sont bons cand
 | `oracle_jobschedule` | Scheduler | lié à `oracle_job` |
 | `oracle_jobwindow` | Scheduler | — |
 | `oracle_privs` | Sécurité | — |
-| `oracle_redo` | Storage | — |
+| `oracle_redo` | Storage | — | **Non testable en Docker/Oracle 26ai** : `ALTER DATABASE ADD LOGFILE` sans chemin explicite échoue ORA-02236 même avec OMF configuré |
 | `oracle_rsrc_consgroup` | Resource Manager | lié à `oracle_rsrc_plan` |
 | `oracle_rsrc_plan` | Resource Manager | — |
 | `oracle_services` | Services DB | via `DBMS_SERVICE` (non-CRS) |
@@ -150,7 +150,7 @@ La priorité est proportionnelle à (fréquence d'usage réel) × (faible coût 
 |---|---|---|
 | 12 | `test_oracle_privs` | Compléter par rapport à `oracle_grant` : WITH ADMIN / WITH GRANT OPTION granulaires |
 | 13 | `test_oracle_acl` | host ACL create/absent, principals, privilèges (connect/resolve) |
-| 14 | `test_oracle_redo` | add/drop redo log group, standby redo log, resize |
+| 14 | `test_oracle_redo` | ~~add/drop redo log group, standby redo log, resize~~ — retiré de CI (Oracle 26ai Free : ORA-02236 sans chemin explicite, même avec OMF) |
 | 15 | `test_oracle_services` | Service DB create/start/stop/drop via `DBMS_SERVICE` |
 | 16 | `test_oracle_rsrc_plan` | create simple plan, activate/deactivate |
 | 17 | `test_oracle_rsrc_consgroup` | create/delete consumer group, rattachement à un plan |
