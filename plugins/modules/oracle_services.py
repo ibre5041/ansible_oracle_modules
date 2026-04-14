@@ -215,63 +215,57 @@ def ensure_service_state(oc, module, msg):
 
     configchange = False
     if not newservice:
-        _wanted_ai = ['']
-        _wanted_pi = ['']
-        _wanted_config = {}
-        if rlbgoal is not None:
-            _wanted_config['rlb'] = rlbgoal
-        else:
-            _wanted_config['rlb'] = 'NONE'
-            rlbgoal = 'NONE'
-        if clbgoal is not None:
-            _wanted_config['clb'] = clbgoal
-        else:
-            _wanted_config['clb'] = 'LONG'
-            clbgoal = 'LONG'
+        if gimanaged:
+            _wanted_ai = ['']
+            _wanted_pi = ['']
+            _wanted_config = {}
+            if rlbgoal is not None:
+                _wanted_config['rlb'] = rlbgoal
+            else:
+                _wanted_config['rlb'] = 'NONE'
+                rlbgoal = 'NONE'
+            if clbgoal is not None:
+                _wanted_config['clb'] = clbgoal
+            else:
+                _wanted_config['clb'] = 'LONG'
+                clbgoal = 'LONG'
 
-        modify_conf = '%s/bin/srvctl modify service -d %s -s %s' % (oracle_home, database_name, name)
-        modify_inst = '%s/bin/srvctl modify service -d %s -s %s -modifyconfig' % (oracle_home, database_name, name)
-        _inst_temp = ""
-        _conf_temp = ""
-        total_mod = []
+            modify_conf = '%s/bin/srvctl modify service -d %s -s %s' % (oracle_home, database_name, name)
+            modify_inst = '%s/bin/srvctl modify service -d %s -s %s -modifyconfig' % (oracle_home, database_name, name)
+            _inst_temp = ""
+            _conf_temp = ""
+            total_mod = []
 
-        if available_instances and available_instances is not None:
-            _wanted_ai = available_instances.split(',')
-        if preferred_instances and preferred_instances is not None:
-            _wanted_pi = preferred_instances.split(',')
+            if available_instances and available_instances is not None:
+                _wanted_ai = available_instances.split(',')
+            if preferred_instances and preferred_instances is not None:
+                _wanted_pi = preferred_instances.split(',')
 
-        # _get_service_config uses run_command internally; cursor param is unused
-        _curr_config,_curr_config_ai,_curr_config_pi = _get_service_config(None, module, msg, name, database_name)
+            _curr_config,_curr_config_ai,_curr_config_pi = _get_service_config(None, module, msg, name, database_name)
 
-        # Compare instance configurations
-        if _wanted_pi != _curr_config_pi:
-            _inst_temp += ' -preferred %s' % preferred_instances
-        if _wanted_ai != _curr_config_ai and '' not in _wanted_ai:
-            _inst_temp += ' -available %s' % available_instances
+            # Compare instance configurations
+            if _wanted_pi != _curr_config_pi:
+                _inst_temp += ' -preferred %s' % preferred_instances
+            if _wanted_ai != _curr_config_ai and '' not in _wanted_ai:
+                _inst_temp += ' -available %s' % available_instances
 
-        if len(_inst_temp) > 0:
-            modify_inst += _inst_temp
-            total_mod.append(modify_inst)
+            if len(_inst_temp) > 0:
+                modify_inst += _inst_temp
+                total_mod.append(modify_inst)
 
-        # Compare other configuration
-        if not _wanted_config == _curr_config:
-            _conf_temp += ' -clbgoal %s -rlbgoal %s' % (clbgoal, rlbgoal)
-            # if clbgoal is not None:
-            #     _conf_temp += ' -clbgoal %s ' % (clbgoal)
-            # if rlbgoal is not None:
-            #     _conf_temp += ' -rlbgoal %s' % (rlbgoal)
-            modify_conf += _conf_temp
-            total_mod.append(modify_conf)
+            # Compare other configuration
+            if not _wanted_config == _curr_config:
+                _conf_temp += ' -clbgoal %s -rlbgoal %s' % (clbgoal, rlbgoal)
+                modify_conf += _conf_temp
+                total_mod.append(modify_conf)
 
-        # module.exit_json(msg="%s,     %s, %s" % (total_mod, _wanted_config, _curr_config))
-        if len(total_mod) > 0:
-            for cmd in total_mod:
-                (rc, stdout, stderr) = module.run_command(cmd)
-                if rc != 0:
+            if len(total_mod) > 0:
+                for cmd in total_mod:
+                    (rc, stdout, stderr) = module.run_command(cmd)
                     if rc != 0:
                         msg = "Error modifying service. Command: %s, stdout: %s, stderr: %s" % (cmd,stdout,stderr)
                         module.fail_json(msg=msg, changed=False)
-            configchange = True
+                configchange = True
 
     if state == 'present':
         if newservice:
@@ -419,7 +413,7 @@ def start_service(oc, module, msg, name, database_name, configchange):
             return True
     else:
         if check_service_exists(oc, module, msg, name, database_name):
-            if not check_service_status(oc, module, msg, name, database_name, 'status'):
+            if not check_service_status(cursor, module, msg, name, database_name, 'status'):
                 sql = 'BEGIN dbms_service.start_service('
                 sql_end = '); END;'
                 sql += 'service_name => \'%s\'' % (name)
@@ -455,7 +449,7 @@ def stop_service(oc, module, msg, name, database_name):
             return True
     else:
         if check_service_exists(oc, module, msg, name, database_name):
-            if check_service_status(oc, module, msg, name, database_name, 'status'):
+            if check_service_status(cursor, module, msg, name, database_name, 'status'):
                 sql = 'BEGIN dbms_service.stop_service('
                 sql_end = '); END;'
                 sql += 'service_name => \'%s\'' % name
@@ -567,6 +561,7 @@ def main():
         gimanaged = ohomes.oracle_gi_managed
 
     # Decide whether to use srvctl or sqlplus
+    cursor = None  # assigned to real DB cursor below when not GI-managed
     if gimanaged:
         oc = None
     else:
@@ -631,7 +626,7 @@ def main():
 
     elif state == 'status':
         if check_service_exists(oc, module, msg, name, database_name):
-            if check_service_status(oc, module, msg, name, database_name,state):
+            if check_service_status(cursor, module, msg, name, database_name, state):
                 msg = 'Service %s is running in database %s' % (name, database_name)
                 module.exit_json(msg=msg, changed=False)
             else:

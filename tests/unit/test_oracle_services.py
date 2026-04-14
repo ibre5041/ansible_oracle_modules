@@ -1025,6 +1025,75 @@ def test_main_non_gi_oracleconnection(monkeypatch):
     assert len(oc_calls) == 1
 
 
+def test_main_non_gi_present_idempotent(monkeypatch):
+    """Non-GI path: state=present, service already exists → exit changed=False; no srvctl called."""
+    mod = _load()
+    oc_calls = []
+
+    class _FakeCursor:
+        """Returns a row so execute_sql_get sees the service as existing."""
+        def execute(self, sql): return None
+        def fetchone(self): return ("test_svc",)
+
+    class _FakeConn:
+        def cursor(self): return _FakeCursor()
+
+    class _FakeOC:
+        conn = _FakeConn()
+
+    def fake_oc(module):
+        oc_calls.append(True)
+        return _FakeOC()
+
+    # No run_command responses — srvctl must never be called in non-GI mode.
+    Mod = _make_main_mod("present", [])
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "OracleHomes", _FakeOracleHomesNonGi, raising=False)
+    monkeypatch.setattr(mod, "gimanaged", True, raising=False)
+    monkeypatch.setattr(mod, "oracleConnection", fake_oc, raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    result = exc.value.args[0]
+    assert result["changed"] is False
+    assert "intended state" in result["msg"]
+    assert len(oc_calls) == 1
+
+
+def test_main_non_gi_status_running(monkeypatch):
+    """Non-GI path: state=status, service exists and is active → exit changed=False with running message."""
+    mod = _load()
+    oc_calls = []
+
+    class _FakeCursor:
+        """Returns a row for both check_service_exists and check_service_status SQL queries."""
+        def execute(self, sql): return None
+        def fetchone(self): return ("test_svc",)
+
+    class _FakeConn:
+        def cursor(self): return _FakeCursor()
+
+    class _FakeOC:
+        conn = _FakeConn()
+
+    def fake_oc(module):
+        oc_calls.append(True)
+        return _FakeOC()
+
+    Mod = _make_main_mod("status", [])
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "OracleHomes", _FakeOracleHomesNonGi, raising=False)
+    monkeypatch.setattr(mod, "gimanaged", True, raising=False)
+    monkeypatch.setattr(mod, "oracleConnection", fake_oc, raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    result = exc.value.args[0]
+    assert result["changed"] is False
+    assert "running" in result["msg"]
+    assert len(oc_calls) == 1
+
+
 def test_main_absent_remove_returns_false(monkeypatch):
     """main(): state=absent, service exists, remove returns False → exit changed=False (line 591)."""
     mod = _load()
