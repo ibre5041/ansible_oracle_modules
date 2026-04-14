@@ -1,0 +1,21 @@
+---
+# Note: there is no oracle_quota module. This target tests tablespace quota
+# management via ALTER USER ... QUOTA ... SQL statements executed through
+# oracle_sql, and verifies state via DBA_TS_QUOTAS.
+
+- name: Quota tests
+  block:
+    - include_tasks: "set_up.yml"
+      when: not running_on_adb
+
+    - include_tasks: "quotas.yml"
+      when: not running_on_adb
+
+    - include_tasks: "tear_down.yml"
+      when: not running_on_adb
+
+  environment:
+    ORACLE_SID: "{{ oracle_sid | default() }}"
+    ORACLE_HOME: "{{ oracle_home | default() }}"
+
+...

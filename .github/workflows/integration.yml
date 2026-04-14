@@ -77,7 +77,8 @@ jobs:
               test_oracle_jobwindow \
               test_oracle_job \
               test_oracle_audit \
-              test_oracle_flashback; do
+              test_oracle_flashback \
+              test_oracle_quota; do
             echo ""
             echo "════════════════════════════════════════"
             echo "  Running: $ROLE"

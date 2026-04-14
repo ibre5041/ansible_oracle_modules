@@ -41,7 +41,8 @@ test-docker: build integration-config-docker
 	    test_oracle_jobclass test_oracle_jobschedule test_oracle_jobwindow \
 	    test_oracle_job \
 	    test_oracle_audit \
-	    test_oracle_flashback; do \
+	    test_oracle_flashback \
+	    test_oracle_quota; do \
 	  echo ""; \
 	  echo "=== $$ROLE ==="; \
 	  $(MAKE) test ROLE=$$ROLE || FAILED="$$FAILED $$ROLE"; \
@@ -64,7 +65,8 @@ test-docker-ee: build integration-config-ee
 	    test_oracle_jobclass test_oracle_jobschedule test_oracle_jobwindow \
 	    test_oracle_job \
 	    test_oracle_audit \
-	    test_oracle_flashback; do \
+	    test_oracle_flashback \
+	    test_oracle_quota; do \
 	  echo ""; \
 	  echo "=== $$ROLE ==="; \
 	  $(MAKE) test ROLE=$$ROLE || FAILED="$$FAILED $$ROLE"; \

@@ -1,0 +1,123 @@
+---
+
+- name: "define connection parameters"
+  set_fact:
+    connection_parameters: &con_param
+      hostname: "{{ oracle_hostname }}"
+      port: "{{ oracle_port }}"
+      service_name: "{{ oracle_pdb_service_name | default(oracle_service_name) }}"
+      username: "{{ oracle_pdb_username | default(oracle_username) }}"
+      password: "{{ oracle_pdb_password | default(oracle_password) }}"
+      dsn: "{{ oracle_dsn | default() }}"
+      mode: "{{ mode }}"
+      oracle_home: "{{ oracle_home | default() }}"
+
+# ── Verify no quotas initially ────────────────────────────────────────────────
+
+- name: "verify user has no quota initially"
+  oracle_sql:
+    <<: *con_param
+    sql: "SELECT count(*) FROM dba_ts_quotas WHERE username = '{{ user | upper }}'"
+  register: quota_count
+  failed_when: quota_count.failed or (quota_count.data[0][0] | int) != 0
+
+# ── Fixed-size quota ──────────────────────────────────────────────────────────
+
+- name: "grant 5M quota on {{ ts_1 }}"
+  oracle_sql:
+    <<: *con_param
+    sql: "ALTER USER {{ user }} QUOTA 5M ON {{ ts_1 }}"
+  register: _
+  failed_when: _.failed
+
+- name: "verify 5M quota is set on {{ ts_1 }}"
+  oracle_sql:
+    <<: *con_param
+    sql: >
+      SELECT max_bytes FROM dba_ts_quotas
+      WHERE username = '{{ user | upper }}' AND tablespace_name = '{{ ts_1 | upper }}'
+  register: quota_result
+  failed_when: >
+    quota_result.failed or
+    quota_result.data | length == 0 or
+    (quota_result.data[0][0] | int) != 5242880
+
+- name: "change quota to 2M on {{ ts_1 }}"
+  oracle_sql:
+    <<: *con_param
+    sql: "ALTER USER {{ user }} QUOTA 2M ON {{ ts_1 }}"
+  register: _
+  failed_when: _.failed
+
+- name: "verify quota changed to 2M on {{ ts_1 }}"
+  oracle_sql:
+    <<: *con_param
+    sql: >
+      SELECT max_bytes FROM dba_ts_quotas
+      WHERE username = '{{ user | upper }}' AND tablespace_name = '{{ ts_1 | upper }}'
+  register: quota_result
+  failed_when: >
+    quota_result.failed or
+    quota_result.data | length == 0 or
+    (quota_result.data[0][0] | int) != 2097152
+
+# ── Unlimited quota ───────────────────────────────────────────────────────────
+
+- name: "grant unlimited quota on {{ ts_2 }}"
+  oracle_sql:
+    <<: *con_param
+    sql: "ALTER USER {{ user }} QUOTA UNLIMITED ON {{ ts_2 }}"
+  register: _
+  failed_when: _.failed
+
+- name: "verify unlimited quota on {{ ts_2 }} (max_bytes = -1)"
+  oracle_sql:
+    <<: *con_param
+    sql: >
+      SELECT max_bytes FROM dba_ts_quotas
+      WHERE username = '{{ user | upper }}' AND tablespace_name = '{{ ts_2 | upper }}'
+  register: quota_result
+  failed_when: >
+    quota_result.failed or
+    quota_result.data | length == 0 or
+    (quota_result.data[0][0] | int) != -1
+
+# ── Revoke quota (set to 0) ───────────────────────────────────────────────────
+
+- name: "revoke quota on {{ ts_1 }} (set to 0)"
+  oracle_sql:
+    <<: *con_param
+    sql: "ALTER USER {{ user }} QUOTA 0 ON {{ ts_1 }}"
+  register: _
+  failed_when: _.failed
+
+- name: "verify quota revoked on {{ ts_1 }}"
+  oracle_sql:
+    <<: *con_param
+    sql: >
+      SELECT count(*) FROM dba_ts_quotas
+      WHERE username = '{{ user | upper }}' AND tablespace_name = '{{ ts_1 | upper }}'
+      AND max_bytes = 0
+  register: quota_result
+  failed_when: quota_result.failed or (quota_result.data[0][0] | int) != 1
+
+# ── Multiple tablespace quotas ────────────────────────────────────────────────
+
+- name: "grant quota on {{ ts_3 }}"
+  oracle_sql:
+    <<: *con_param
+    sql: "ALTER USER {{ user }} QUOTA 1M ON {{ ts_3 }}"
+  register: _
+  failed_when: _.failed
+
+- name: "verify all active quotas for user"
+  oracle_sql:
+    <<: *con_param
+    sql: >
+      SELECT count(*) FROM dba_ts_quotas
+      WHERE username = '{{ user | upper }}' AND max_bytes != 0
+  register: quota_result
+  # ts_2 (unlimited), ts_3 (1M) — ts_1 was revoked (0)
+  failed_when: quota_result.failed or (quota_result.data[0][0] | int) != 2
+
+...

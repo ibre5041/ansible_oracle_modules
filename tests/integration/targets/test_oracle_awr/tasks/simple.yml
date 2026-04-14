@@ -16,7 +16,7 @@
   debug:
     var: connection_parameters
 
-- name: "Set AWR intervals, reset to database defaults"
+- name: "Read current AWR settings (set to known baseline: 60min / 8 days)"
   oracle_awr:
     <<: *con_param
     snapshot_interval_min: "60"
@@ -24,28 +24,36 @@
   register: awr_defaults
   failed_when: awr_defaults.failed
 
-- name: "Set AWR intervals, reset to database defaults(again)"
-  oracle_awr:
-    <<: *con_param
-    snapshot_interval_min: "{{ awr_defaults.snap_interval }}"
-    snapshot_retention_days: "{{ awr_defaults.retention }}"    
-  register: _
-  failed_when: _.failed or _.changed
-  
-- name: "Set AWR intervals: 30 minutes, retention: 10 days "
-  oracle_awr:
-    <<: *con_param
-    snapshot_interval_min: "30"
-    snapshot_retention_days: "10"
-  register: _
-  failed_when: _.failed
-
-- name: "Reset AWR intervals"
+- name: "Idempotence: same settings again — no change expected"
   oracle_awr:
     <<: *con_param
     snapshot_interval_min: "{{ awr_defaults.snap_interval }}"
     snapshot_retention_days: "{{ awr_defaults.retention }}"
   register: _
-  failed_when: _.failed
+  failed_when: _.failed or _.changed
+
+- name: "Change AWR settings: 30 minutes, 10 days"
+  oracle_awr:
+    <<: *con_param
+    snapshot_interval_min: "30"
+    snapshot_retention_days: "10"
+  register: _
+  failed_when: _.failed or _.changed == false
+
+- name: "Idempotence: same settings again — no change expected"
+  oracle_awr:
+    <<: *con_param
+    snapshot_interval_min: "30"
+    snapshot_retention_days: "10"
+  register: _
+  failed_when: _.failed or _.changed
+
+- name: "Reset AWR settings to baseline"
+  oracle_awr:
+    <<: *con_param
+    snapshot_interval_min: "{{ awr_defaults.snap_interval }}"
+    snapshot_retention_days: "{{ awr_defaults.retention }}"
+  register: _
+  failed_when: _.failed or _.changed == false
   
 ...
