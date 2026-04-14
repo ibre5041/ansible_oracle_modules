@@ -1,0 +1,11 @@
+---
+
+- name: Flashback restore point tests
+  block:
+    - include_tasks: "create_delete.yml"
+
+  environment:
+    ORACLE_SID: "{{ oracle_sid | default() }}"
+    ORACLE_HOME: "{{ oracle_home | default() }}"
+
+...
