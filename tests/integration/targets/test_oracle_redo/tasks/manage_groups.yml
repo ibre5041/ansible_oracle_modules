@@ -7,6 +7,9 @@
 # NOTE: Dropping groups only works on non-current (inactive) log groups.
 # The restore step uses failed_when: false to avoid test failure if the
 # database cannot immediately switch to make a group inactive.
+#
+# oracle_sql returns data as list of dicts (column name as key).
+# Use (result.data | first)['alias'] — never numeric indices.
 
 - name: "define CDB connection parameters"
   set_fact:
@@ -36,14 +39,14 @@
 - name: "query current redo log group count and size"
   oracle_sql:
     <<: *con_new
-    sql: "SELECT count(*), max(bytes)/1024/1024 FROM v$log"
+    sql: "SELECT count(*) AS cnt, max(bytes)/1024/1024 AS size_mb FROM v$log"
   register: current_redo
   failed_when: current_redo.failed
 
 - name: "set baseline facts"
   set_fact:
-    baseline_groups: "{{ current_redo.data[0][0] | int }}"
-    baseline_size_mb: "{{ current_redo.data[0][1] | int }}"
+    baseline_groups: "{{ (current_redo.data | first)['cnt'] | int }}"
+    baseline_size_mb: "{{ (current_redo.data | first)['size_mb'] | int }}"
 
 - name: "debug: current redo configuration"
   debug:
@@ -63,11 +66,11 @@
 - name: "verify group count increased"
   oracle_sql:
     <<: *con_new
-    sql: "SELECT count(*) FROM v$log"
+    sql: "SELECT count(*) AS cnt FROM v$log"
   register: new_count
   failed_when: >
     new_count.failed or
-    (new_count.data[0][0] | int) != (baseline_groups | int + 1)
+    (new_count.data | first)['cnt'] | int != baseline_groups | int + 1
 
 - name: "idempotence: same group count, no change"
   oracle_redo:

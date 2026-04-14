@@ -61,7 +61,7 @@
     <<: *con_cdb
     sql: "SELECT count(*) FROM v$pdbs WHERE name = 'TESTPDB2'"
   register: pdb_check
-  failed_when: pdb_check.failed or (pdb_check.data[0][0] | int) != 1
+  failed_when: pdb_check.failed or (pdb_check.data | first)['count(*)'] | int != 1
 
 # ── Step 2: Unplug TESTPDB2 ───────────────────────────────────────────────────
 
@@ -81,7 +81,7 @@
     <<: *con_cdb
     sql: "SELECT count(*) FROM v$pdbs WHERE name = 'TESTPDB2'"
   register: pdb_check
-  failed_when: pdb_check.failed or (pdb_check.data[0][0] | int) != 0
+  failed_when: pdb_check.failed or (pdb_check.data | first)['count(*)'] | int != 0
 
 # ── Step 4: Plug as TESTPDB3 (copy datafiles to new path) ────────────────────
 
@@ -102,7 +102,7 @@
     <<: *con_cdb
     sql: "SELECT count(*) FROM v$pdbs WHERE name = 'TESTPDB3'"
   register: pdb_check
-  failed_when: pdb_check.failed or (pdb_check.data[0][0] | int) != 1
+  failed_when: pdb_check.failed or (pdb_check.data | first)['count(*)'] | int != 1
 
 # ── Step 6: Drop TESTPDB3 (including its copied datafiles) ───────────────────
 
@@ -130,7 +130,7 @@
     <<: *con_cdb
     sql: "SELECT count(*) FROM v$pdbs WHERE name = 'TESTPDB2' AND open_mode = 'READ WRITE'"
   register: pdb_check
-  failed_when: pdb_check.failed or (pdb_check.data[0][0] | int) != 1
+  failed_when: pdb_check.failed or (pdb_check.data | first)['count(*)'] | int != 1
 
 # ── Step 8: Final cleanup ─────────────────────────────────────────────────────
 

@@ -557,10 +557,10 @@ def main():
     ohomes.list_crs_instances()
     ohomes.list_processes()
     ohomes.parse_oratab()
-    #ohomes.oracle_gi_managed = False# TODO REMOVE - override GI presence for testing
+    gimanaged = ohomes.oracle_gi_managed
 
     # Decide whether to use srvctl or sqlplus
-    if ohomes.oracle_gi_managed:
+    if gimanaged:
         oc = None
     else:
         oc = oracleConnection(module)

@@ -1,6 +1,8 @@
 ---
 
-# oracle_jobwindow uses old-style 'user' parameter (not 'username')
+# oracle_jobwindow uses old-style 'user' parameter (not 'username').
+# NOTE: The module validates duration_min/duration_hour unconditionally,
+# even for state: absent. All tasks must include one duration parameter.
 - name: "define connection parameters"
   set_fact:
     connection_parameters: &con_param
@@ -19,6 +21,7 @@
     <<: *con_param
     name: TEST_WINDOW
     repeat_interval: "FREQ=DAILY;BYHOUR=22;BYMINUTE=0"
+    duration_hour: 1
     state: absent
   failed_when: false
 
@@ -75,6 +78,7 @@
     <<: *con_param
     name: TEST_WINDOW
     repeat_interval: "FREQ=DAILY;BYHOUR=22;BYMINUTE=0"
+    duration_hour: 1
     state: absent
   register: _
   failed_when: _.failed or _.changed == false
@@ -84,6 +88,7 @@
     <<: *con_param
     name: TEST_WINDOW
     repeat_interval: "FREQ=DAILY;BYHOUR=22;BYMINUTE=0"
+    duration_hour: 1
     state: absent
   register: _
   failed_when: _.failed or _.changed == true

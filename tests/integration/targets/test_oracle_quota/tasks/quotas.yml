@@ -1,4 +1,6 @@
 ---
+# oracle_sql returns data as list of dicts (column name as key).
+# Use (result.data | first)['column'] — never numeric indices.
 
 - name: "define connection parameters"
   set_fact:
@@ -17,9 +19,9 @@
 - name: "verify user has no quota initially"
   oracle_sql:
     <<: *con_param
-    sql: "SELECT count(*) FROM dba_ts_quotas WHERE username = '{{ user | upper }}'"
+    sql: "SELECT count(*) AS cnt FROM dba_ts_quotas WHERE username = '{{ user | upper }}'"
   register: quota_count
-  failed_when: quota_count.failed or (quota_count.data[0][0] | int) != 0
+  failed_when: quota_count.failed or (quota_count.data | first)['cnt'] | int != 0
 
 # ── Fixed-size quota ──────────────────────────────────────────────────────────
 
@@ -40,7 +42,7 @@
   failed_when: >
     quota_result.failed or
     quota_result.data | length == 0 or
-    (quota_result.data[0][0] | int) != 5242880
+    (quota_result.data | first)['max_bytes'] | int != 5242880
 
 - name: "change quota to 2M on {{ ts_1 }}"
   oracle_sql:
@@ -59,7 +61,7 @@
   failed_when: >
     quota_result.failed or
     quota_result.data | length == 0 or
-    (quota_result.data[0][0] | int) != 2097152
+    (quota_result.data | first)['max_bytes'] | int != 2097152
 
 # ── Unlimited quota ───────────────────────────────────────────────────────────
 
@@ -80,7 +82,7 @@
   failed_when: >
     quota_result.failed or
     quota_result.data | length == 0 or
-    (quota_result.data[0][0] | int) != -1
+    (quota_result.data | first)['max_bytes'] | int != -1
 
 # ── Revoke quota (set to 0) ───────────────────────────────────────────────────
 
@@ -95,11 +97,11 @@
   oracle_sql:
     <<: *con_param
     sql: >
-      SELECT count(*) FROM dba_ts_quotas
+      SELECT count(*) AS cnt FROM dba_ts_quotas
       WHERE username = '{{ user | upper }}' AND tablespace_name = '{{ ts_1 | upper }}'
       AND max_bytes = 0
   register: quota_result
-  failed_when: quota_result.failed or (quota_result.data[0][0] | int) != 1
+  failed_when: quota_result.failed or (quota_result.data | first)['cnt'] | int != 1
 
 # ── Multiple tablespace quotas ────────────────────────────────────────────────
 
@@ -114,10 +116,10 @@
   oracle_sql:
     <<: *con_param
     sql: >
-      SELECT count(*) FROM dba_ts_quotas
+      SELECT count(*) AS cnt FROM dba_ts_quotas
       WHERE username = '{{ user | upper }}' AND max_bytes != 0
   register: quota_result
   # ts_2 (unlimited), ts_3 (1M) — ts_1 was revoked (0)
-  failed_when: quota_result.failed or (quota_result.data[0][0] | int) != 2
+  failed_when: quota_result.failed or (quota_result.data | first)['cnt'] | int != 2
 
 ...

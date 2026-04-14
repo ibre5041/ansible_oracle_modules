@@ -17,7 +17,7 @@
 - name: "cleanup: drop schedule if exists"
   oracle_jobschedule:
     <<: *con_param
-    name: TEST_SCHEDULE
+    name: SYS.TEST_SCHEDULE
     repeat_interval: "FREQ=DAILY"
     state: absent
   failed_when: false
@@ -27,7 +27,7 @@
 - name: "create schedule"
   oracle_jobschedule:
     <<: *con_param
-    name: TEST_SCHEDULE
+    name: SYS.TEST_SCHEDULE
     repeat_interval: "FREQ=DAILY;BYHOUR=2;BYMINUTE=0"
     comments: "Integration test schedule"
     state: present
@@ -37,7 +37,7 @@
 - name: "idempotence: schedule already present"
   oracle_jobschedule:
     <<: *con_param
-    name: TEST_SCHEDULE
+    name: SYS.TEST_SCHEDULE
     repeat_interval: "FREQ=DAILY;BYHOUR=2;BYMINUTE=0"
     comments: "Integration test schedule"
     state: present
@@ -49,7 +49,7 @@
 - name: "drop schedule"
   oracle_jobschedule:
     <<: *con_param
-    name: TEST_SCHEDULE
+    name: SYS.TEST_SCHEDULE
     repeat_interval: "FREQ=DAILY;BYHOUR=2;BYMINUTE=0"
     state: absent
   register: _
@@ -58,7 +58,7 @@
 - name: "idempotence: drop absent schedule"
   oracle_jobschedule:
     <<: *con_param
-    name: TEST_SCHEDULE
+    name: SYS.TEST_SCHEDULE
     repeat_interval: "FREQ=DAILY;BYHOUR=2;BYMINUTE=0"
     state: absent
   register: _

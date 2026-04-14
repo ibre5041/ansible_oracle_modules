@@ -17,7 +17,7 @@
 - name: "cleanup: drop job if exists"
   oracle_job:
     <<: *con_param
-    job_name: TEST_JOB
+    job_name: SYS.TEST_JOB
     state: absent
   failed_when: false
 
@@ -26,7 +26,7 @@
 - name: "create PL/SQL block job (disabled)"
   oracle_job:
     <<: *con_param
-    job_name: TEST_JOB
+    job_name: SYS.TEST_JOB
     job_type: plsql_block
     job_action: "BEGIN NULL; END;"
     enabled: false
@@ -39,7 +39,7 @@
 - name: "idempotence: job already present"
   oracle_job:
     <<: *con_param
-    job_name: TEST_JOB
+    job_name: SYS.TEST_JOB
     job_type: plsql_block
     job_action: "BEGIN NULL; END;"
     enabled: false
@@ -54,7 +54,7 @@
 - name: "enable job"
   oracle_job:
     <<: *con_param
-    job_name: TEST_JOB
+    job_name: SYS.TEST_JOB
     job_type: plsql_block
     job_action: "BEGIN NULL; END;"
     enabled: true
@@ -66,7 +66,7 @@
 - name: "idempotence: job already enabled"
   oracle_job:
     <<: *con_param
-    job_name: TEST_JOB
+    job_name: SYS.TEST_JOB
     job_type: plsql_block
     job_action: "BEGIN NULL; END;"
     enabled: true
@@ -80,14 +80,14 @@
 - name: "cleanup: drop scheduled job if exists"
   oracle_job:
     <<: *con_param
-    job_name: TEST_JOB_SCHEDULED
+    job_name: SYS.TEST_JOB_SCHEDULED
     state: absent
   failed_when: false
 
 - name: "create job with repeat_interval"
   oracle_job:
     <<: *con_param
-    job_name: TEST_JOB_SCHEDULED
+    job_name: SYS.TEST_JOB_SCHEDULED
     job_type: plsql_block
     job_action: "BEGIN NULL; END;"
     repeat_interval: "FREQ=HOURLY"
@@ -100,7 +100,7 @@
 - name: "drop scheduled job"
   oracle_job:
     <<: *con_param
-    job_name: TEST_JOB_SCHEDULED
+    job_name: SYS.TEST_JOB_SCHEDULED
     state: absent
   register: _
   failed_when: _.failed or _.changed == false
@@ -110,7 +110,7 @@
 - name: "drop job"
   oracle_job:
     <<: *con_param
-    job_name: TEST_JOB
+    job_name: SYS.TEST_JOB
     state: absent
   register: _
   failed_when: _.failed or _.changed == false
@@ -118,7 +118,7 @@
 - name: "idempotence: drop absent job"
   oracle_job:
     <<: *con_param
-    job_name: TEST_JOB
+    job_name: SYS.TEST_JOB
     state: absent
   register: _
   failed_when: _.failed or _.changed == true

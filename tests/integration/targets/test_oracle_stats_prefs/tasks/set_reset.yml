@@ -10,7 +10,6 @@
       user: "{{ oracle_pdb_username | default(oracle_username) }}"
       password: "{{ oracle_pdb_password | default(oracle_password) }}"
       mode: "{{ mode }}"
-      oracle_home: "{{ oracle_home | default() }}"
 
 # ── Set a preference ──────────────────────────────────────────────────────────
 
