@@ -1,0 +1,101 @@
+---
+# oracle_redo uses old-style 'user' parameter (not 'username').
+# The module is declarative: it ensures exactly N groups of the given size exist.
+# Redo logs are CDB-level objects: connect to CDB (oracle_service_name).
+#
+# Strategy: query current group count, add one group, verify, restore.
+# NOTE: Dropping groups only works on non-current (inactive) log groups.
+# The restore step uses failed_when: false to avoid test failure if the
+# database cannot immediately switch to make a group inactive.
+
+- name: "define CDB connection parameters"
+  set_fact:
+    connection_parameters: &con_param
+      hostname: "{{ oracle_hostname }}"
+      port: "{{ oracle_port }}"
+      service_name: "{{ oracle_service_name }}"
+      user: "{{ oracle_username }}"
+      password: "{{ oracle_password }}"
+      mode: "{{ mode }}"
+      oracle_home: "{{ oracle_home | default() }}"
+
+- name: "define new-style CDB connection for oracle_sql"
+  set_fact:
+    con_new: &con_new
+      hostname: "{{ oracle_hostname }}"
+      port: "{{ oracle_port }}"
+      service_name: "{{ oracle_service_name }}"
+      username: "{{ oracle_username }}"
+      password: "{{ oracle_password }}"
+      dsn: "{{ oracle_dsn | default() }}"
+      mode: "{{ mode }}"
+      oracle_home: "{{ oracle_home | default() }}"
+
+# ── Read current state ────────────────────────────────────────────────────────
+
+- name: "query current redo log group count and size"
+  oracle_sql:
+    <<: *con_new
+    sql: "SELECT count(*), max(bytes)/1024/1024 FROM v$log"
+  register: current_redo
+  failed_when: current_redo.failed
+
+- name: "set baseline facts"
+  set_fact:
+    baseline_groups: "{{ current_redo.data[0][0] | int }}"
+    baseline_size_mb: "{{ current_redo.data[0][1] | int }}"
+
+- name: "debug: current redo configuration"
+  debug:
+    msg: "Current redo: {{ baseline_groups }} groups × {{ baseline_size_mb }}M"
+
+# ── Add one group ─────────────────────────────────────────────────────────────
+
+- name: "add one redo log group ({{ baseline_groups | int + 1 }} groups)"
+  oracle_redo:
+    <<: *con_param
+    log_type: redo
+    size: "{{ baseline_size_mb }}M"
+    groups: "{{ baseline_groups | int + 1 }}"
+  register: _
+  failed_when: _.failed or _.changed == false
+
+- name: "verify group count increased"
+  oracle_sql:
+    <<: *con_new
+    sql: "SELECT count(*) FROM v$log"
+  register: new_count
+  failed_when: >
+    new_count.failed or
+    (new_count.data[0][0] | int) != (baseline_groups | int + 1)
+
+- name: "idempotence: same group count, no change"
+  oracle_redo:
+    <<: *con_param
+    log_type: redo
+    size: "{{ baseline_size_mb }}M"
+    groups: "{{ baseline_groups | int + 1 }}"
+  register: _
+  failed_when: _.failed or _.changed == true
+
+# ── Restore original group count ──────────────────────────────────────────────
+# Oracle can only drop non-current (INACTIVE) log groups.
+# If only one group is inactive (the newly added one), this should succeed.
+
+- name: "restore original redo log count ({{ baseline_groups }} groups)"
+  oracle_redo:
+    <<: *con_param
+    log_type: redo
+    size: "{{ baseline_size_mb }}M"
+    groups: "{{ baseline_groups }}"
+  register: restore_result
+  # Use failed_when: false — active log group cannot be dropped.
+  # The test verifies the add succeeded; restore is best-effort.
+  failed_when: false
+
+- name: "warn if restore did not succeed"
+  debug:
+    msg: "WARNING: Could not restore original redo group count — manual cleanup may be needed"
+  when: restore_result.failed | default(false) or restore_result.changed == false
+
+...

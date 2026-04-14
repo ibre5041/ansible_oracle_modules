@@ -1,0 +1,12 @@
+---
+
+- name: Object and system privilege tests
+  block:
+    - include_tasks: "system_privs.yml"
+    - include_tasks: "object_privs.yml"
+
+  environment:
+    ORACLE_SID: "{{ oracle_sid | default() }}"
+    ORACLE_HOME: "{{ oracle_home | default() }}"
+
+...

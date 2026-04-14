@@ -1,0 +1,11 @@
+---
+
+- name: DBMS_STATS global preferences tests
+  block:
+    - include_tasks: "set_reset.yml"
+
+  environment:
+    ORACLE_SID: "{{ oracle_sid | default() }}"
+    ORACLE_HOME: "{{ oracle_home | default() }}"
+
+...

@@ -42,7 +42,13 @@ test-docker: build integration-config-docker
 	    test_oracle_job \
 	    test_oracle_audit \
 	    test_oracle_flashback \
-	    test_oracle_quota; do \
+	    test_oracle_quota \
+	    test_oracle_privs \
+	    test_oracle_acl \
+	    test_oracle_redo \
+	    test_oracle_stats_prefs \
+	    test_oracle_rsrc_consgroup test_oracle_rsrc_plan \
+	    test_oracle_services; do \
 	  echo ""; \
 	  echo "=== $$ROLE ==="; \
 	  $(MAKE) test ROLE=$$ROLE || FAILED="$$FAILED $$ROLE"; \
@@ -66,7 +72,13 @@ test-docker-ee: build integration-config-ee
 	    test_oracle_job \
 	    test_oracle_audit \
 	    test_oracle_flashback \
-	    test_oracle_quota; do \
+	    test_oracle_quota \
+	    test_oracle_privs \
+	    test_oracle_acl \
+	    test_oracle_redo \
+	    test_oracle_stats_prefs \
+	    test_oracle_rsrc_consgroup test_oracle_rsrc_plan \
+	    test_oracle_services; do \
 	  echo ""; \
 	  echo "=== $$ROLE ==="; \
 	  $(MAKE) test ROLE=$$ROLE || FAILED="$$FAILED $$ROLE"; \

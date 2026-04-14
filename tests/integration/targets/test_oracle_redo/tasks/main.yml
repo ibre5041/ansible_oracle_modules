@@ -1,0 +1,11 @@
+---
+
+- name: Redo log tests
+  block:
+    - include_tasks: "manage_groups.yml"
+
+  environment:
+    ORACLE_SID: "{{ oracle_sid | default() }}"
+    ORACLE_HOME: "{{ oracle_home | default() }}"
+
+...

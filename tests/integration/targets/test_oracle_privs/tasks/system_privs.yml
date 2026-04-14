@@ -1,0 +1,126 @@
+---
+# oracle_privs uses old-style 'user' parameter (not 'username')
+
+- name: "define connection parameters"
+  set_fact:
+    connection_parameters: &con_param
+      hostname: "{{ oracle_hostname }}"
+      port: "{{ oracle_port }}"
+      service_name: "{{ oracle_pdb_service_name | default(oracle_service_name) }}"
+      user: "{{ oracle_pdb_username | default(oracle_username) }}"
+      password: "{{ oracle_pdb_password | default(oracle_password) }}"
+      mode: "{{ mode }}"
+      oracle_home: "{{ oracle_home | default() }}"
+
+# ── Setup ─────────────────────────────────────────────────────────────────────
+
+- name: "setup: create test user for privilege tests"
+  oracle_user:
+    hostname: "{{ oracle_hostname }}"
+    port: "{{ oracle_port }}"
+    service_name: "{{ oracle_pdb_service_name | default(oracle_service_name) }}"
+    username: "{{ oracle_pdb_username | default(oracle_username) }}"
+    password: "{{ oracle_pdb_password | default(oracle_password) }}"
+    mode: "{{ mode }}"
+    oracle_home: "{{ oracle_home | default() }}"
+    schema_name: "U_PRIVS_TEST"
+    state: present
+  failed_when: false
+
+# ── System privileges ─────────────────────────────────────────────────────────
+
+- name: "grant CREATE TABLE system privilege"
+  oracle_privs:
+    <<: *con_param
+    privs:
+      - CREATE TABLE
+    roles:
+      - U_PRIVS_TEST
+    state: present
+  register: _
+  failed_when: _.failed or _.changed == false
+
+- name: "idempotence: privilege already granted"
+  oracle_privs:
+    <<: *con_param
+    privs:
+      - CREATE TABLE
+    roles:
+      - U_PRIVS_TEST
+    state: present
+  register: _
+  failed_when: _.failed or _.changed == true
+
+- name: "grant multiple system privileges"
+  oracle_privs:
+    <<: *con_param
+    privs:
+      - CREATE VIEW
+      - CREATE SEQUENCE
+    roles:
+      - U_PRIVS_TEST
+    state: present
+  register: _
+  failed_when: _.failed or _.changed == false
+
+- name: "idempotence: multiple privileges already granted"
+  oracle_privs:
+    <<: *con_param
+    privs:
+      - CREATE VIEW
+      - CREATE SEQUENCE
+    roles:
+      - U_PRIVS_TEST
+    state: present
+  register: _
+  failed_when: _.failed or _.changed == true
+
+- name: "revoke CREATE TABLE privilege"
+  oracle_privs:
+    <<: *con_param
+    privs:
+      - CREATE TABLE
+    roles:
+      - U_PRIVS_TEST
+    state: absent
+  register: _
+  failed_when: _.failed or _.changed == false
+
+- name: "idempotence: revoke already-absent privilege"
+  oracle_privs:
+    <<: *con_param
+    privs:
+      - CREATE TABLE
+    roles:
+      - U_PRIVS_TEST
+    state: absent
+  register: _
+  failed_when: _.failed or _.changed == true
+
+# ── Cleanup ───────────────────────────────────────────────────────────────────
+
+- name: "cleanup: revoke remaining privileges"
+  oracle_privs:
+    <<: *con_param
+    privs:
+      - CREATE VIEW
+      - CREATE SEQUENCE
+    roles:
+      - U_PRIVS_TEST
+    state: absent
+  failed_when: false
+
+- name: "cleanup: drop test user"
+  oracle_user:
+    hostname: "{{ oracle_hostname }}"
+    port: "{{ oracle_port }}"
+    service_name: "{{ oracle_pdb_service_name | default(oracle_service_name) }}"
+    username: "{{ oracle_pdb_username | default(oracle_username) }}"
+    password: "{{ oracle_pdb_password | default(oracle_password) }}"
+    mode: "{{ mode }}"
+    oracle_home: "{{ oracle_home | default() }}"
+    schema_name: "U_PRIVS_TEST"
+    state: absent
+  failed_when: false
+
+...
