@@ -12,17 +12,22 @@
       mode: "{{ mode }}"
       oracle_home: "{{ oracle_home | default() }}"
 
+- name: "define new-style connection for setup modules"
+  set_fact:
+    con_new: &con_new
+      hostname: "{{ oracle_hostname }}"
+      port: "{{ oracle_port }}"
+      service_name: "{{ oracle_pdb_service_name | default(oracle_service_name) }}"
+      username: "{{ oracle_pdb_username | default(oracle_username) }}"
+      password: "{{ oracle_pdb_password | default(oracle_password) }}"
+      mode: "{{ mode }}"
+      oracle_home: "{{ oracle_home | default() }}"
+
 # ── Setup ─────────────────────────────────────────────────────────────────────
 
 - name: "setup: create test user for privilege tests"
   oracle_user:
-    hostname: "{{ oracle_hostname }}"
-    port: "{{ oracle_port }}"
-    service_name: "{{ oracle_pdb_service_name | default(oracle_service_name) }}"
-    username: "{{ oracle_pdb_username | default(oracle_username) }}"
-    password: "{{ oracle_pdb_password | default(oracle_password) }}"
-    mode: "{{ mode }}"
-    oracle_home: "{{ oracle_home | default() }}"
+    <<: *con_new
     schema_name: "U_PRIVS_TEST"
     state: present
   failed_when: false
@@ -112,13 +117,7 @@
 
 - name: "cleanup: drop test user"
   oracle_user:
-    hostname: "{{ oracle_hostname }}"
-    port: "{{ oracle_port }}"
-    service_name: "{{ oracle_pdb_service_name | default(oracle_service_name) }}"
-    username: "{{ oracle_pdb_username | default(oracle_username) }}"
-    password: "{{ oracle_pdb_password | default(oracle_password) }}"
-    mode: "{{ mode }}"
-    oracle_home: "{{ oracle_home | default() }}"
+    <<: *con_new
     schema_name: "U_PRIVS_TEST"
     state: absent
   failed_when: false

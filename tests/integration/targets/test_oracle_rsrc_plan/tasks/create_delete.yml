@@ -12,6 +12,17 @@
       mode: "{{ mode }}"
       oracle_home: "{{ oracle_home | default() }}"
 
+- name: "define new-style connection for oracle_sql"
+  set_fact:
+    con_sql: &con_sql
+      hostname: "{{ oracle_hostname }}"
+      port: "{{ oracle_port }}"
+      service_name: "{{ oracle_pdb_service_name | default(oracle_service_name) }}"
+      username: "{{ oracle_pdb_username | default(oracle_username) }}"
+      password: "{{ oracle_pdb_password | default(oracle_password) }}"
+      mode: "{{ mode }}"
+      oracle_home: "{{ oracle_home | default() }}"
+
 # ── Setup ─────────────────────────────────────────────────────────────────────
 
 - name: "cleanup: drop test plan if exists"
@@ -103,13 +114,14 @@
   register: _
   failed_when: _.failed or _.changed == true
 
-# ── Restore default plan before cleanup ───────────────────────────────────────
+# ── Deactivate before cleanup ─────────────────────────────────────────────────
+# Use SQL directly: oracle_rsrc_plan state:active cannot guarantee deactivation
+# if DEFAULT_PLAN doesn't exist. Empty string unambiguously deactivates any plan.
 
-- name: "restore default resource plan"
-  oracle_rsrc_plan:
-    <<: *con_param
-    plan: DEFAULT_PLAN
-    state: active
+- name: "deactivate resource manager plan before drop"
+  oracle_sql:
+    <<: *con_sql
+    sql: "ALTER SYSTEM SET RESOURCE_MANAGER_PLAN = '' SCOPE=BOTH"
   failed_when: false
 
 # ── Delete ────────────────────────────────────────────────────────────────────

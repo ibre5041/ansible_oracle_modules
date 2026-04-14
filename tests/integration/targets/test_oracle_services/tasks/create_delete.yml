@@ -13,6 +13,8 @@
       password: "{{ oracle_pdb_password | default(oracle_password) }}"
       mode: "{{ mode }}"
       oracle_home: "{{ oracle_home | default() }}"
+      database_name: "{{ oracle_sid }}"
+      pdb: "{{ oracle_pdb_service_name }}"
 
 # ── Setup ─────────────────────────────────────────────────────────────────────
 
@@ -20,8 +22,6 @@
   oracle_services:
     <<: *con_param
     name: TEST_SVC
-    database_name: "{{ oracle_sid | default('FREE') }}"
-    pdb: "{{ oracle_pdb_service_name | default('FREEPDB1') }}"
     state: absent
   failed_when: false
 
@@ -31,8 +31,6 @@
   oracle_services:
     <<: *con_param
     name: TEST_SVC
-    database_name: "{{ oracle_sid | default('FREE') }}"
-    pdb: "{{ oracle_pdb_service_name | default('FREEPDB1') }}"
     state: present
   register: _
   check_mode: true
@@ -42,8 +40,6 @@
   oracle_services:
     <<: *con_param
     name: TEST_SVC
-    database_name: "{{ oracle_sid | default('FREE') }}"
-    pdb: "{{ oracle_pdb_service_name | default('FREEPDB1') }}"
     state: present
   register: _
   failed_when: _.failed or _.changed == false
@@ -52,8 +48,6 @@
   oracle_services:
     <<: *con_param
     name: TEST_SVC
-    database_name: "{{ oracle_sid | default('FREE') }}"
-    pdb: "{{ oracle_pdb_service_name | default('FREEPDB1') }}"
     state: present
   register: _
   failed_when: _.failed or _.changed == true
@@ -64,8 +58,6 @@
   oracle_services:
     <<: *con_param
     name: TEST_SVC
-    database_name: "{{ oracle_sid | default('FREE') }}"
-    pdb: "{{ oracle_pdb_service_name | default('FREEPDB1') }}"
     state: started
   register: _
   failed_when: _.failed
@@ -74,8 +66,6 @@
   oracle_services:
     <<: *con_param
     name: TEST_SVC
-    database_name: "{{ oracle_sid | default('FREE') }}"
-    pdb: "{{ oracle_pdb_service_name | default('FREEPDB1') }}"
     state: status
   register: _
   failed_when: _.failed
@@ -84,8 +74,6 @@
   oracle_services:
     <<: *con_param
     name: TEST_SVC
-    database_name: "{{ oracle_sid | default('FREE') }}"
-    pdb: "{{ oracle_pdb_service_name | default('FREEPDB1') }}"
     state: stopped
   register: _
   failed_when: _.failed
@@ -96,8 +84,6 @@
   oracle_services:
     <<: *con_param
     name: TEST_SVC
-    database_name: "{{ oracle_sid | default('FREE') }}"
-    pdb: "{{ oracle_pdb_service_name | default('FREEPDB1') }}"
     state: absent
   register: _
   check_mode: true
@@ -107,8 +93,6 @@
   oracle_services:
     <<: *con_param
     name: TEST_SVC
-    database_name: "{{ oracle_sid | default('FREE') }}"
-    pdb: "{{ oracle_pdb_service_name | default('FREEPDB1') }}"
     state: absent
   register: _
   failed_when: _.failed or _.changed == false
@@ -117,8 +101,6 @@
   oracle_services:
     <<: *con_param
     name: TEST_SVC
-    database_name: "{{ oracle_sid | default('FREE') }}"
-    pdb: "{{ oracle_pdb_service_name | default('FREEPDB1') }}"
     state: absent
   register: _
   failed_when: _.failed or _.changed == true
