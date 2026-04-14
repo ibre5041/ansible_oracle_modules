@@ -16,19 +16,20 @@ Ce document recense, pour chaque module de la collection `ibre5041.ansible_oracl
 | Catégorie | Nombre |
 |---|---:|
 | Modules totaux | 45 |
-| Modules testés en CI Docker | 16 |
-| Cibles existantes mais inactives/partielles | 7 |
-| Modules sans tests mais **testables en Docker** (à créer) | 14 |
-| Modules **non testables en Docker** (documentation seulement) | 15 |
+| Modules testés en CI Docker (`test-docker`) | 17 |
+| Modules sans tests mais **testables en Docker** (cibles à créer) | 14 |
+| Modules **non testables en Docker** (documentation seulement) | 14 |
+
+> 17 + 14 + 14 = 45. La section 3 liste des cibles de test existantes pour des modules déjà comptés ci-dessus (partiels ou CRS-only) — elle ne s'additionne pas à ce total.
 
 ---
 
-## 2. Modules avec tests actifs en CI Docker (16)
+## 2. Modules avec tests actifs en CI Docker (17)
 
 | Module | Cible | Scénarios couverts | Manques identifiés |
 |---|---|---|---|
 | `oracle_ping` | `test_oracle_ping` | Modes A1/A2 (SYSDBA local/remote), B (session_container CDB→PDB), C (user normal) | — |
-| `oracle_user` | `test_oracle_user` | create / delete / modify / change_state / check_mode ; auth password/external/none ; default+temp tablespace ; profile ; lock ; expire | proxy users, quotas (cf. `oracle_quota`) |
+| `oracle_user` | `test_oracle_user` | create / delete / modify / change_state / check_mode ; auth password/external/none ; default+temp tablespace ; profile ; lock ; expire | proxy users, quotas tablespace (cf. `test_oracle_quota` P2) |
 | `oracle_role` | `test_oracle_role` | create_delete, parameter, change_identified_method, every_identified_method, check_mode | grant de rôle à rôle, rôles applicatifs complexes |
 | `oracle_parameter` | `test_oracle_parameter` | modification / reset ; scope memory/spfile/both ; types num/bool/string ; CDB-only ; no-sysdba | paramètres PDB-spécifiques, paramètres hidden _* exhaustifs |
 | `oracle_tablespace` | `test_oracle_tablespace` | create/drop permanent/undo/temp, bigfile, multi-datafiles, modify, check_mode (create/drop), erreurs, valeurs nulles, idempotence | limites d'autoextend, chiffrement (couvert indirectement par `oracle_tde`) |
@@ -43,22 +44,28 @@ Ce document recense, pour chaque module de la collection `ibre5041.ansible_oracl
 | `oracle_awr` | `test_oracle_awr` | `simple.yml` basique | modification intervalle/rétention + reset |
 | `oracle_profile` | `test_oracle_profile` | `simple.yml` + régression `issue_4` | limites exhaustives (failed_login_attempts, password_life_time, password_verify_function) |
 | `oracle_facts` | `test_oracle_facts` | compile, subset parameter/content, no_sysdba | facts standby/DG (hors Docker) |
+| `oracle_dataguard` | `test_oracle_dataguard` | broker status/config/enable (skip si orapki absent) | standby réel impossible en Docker — couverture limitée au broker |
+
+> **Note** : `oracle_grant` est dans le `Makefile::test-docker` mais absent du workflow `.github/workflows/integration.yml` — divergence à corriger dans ce fichier CI.
 
 ---
 
-## 3. Cibles existantes inactives ou partielles (7)
+## 3. Cibles existantes inactives ou partielles (8)
 
-| Cible | État | Action recommandée |
-|---|---|---|
-| `test_oracle_db` | Squelette sans scénario | Non prioritaire (Docker fournit déjà la DB) |
-| `test_oracle_quota` | `tasks.missing` — pas de `main.yml` opérationnel | **À finaliser (P2)** : grant quota unlimited/limited/none sur `ts_1`/`ts_2`/`ts_3` |
-| `test_oracle_dataguard` | broker status/config/enable, skip si pas d'orapki | Limite fonctionnelle : pas de standby en Docker. Garder tel quel |
-| `test_oracle_crs_db` | Pas de `main.yml` | Non testable Docker (CRS requis) |
-| `test_oracle_crs_asm` | Pas de `main.yml` | Non testable Docker (CRS requis) |
-| `test_oracle_crs_listener` | `simple.yml` conditionnel | Non testable Docker |
-| `test_oracle_crs_service` | `simple.yml` + `complex.yml` conditionnels | Non testable Docker |
-| `test_oracle_gi_facts` | Conditionnel CRS | Non testable Docker |
-| `test_pwfilter` | Test du filtre `pwhash12c` | OK — pas un module DB |
+Ces cibles existent dans `tests/integration/targets/` mais sont incomplètes ou non exécutables en Docker. Les modules correspondants sont déjà comptés dans les sections 2 ou 5.
+
+| Cible | Module concerné | État | Action recommandée |
+|---|---|---|---|
+| `test_oracle_db` | `oracle_db` | Squelette sans scénario | Non prioritaire (Docker fournit déjà la DB) |
+| `test_oracle_quota` | *(pas de module `oracle_quota`)* | `tasks.missing` — pas de `main.yml` | **À finaliser (P2)** : tester les quotas tablespace (GRANT QUOTA sur `oracle_user`) via SQL |
+| `test_oracle_crs_db` | `oracle_crs_db` | Pas de `main.yml` | Non testable Docker (CRS requis) |
+| `test_oracle_crs_asm` | `oracle_crs_asm` | Pas de `main.yml` | Non testable Docker (CRS requis) |
+| `test_oracle_crs_listener` | `oracle_crs_listener` | `simple.yml` conditionnel | Non testable Docker |
+| `test_oracle_crs_service` | `oracle_crs_service` | `simple.yml` + `complex.yml` conditionnels | Non testable Docker |
+| `test_oracle_gi_facts` | `oracle_gi_facts` | Conditionnel CRS | Non testable Docker |
+| `test_pwfilter` | filtre Jinja `pwhash12c` | Tests du filtre de hachage de mots de passe | OK — pas un module DB |
+
+> **Note** : Il n'existe pas de module `oracle_quota.py`. La cible `test_oracle_quota` teste la fonctionnalité de quotas tablespace, gérée par `oracle_user` (paramètre `quota`) ou via SQL direct.
 
 ---
 
@@ -85,7 +92,7 @@ Ces modules n'ont actuellement **aucune** cible d'intégration et sont bons cand
 
 ---
 
-## 5. Modules non testables en Docker (15)
+## 5. Modules non testables en Docker (14)
 
 À documenter dans ce fichier mais **pas** à couvrir dans la CI Docker.
 
@@ -99,13 +106,14 @@ Ces modules n'ont actuellement **aucune** cible d'intégration et sont bons cand
 | `oracle_crs_listener` | Requiert CRS |
 | `oracle_crs_service` | Requiert CRS |
 | `oracle_gi_facts` | Requiert Grid Infrastructure |
-| `oracle_dataguard` | Requiert instance standby (test partiel déjà présent) |
 | `oracle_datapatch` | Requiert un patch à appliquer |
 | `oracle_opatch` | Requiert OPatch et home patché |
 | `oracle_ldapuser` | Requiert serveur LDAP/AD |
 | `oracle_oratab` | Requiert accès OS local (`running_on_server`) |
 | `oracle_sqldba` | Requiert sqlplus/catcon.pl local |
 | `oracle_db` | Requiert DBCA / création de DB complète |
+
+> `oracle_dataguard` est testé partiellement en Docker (broker uniquement) — voir section 2.
 
 Pour ces modules, les utilisateurs disposant d'une infra RAC/CRS peuvent utiliser `tests/integration/integration_config.yml.template.crs`.
 
@@ -131,7 +139,7 @@ La priorité est proportionnelle à (fréquence d'usage réel) × (faible coût 
 
 | # | Cible | Action |
 |---|---|---|
-| 8 | `test_oracle_quota` | Écrire `tasks/main.yml` : grant quota unlimited/limited/none sur `ts_1`/`ts_2`/`ts_3`, puis revocation |
+| 8 | `test_oracle_quota` | Écrire `tasks/main.yml` : tester GRANT/REVOKE QUOTA (unlimited, valeur, 0) via `oracle_user` ou SQL direct — pas de module standalone |
 | 9 | `test_oracle_awr` | Ajouter modification d'intervalle/rétention + reset |
 | 10 | `test_oracle_profile` | Ajouter `failed_login_attempts`, `password_life_time`, `password_verify_function` |
 | 11 | `test_oracle_pdb` | Activer les scénarios unplug/plug aujourd'hui en TODO |
