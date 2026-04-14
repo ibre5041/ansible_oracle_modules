@@ -46,7 +46,7 @@ Ce document recense, pour chaque module de la collection `ibre5041.ansible_oracl
 | `oracle_facts` | `test_oracle_facts` | compile, subset parameter/content, no_sysdba | facts standby/DG (hors Docker) |
 | `oracle_dataguard` | `test_oracle_dataguard` | broker status/config/enable (skip si orapki absent) | standby réel impossible en Docker — couverture limitée au broker |
 
-> **Note** : `oracle_grant` est dans le `Makefile::test-docker` mais absent du workflow `.github/workflows/integration.yml` — divergence à corriger dans ce fichier CI.
+> **Note** : `oracle_grant` est présent dans `Makefile::test-docker`, `Makefile::test-docker-ee` et `.github/workflows/integration.yml`.
 
 ---
 
