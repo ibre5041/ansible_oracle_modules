@@ -49,12 +49,14 @@
     domain_name: ""
     oracle_cdb_hostname: "{{ lookup('pipe', 'hostname -s') }}"
     pdb_name: "PDB37"
+    pdbseed_path: "{{ oracle_datadir }}/pdbseed"
 
 - name: drop PDB
   oracle_pdb:
     <<: *con_param
     pdb_name: "{{ pdb_name }}"
     state: "absent"
+  failed_when: false
 
 - name: create PDB
   oracle_pdb:
@@ -64,6 +66,7 @@
     pdb_admin_password: pdbpass
     state: "opened"
     roles: dba
+    file_name_convert: "{{ {pdbseed_path: oracle_datadir + '/' + pdb_name} }}"
   register: _
 # failed_when: _.failed or not _.changed
 
