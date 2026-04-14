@@ -482,7 +482,7 @@ def execute_sql_get(module, msg, cursor, sql):
         module.fail_json(msg=msg, changed=False)
         return False
 
-    if result > 0:
+    if result:
         return True
     else:
         return False
@@ -500,6 +500,7 @@ def execute_sql(module, msg, cursor, sql):
 
 def main():
     global gimanaged
+    global cursor
     global newservice
     global configchange
     configchange = False
@@ -564,6 +565,7 @@ def main():
         oc = None
     else:
         oc = oracleConnection(module)
+        cursor = oc.conn.cursor()
 
     if not service_name:
         service_name = database_name

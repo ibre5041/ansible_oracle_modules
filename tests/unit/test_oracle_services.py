@@ -994,17 +994,26 @@ class _FakeOracleHomesNonGi(FakeOracleHomes):
 
 
 def test_main_non_gi_oracleconnection(monkeypatch):
-    """main(): oracle_gi_managed=False → oracleConnection called (line 564)."""
+    """main(): oracle_gi_managed=False → oracleConnection called; SQL path used."""
     mod = _load()
     oc_calls = []
 
+    class _FakeCursor:
+        """Simulates a DB cursor that finds no service (fetchone → None)."""
+        def execute(self, sql): return None
+        def fetchone(self): return None
+
+    class _FakeConn:
+        def cursor(self): return _FakeCursor()
+
+    class _FakeOC:
+        conn = _FakeConn()
+
     def fake_oc(module):
         oc_calls.append(True)
-        return object()
+        return _FakeOC()
 
-    Mod = _make_main_mod("absent", [
-        (1, "PRCR-1001 service not found", ""),  # check_service_exists → False
-    ])
+    Mod = _make_main_mod("absent", [])  # no srvctl calls in non-GI path
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
     monkeypatch.setattr(mod, "OracleHomes", _FakeOracleHomesNonGi, raising=False)
     monkeypatch.setattr(mod, "gimanaged", True, raising=False)
