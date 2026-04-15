@@ -51,6 +51,18 @@
     pdb_name: "PDB37"
     pdbseed_path: "{{ oracle_datadir }}/pdbseed"
 
+- name: "define PDB admin connection parameters"
+  set_fact:
+    pdb_connection_parameters: &pdb_con_param
+      hostname: "{{ oracle_cdb_hostname }}"
+      port: "{{ oracle_port }}"
+      service_name: "{{ pdb_name }}"
+      username: pdbadmin
+      password: pdbpass
+      dsn: "{{ oracle_dsn | default() }}"
+      mode: sysdba
+      oracle_home: "{{ oracle_home | default() }}"
+
 - name: drop PDB
   oracle_pdb:
     <<: *con_param
@@ -83,24 +95,13 @@
 
 - name: create u_foo user
   oracle_user:
-    <<: *con_param
-    hostname: "{{ oracle_cdb_hostname }}"
-    port: "{{ oracle_port }}"
-    service_name: "{{ pdb_name }}{{ '.' ~ domain_name if domain_name }}"
-    username: pdbadmin
-    password: pdbpass
+    <<: *pdb_con_param
     schema_name: "u_foo"
     schema_password: "bar"
 
 - name: create r_foo role
   oracle_role:
-    <<: *con_param
-    hostname: "{{ oracle_cdb_hostname }}"
-    port: "{{ oracle_port }}"
-    service_name: "{{ pdb_name }}{{ '.' ~ domain_name if domain_name }}"
-    username: pdbadmin
-    password: pdbpass
-    mode: sysdba
+    <<: *pdb_con_param
     role: "r_foo"
 
 ...
