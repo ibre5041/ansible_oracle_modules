@@ -1,0 +1,92 @@
+---
+# oracle_stats_prefs uses old-style 'user' parameter (not 'username').
+
+- name: "define connection parameters"
+  set_fact:
+    connection_parameters: &con_param
+      hostname: "{{ oracle_hostname }}"
+      port: "{{ oracle_port }}"
+      service_name: "{{ oracle_pdb_service_name | default(oracle_service_name) }}"
+      user: "{{ oracle_pdb_username | default(oracle_username) }}"
+      password: "{{ oracle_pdb_password | default(oracle_password) }}"
+      mode: "{{ mode }}"
+
+# ── Set a preference ──────────────────────────────────────────────────────────
+
+- name: "set TABLE_CACHED_BLOCKS preference to 16"
+  oracle_stats_prefs:
+    <<: *con_param
+    preference_name: TABLE_CACHED_BLOCKS
+    preference_value: "16"
+    state: present
+  register: _
+  failed_when: _.failed or _.changed == false
+
+- name: "idempotence: same preference value, no change"
+  oracle_stats_prefs:
+    <<: *con_param
+    preference_name: TABLE_CACHED_BLOCKS
+    preference_value: "16"
+    state: present
+  register: _
+  failed_when: _.failed or _.changed == true
+
+- name: "change preference to different value"
+  oracle_stats_prefs:
+    <<: *con_param
+    preference_name: TABLE_CACHED_BLOCKS
+    preference_value: "8"
+    state: present
+  register: _
+  failed_when: _.failed or _.changed == false
+
+- name: "idempotence: same changed value, no change"
+  oracle_stats_prefs:
+    <<: *con_param
+    preference_name: TABLE_CACHED_BLOCKS
+    preference_value: "8"
+    state: present
+  register: _
+  failed_when: _.failed or _.changed == true
+
+# ── Set another preference ────────────────────────────────────────────────────
+
+- name: "set ESTIMATE_PERCENT preference"
+  oracle_stats_prefs:
+    <<: *con_param
+    preference_name: ESTIMATE_PERCENT
+    preference_value: "100"
+    state: present
+  register: _
+  failed_when: _.failed
+
+# ── Reset to default (absent) ─────────────────────────────────────────────────
+
+- name: "reset TABLE_CACHED_BLOCKS to default"
+  oracle_stats_prefs:
+    <<: *con_param
+    preference_name: TABLE_CACHED_BLOCKS
+    preference_value: "8"
+    state: absent
+  register: _
+  failed_when: _.failed or _.changed == false
+
+- name: "idempotence: reset already-default preference"
+  oracle_stats_prefs:
+    <<: *con_param
+    preference_name: TABLE_CACHED_BLOCKS
+    preference_value: "8"
+    state: absent
+  register: _
+  failed_when: _.failed or _.changed == true
+
+- name: "reset ESTIMATE_PERCENT to default"
+  oracle_stats_prefs:
+    <<: *con_param
+    preference_name: ESTIMATE_PERCENT
+    preference_value: "100"
+    state: absent
+  register: _
+  failed_when: _.failed
+
+...

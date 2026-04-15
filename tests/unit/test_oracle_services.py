@@ -43,6 +43,7 @@ def _svc_params(**overrides):
         "clbgoal": None,
         "rlbgoal": None,
         "force": False,
+        "gi_managed": None,
     }
     base.update(overrides)
     return base
@@ -385,8 +386,7 @@ def test_ensure_service_state_existing_no_changes(monkeypatch):
     monkeypatch.setattr(mod, "newservice", False, raising=False)
     monkeypatch.setattr(mod, "configchange", False, raising=False)
 
-    # _get_service_config bug: called with 6 args but takes 5 → monkeypatch it
-    def _fake_get_config(oc, module, msg, oracle_home, name, database_name):
+    def _fake_get_config(cursor, module, msg, name, database_name):
         return ({"clb": "LONG", "rlb": "NONE"}, [''], [''])
 
     monkeypatch.setattr(mod, "_get_service_config", _fake_get_config, raising=False)
@@ -410,7 +410,7 @@ def test_ensure_service_state_existing_config_changed(monkeypatch):
     monkeypatch.setattr(mod, "configchange", False, raising=False)
 
     # Return different config → triggers modify_conf command
-    def _fake_get_config(oc, module, msg, oracle_home, name, database_name):
+    def _fake_get_config(cursor, module, msg, name, database_name):
         return ({"clb": "SHORT", "rlb": "SERVICE_TIME"}, [''], [''])
 
     monkeypatch.setattr(mod, "_get_service_config", _fake_get_config, raising=False)
@@ -432,7 +432,7 @@ def test_ensure_service_state_existing_instances_changed(monkeypatch):
     monkeypatch.setattr(mod, "configchange", False, raising=False)
 
     # Current config has no preferred instances, wanted has MYDB1
-    def _fake_get_config(oc, module, msg, oracle_home, name, database_name):
+    def _fake_get_config(cursor, module, msg, name, database_name):
         return ({}, [], [])
 
     monkeypatch.setattr(mod, "_get_service_config", _fake_get_config, raising=False)
@@ -453,7 +453,7 @@ def test_ensure_service_state_existing_modify_fails(monkeypatch):
     monkeypatch.setattr(mod, "newservice", False, raising=False)
     monkeypatch.setattr(mod, "configchange", False, raising=False)
 
-    def _fake_get_config(oc, module, msg, oracle_home, name, database_name):
+    def _fake_get_config(cursor, module, msg, name, database_name):
         return ({"clb": "SHORT", "rlb": "SERVICE_TIME"}, [], [])
 
     monkeypatch.setattr(mod, "_get_service_config", _fake_get_config, raising=False)
@@ -473,7 +473,7 @@ def test_ensure_service_state_existing_state_started(monkeypatch):
     monkeypatch.setattr(mod, "newservice", False, raising=False)
     monkeypatch.setattr(mod, "configchange", False, raising=False)
 
-    def _fake_get_config(oc, module, msg, oracle_home, name, database_name):
+    def _fake_get_config(cursor, module, msg, name, database_name):
         return ({"clb": "LONG", "rlb": "NONE"}, [''], [''])
 
     monkeypatch.setattr(mod, "_get_service_config", _fake_get_config, raising=False)
@@ -494,7 +494,7 @@ def test_ensure_service_state_existing_state_stopped(monkeypatch):
     monkeypatch.setattr(mod, "newservice", False, raising=False)
     monkeypatch.setattr(mod, "configchange", False, raising=False)
 
-    def _fake_get_config(oc, module, msg, oracle_home, name, database_name):
+    def _fake_get_config(cursor, module, msg, name, database_name):
         return ({"clb": "LONG", "rlb": "NONE"}, [''], [''])
 
     monkeypatch.setattr(mod, "_get_service_config", _fake_get_config, raising=False)
@@ -515,7 +515,7 @@ def test_ensure_service_state_existing_state_stopped_already(monkeypatch):
     monkeypatch.setattr(mod, "newservice", False, raising=False)
     monkeypatch.setattr(mod, "configchange", False, raising=False)
 
-    def _fake_get_config(oc, module, msg, oracle_home, name, database_name):
+    def _fake_get_config(cursor, module, msg, name, database_name):
         return ({"clb": "LONG", "rlb": "NONE"}, [''], [''])
 
     monkeypatch.setattr(mod, "_get_service_config", _fake_get_config, raising=False)
@@ -559,7 +559,7 @@ def test_ensure_service_state_existing_with_rlbgoal_clbgoal(monkeypatch):
     monkeypatch.setattr(mod, "newservice", False, raising=False)
     monkeypatch.setattr(mod, "configchange", False, raising=False)
 
-    def _fake_get_config(oc, module, msg, oracle_home, name, database_name):
+    def _fake_get_config(cursor, module, msg, name, database_name):
         return ({"clb": "SERVICE_TIME", "rlb": "NONE"}, ['MYDB2'], ['MYDB1'])
 
     monkeypatch.setattr(mod, "_get_service_config", _fake_get_config, raising=False)
@@ -588,7 +588,7 @@ def test_ensure_service_state_existing_config_changed_then_started(monkeypatch):
     monkeypatch.setattr(mod, "newservice", False, raising=False)
     monkeypatch.setattr(mod, "configchange", False, raising=False)
 
-    def _fake_get_config(oc, module, msg, oracle_home, name, database_name):
+    def _fake_get_config(cursor, module, msg, name, database_name):
         # ai/pi match defaults [''] to avoid extra modify_inst command
         return ({"clb": "SHORT", "rlb": "SERVICE_TIME"}, [''], [''])  # clb/rlb differ
 
@@ -613,7 +613,7 @@ def test_ensure_service_state_existing_config_changed_then_stopped(monkeypatch):
     monkeypatch.setattr(mod, "newservice", False, raising=False)
     monkeypatch.setattr(mod, "configchange", False, raising=False)
 
-    def _fake_get_config(oc, module, msg, oracle_home, name, database_name):
+    def _fake_get_config(cursor, module, msg, name, database_name):
         # ai/pi match defaults [''] so only modify_conf is needed (not modify_inst)
         return ({"clb": "SHORT", "rlb": "SERVICE_TIME"}, [''], [''])
 
@@ -745,7 +745,7 @@ def test_main_present_new_service(monkeypatch):
     """main(): state=present, service not found → create → ensure → exit changed=True."""
     mod = _load()
 
-    def _fake_get_config(oc, module, msg, oracle_home, name, database_name):
+    def _fake_get_config(cursor, module, msg, name, database_name):
         return ({}, [''], [''])
 
     Mod = _make_main_mod("present", [
@@ -766,7 +766,7 @@ def test_main_present_existing_service_no_changes(monkeypatch):
     """main(): state=present, service exists, config unchanged → exit changed=False."""
     mod = _load()
 
-    def _fake_get_config(oc, module, msg, oracle_home, name, database_name):
+    def _fake_get_config(cursor, module, msg, name, database_name):
         return ({"clb": "LONG", "rlb": "NONE"}, [''], [''])
 
     Mod = _make_main_mod("present", [
@@ -875,7 +875,7 @@ def test_ensure_service_state_available_instances_changed(monkeypatch):
     monkeypatch.setattr(mod, "configchange", False, raising=False)
 
     # Current config has MYDB1 as available, wanted has MYDB2
-    def _fake_get_config(oc, module, msg, oracle_home, name, database_name):
+    def _fake_get_config(cursor, module, msg, name, database_name):
         return ({}, ['MYDB1'], [''])
 
     monkeypatch.setattr(mod, "_get_service_config", _fake_get_config, raising=False)
@@ -895,7 +895,7 @@ def test_ensure_service_state_stopped_with_configchange(monkeypatch):
     monkeypatch.setattr(mod, "newservice", False, raising=False)
     monkeypatch.setattr(mod, "configchange", False, raising=False)
 
-    def _fake_get_config(oc, module, msg, oracle_home, name, database_name):
+    def _fake_get_config(cursor, module, msg, name, database_name):
         return ({"clb": "SHORT", "rlb": "SERVICE_TIME"}, [''], [''])
 
     monkeypatch.setattr(mod, "_get_service_config", _fake_get_config, raising=False)
@@ -994,26 +994,133 @@ class _FakeOracleHomesNonGi(FakeOracleHomes):
 
 
 def test_main_non_gi_oracleconnection(monkeypatch):
-    """main(): oracle_gi_managed=False → oracleConnection called (line 564)."""
+    """main(): oracle_gi_managed=False → oracleConnection called; SQL path used."""
     mod = _load()
     oc_calls = []
 
+    class _FakeCursor:
+        """Simulates a DB cursor that finds no service (fetchone → None)."""
+        def execute(self, sql): return None
+        def fetchone(self): return None
+
+    class _FakeConn:
+        def cursor(self): return _FakeCursor()
+
+    class _FakeOC:
+        conn = _FakeConn()
+
     def fake_oc(module):
         oc_calls.append(True)
-        return object()
+        return _FakeOC()
 
-    Mod = _make_main_mod("absent", [
-        (1, "PRCR-1001 service not found", ""),  # check_service_exists → False
-    ])
+    Mod = _make_main_mod("absent", [])  # no srvctl calls in non-GI path
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
     monkeypatch.setattr(mod, "OracleHomes", _FakeOracleHomesNonGi, raising=False)
-    monkeypatch.setattr(mod, "gimanaged", True, raising=False)
     monkeypatch.setattr(mod, "oracleConnection", fake_oc, raising=False)
 
     with pytest.raises(ExitJson) as exc:
         mod.main()
     assert exc.value.args[0]["changed"] is False
     assert len(oc_calls) == 1
+
+
+def test_main_non_gi_present_idempotent(monkeypatch):
+    """Non-GI path: state=present, service already exists → exit changed=False; no srvctl called."""
+    mod = _load()
+    oc_calls = []
+
+    class _FakeCursor:
+        """Returns a row so execute_sql_get sees the service as existing."""
+        def execute(self, sql): return None
+        def fetchone(self): return ("test_svc",)
+
+    class _FakeConn:
+        def cursor(self): return _FakeCursor()
+
+    class _FakeOC:
+        conn = _FakeConn()
+
+    def fake_oc(module):
+        oc_calls.append(True)
+        return _FakeOC()
+
+    # No run_command responses — srvctl must never be called in non-GI mode.
+    Mod = _make_main_mod("present", [])
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "OracleHomes", _FakeOracleHomesNonGi, raising=False)
+    monkeypatch.setattr(mod, "oracleConnection", fake_oc, raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    result = exc.value.args[0]
+    assert result["changed"] is False
+    assert "intended state" in result["msg"]
+    assert len(oc_calls) == 1
+
+
+def test_main_non_gi_status_running(monkeypatch):
+    """Non-GI path: state=status, service exists and is active → exit changed=False with running message."""
+    mod = _load()
+    oc_calls = []
+
+    class _FakeCursor:
+        """Returns a row for both check_service_exists and check_service_status SQL queries."""
+        def execute(self, sql): return None
+        def fetchone(self): return ("test_svc",)
+
+    class _FakeConn:
+        def cursor(self): return _FakeCursor()
+
+    class _FakeOC:
+        conn = _FakeConn()
+
+    def fake_oc(module):
+        oc_calls.append(True)
+        return _FakeOC()
+
+    Mod = _make_main_mod("status", [])
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "OracleHomes", _FakeOracleHomesNonGi, raising=False)
+    monkeypatch.setattr(mod, "oracleConnection", fake_oc, raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    result = exc.value.args[0]
+    assert result["changed"] is False
+    assert "running" in result["msg"]
+    assert len(oc_calls) == 1
+
+
+def test_main_non_gi_started_already_running(monkeypatch):
+    """Non-GI path: state=started, service already running → exit changed=False with 'already running'."""
+    mod = _load()
+    oc_calls = []
+
+    class _FakeCursor:
+        """Service exists (check_service_exists) and is active (check_service_status)."""
+        def execute(self, sql): return None
+        def fetchone(self): return ("test_svc",)
+
+    class _FakeConn:
+        def cursor(self): return _FakeCursor()
+
+    class _FakeOC:
+        conn = _FakeConn()
+
+    def fake_oc(module):
+        oc_calls.append(True)
+        return _FakeOC()
+
+    Mod = _make_main_mod("started", [])
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "OracleHomes", _FakeOracleHomesNonGi, raising=False)
+    monkeypatch.setattr(mod, "oracleConnection", fake_oc, raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    result = exc.value.args[0]
+    assert result["changed"] is False
+    assert "already running" in result["msg"]
 
 
 def test_main_absent_remove_returns_false(monkeypatch):

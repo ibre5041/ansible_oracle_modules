@@ -1,0 +1,145 @@
+---
+# oracle_rsrc_plan uses old-style 'user' parameter (not 'username').
+
+- name: "define connection parameters"
+  set_fact:
+    connection_parameters: &con_param
+      hostname: "{{ oracle_hostname }}"
+      port: "{{ oracle_port }}"
+      service_name: "{{ oracle_pdb_service_name | default(oracle_service_name) }}"
+      user: "{{ oracle_pdb_username | default(oracle_username) }}"
+      password: "{{ oracle_pdb_password | default(oracle_password) }}"
+      mode: "{{ mode }}"
+      oracle_home: "{{ oracle_home | default() }}"
+
+- name: "define new-style connection for oracle_sql"
+  set_fact:
+    con_sql: &con_sql
+      hostname: "{{ oracle_hostname }}"
+      port: "{{ oracle_port }}"
+      service_name: "{{ oracle_pdb_service_name | default(oracle_service_name) }}"
+      username: "{{ oracle_pdb_username | default(oracle_username) }}"
+      password: "{{ oracle_pdb_password | default(oracle_password) }}"
+      mode: "{{ mode }}"
+      oracle_home: "{{ oracle_home | default() }}"
+
+# ── Setup ─────────────────────────────────────────────────────────────────────
+
+- name: "cleanup: drop test plan if exists"
+  oracle_rsrc_plan:
+    <<: *con_param
+    plan: TEST_RSRC_PLAN
+    state: absent
+  failed_when: false
+
+# ── Create ────────────────────────────────────────────────────────────────────
+
+- name: "create resource plan with directives"
+  oracle_rsrc_plan:
+    <<: *con_param
+    plan: TEST_RSRC_PLAN
+    comment: "Integration test resource plan"
+    directives:
+      - group: OTHER_GROUPS
+        cpu_p1: 20
+    state: present
+  register: _
+  failed_when: _.failed or _.changed == false
+
+- name: "idempotence: plan already present with same config"
+  oracle_rsrc_plan:
+    <<: *con_param
+    plan: TEST_RSRC_PLAN
+    comment: "Integration test resource plan"
+    directives:
+      - group: OTHER_GROUPS
+        cpu_p1: 20
+    state: present
+  register: _
+  failed_when: _.failed or _.changed == true
+
+- name: "update plan: add directive for SYS_GROUP"
+  oracle_rsrc_plan:
+    <<: *con_param
+    plan: TEST_RSRC_PLAN
+    comment: "Integration test resource plan"
+    directives:
+      - group: SYS_GROUP
+        cpu_p1: 80
+      - group: OTHER_GROUPS
+        cpu_p1: 20
+    state: present
+  register: _
+  failed_when: _.failed or _.changed == false
+
+- name: "idempotence: plan with two directives"
+  oracle_rsrc_plan:
+    <<: *con_param
+    plan: TEST_RSRC_PLAN
+    comment: "Integration test resource plan"
+    directives:
+      - group: SYS_GROUP
+        cpu_p1: 80
+      - group: OTHER_GROUPS
+        cpu_p1: 20
+    state: present
+  register: _
+  failed_when: _.failed or _.changed == true
+
+# ── Status ────────────────────────────────────────────────────────────────────
+
+- name: "status: query plan details"
+  oracle_rsrc_plan:
+    <<: *con_param
+    plan: TEST_RSRC_PLAN
+    state: status
+  register: _
+  failed_when: _.failed
+
+# ── Activate ──────────────────────────────────────────────────────────────────
+
+- name: "activate the test plan"
+  oracle_rsrc_plan:
+    <<: *con_param
+    plan: TEST_RSRC_PLAN
+    state: active
+  register: _
+  failed_when: _.failed or _.changed == false
+
+- name: "idempotence: plan already active"
+  oracle_rsrc_plan:
+    <<: *con_param
+    plan: TEST_RSRC_PLAN
+    state: active
+  register: _
+  failed_when: _.failed or _.changed == true
+
+# ── Deactivate before cleanup ─────────────────────────────────────────────────
+# Use SQL directly: oracle_rsrc_plan state:active cannot guarantee deactivation
+# if DEFAULT_PLAN doesn't exist. Empty string unambiguously deactivates any plan.
+
+- name: "deactivate resource manager plan before drop"
+  oracle_sql:
+    <<: *con_sql
+    sql: "ALTER SYSTEM SET RESOURCE_MANAGER_PLAN = '' SCOPE=BOTH"
+  failed_when: false
+
+# ── Delete ────────────────────────────────────────────────────────────────────
+
+- name: "drop resource plan"
+  oracle_rsrc_plan:
+    <<: *con_param
+    plan: TEST_RSRC_PLAN
+    state: absent
+  register: _
+  failed_when: _.failed or _.changed == false
+
+- name: "idempotence: drop absent resource plan"
+  oracle_rsrc_plan:
+    <<: *con_param
+    plan: TEST_RSRC_PLAN
+    state: absent
+  register: _
+  failed_when: _.failed or _.changed == true
+
+...

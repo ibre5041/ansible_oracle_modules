@@ -1,0 +1,154 @@
+---
+
+# Note: oracle_acl uses new-style 'username' connection params (oracle_ping format).
+# 'host' is the ACL network pattern, NOT the Oracle listener hostname.
+# Use 'hostname' (default: localhost) for the Oracle server.
+
+- name: "define connection parameters"
+  set_fact:
+    connection_parameters: &con_param
+      hostname: "{{ oracle_hostname }}"
+      port: "{{ oracle_port }}"
+      service_name: "{{ oracle_pdb_service_name | default(oracle_service_name) }}"
+      username: "{{ oracle_pdb_username | default(oracle_username) }}"
+      password: "{{ oracle_pdb_password | default(oracle_password) }}"
+      dsn: "{{ oracle_dsn | default() }}"
+      mode: "{{ mode }}"
+      oracle_home: "{{ oracle_home | default() }}"
+
+# ── Setup: create test user ───────────────────────────────────────────────────
+
+- name: "setup: create ACL test user"
+  oracle_user:
+    <<: *con_param
+    schema_name: "U_ACL_TEST"
+    state: present
+  failed_when: false
+
+# ── Grant connect ACE ─────────────────────────────────────────────────────────
+
+- name: "check mode: would add ACE?"
+  oracle_acl:
+    <<: *con_param
+    host: "*.example.com"
+    principal: "U_ACL_TEST"
+    privilege: connect
+    is_grant: true
+    state: present
+  check_mode: true
+  register: _
+  failed_when: _.failed or _.changed == false
+
+- name: "grant connect privilege for host pattern"
+  oracle_acl:
+    <<: *con_param
+    host: "*.example.com"
+    principal: "U_ACL_TEST"
+    privilege: connect
+    is_grant: true
+    state: present
+  register: _
+  failed_when: _.failed or _.changed == false
+
+- name: "idempotence: ACE already present"
+  oracle_acl:
+    <<: *con_param
+    host: "*.example.com"
+    principal: "U_ACL_TEST"
+    privilege: connect
+    is_grant: true
+    state: present
+  register: _
+  failed_when: _.failed or _.changed == true
+
+- name: "status: query ACL for host"
+  oracle_acl:
+    <<: *con_param
+    host: "*.example.com"
+    state: status
+  register: acl_status
+  failed_when: acl_status.failed
+
+# ── Grant resolve ACE ─────────────────────────────────────────────────────────
+
+- name: "grant resolve privilege for specific host"
+  oracle_acl:
+    <<: *con_param
+    host: "mail.example.com"
+    principal: "U_ACL_TEST"
+    privilege: resolve
+    is_grant: true
+    state: present
+  register: _
+  failed_when: _.failed or _.changed == false
+
+# ── Grant with port range ─────────────────────────────────────────────────────
+
+- name: "grant connect with port range"
+  oracle_acl:
+    <<: *con_param
+    host: "smtp.example.com"
+    lower_port: 25
+    upper_port: 25
+    principal: "U_ACL_TEST"
+    privilege: connect
+    is_grant: true
+    state: present
+  register: _
+  failed_when: _.failed or _.changed == false
+
+# ── Remove ACE ────────────────────────────────────────────────────────────────
+
+- name: "check mode: would remove ACE?"
+  oracle_acl:
+    <<: *con_param
+    host: "*.example.com"
+    principal: "U_ACL_TEST"
+    privilege: connect
+    state: absent
+  check_mode: true
+  register: _
+  failed_when: _.failed or _.changed == false
+
+- name: "remove connect ACE for wildcard host"
+  oracle_acl:
+    <<: *con_param
+    host: "*.example.com"
+    principal: "U_ACL_TEST"
+    privilege: connect
+    state: absent
+  register: _
+  failed_when: _.failed or _.changed == false
+
+- name: "idempotence: remove already-absent ACE"
+  oracle_acl:
+    <<: *con_param
+    host: "*.example.com"
+    principal: "U_ACL_TEST"
+    privilege: connect
+    state: absent
+  register: _
+  failed_when: _.failed or _.changed == true
+
+# ── Cleanup ───────────────────────────────────────────────────────────────────
+
+- name: "cleanup: remove remaining ACEs"
+  oracle_acl:
+    <<: *con_param
+    host: "{{ item.host }}"
+    principal: "U_ACL_TEST"
+    privilege: "{{ item.priv }}"
+    state: absent
+  loop:
+    - {host: "mail.example.com", priv: "resolve"}
+    - {host: "smtp.example.com", priv: "connect"}
+  failed_when: false
+
+- name: "cleanup: drop ACL test user"
+  oracle_user:
+    <<: *con_param
+    schema_name: "U_ACL_TEST"
+    state: absent
+  failed_when: false
+
+...

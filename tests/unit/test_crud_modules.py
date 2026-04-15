@@ -605,6 +605,7 @@ def _pdb_params(**overrides):
         "datafile_dest": None,
         "file_name_convert": None,
         "service_name_convert": None,
+        "nocopy": False,
         "default_tablespace_type": "smallfile",
         "default_tablespace": None,
         "default_temp_tablespace": None,
@@ -654,6 +655,38 @@ def test_pdb_creates_new(monkeypatch):
     payload = exc.value.args[0]
     assert payload["changed"] is True
     assert any("create pluggable database" in d.lower() for d in payload["ddls"])
+
+
+def test_pdb_creates_with_nocopy(monkeypatch):
+    """plug_file + nocopy=True → DDL contains NOCOPY clause."""
+    mod = _load("oracle_pdb")
+
+    class Mod(BaseFakeModule):
+        params = _pdb_params(state="present", plug_file="/tmp/test.xml", nocopy=True, sourcedb=None)
+
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "oracleConnection", lambda m: _PdbConn(m, None), raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    payload = exc.value.args[0]
+    assert payload["changed"] is True
+    assert any("NOCOPY" in d for d in payload["ddls"])
+
+
+def test_pdb_nocopy_without_plug_file_fails(monkeypatch):
+    """nocopy=True with no plug_file → fail_json with descriptive message."""
+    mod = _load("oracle_pdb")
+
+    class Mod(BaseFakeModule):
+        params = _pdb_params(state="present", nocopy=True, plug_file=None, sourcedb=None)
+
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "oracleConnection", lambda m: _PdbConn(m, None), raising=False)
+
+    with pytest.raises(FailJson) as exc:
+        mod.main()
+    assert "plug_file" in exc.value.args[0]["msg"]
 
 
 def test_pdb_absent_removes_existing(monkeypatch):
