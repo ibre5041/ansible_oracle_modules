@@ -287,6 +287,13 @@ def ensure_service_state(oc, module, msg):
                 msg += ' and config changes have been applied'
                 change = True
             module.exit_json(msg=msg, changed=change)
+        else:
+            msg = 'Service %s (%s) already running' % (name, database_name)
+            change = False
+            if configchange:
+                msg += ' but config changes have been applied'
+                change = True
+            module.exit_json(msg=msg, changed=change)
 
     if state == 'stopped':
         if stop_service(oc, module, msg, name, database_name):
@@ -577,7 +584,20 @@ def main():
         database_name = pdb
 
     if module.check_mode and state != 'status':
-        module.exit_json(msg="check_mode: no changes applied", changed=False)
+        exists = check_service_exists(oc, module, msg, name, database_name)
+        if state == 'absent':
+            changed = exists
+            msg = ('Service %s (%s) would be removed' % (name, database_name)) if exists \
+                else ('Service %s (%s) does not exist' % (name, database_name))
+        elif state == 'restarted':
+            changed = exists
+            msg = ('Service %s (%s) would be restarted' % (name, database_name)) if exists \
+                else ('Service %s (%s) does not exist' % (name, database_name))
+        else:  # present, started, stopped
+            changed = not exists
+            msg = ('Service %s (%s) would be created' % (name, database_name)) if not exists \
+                else ('Service %s (%s) already exists' % (name, database_name))
+        module.exit_json(msg=msg, changed=changed)
 
     if state in ('present', 'started', 'stopped'):
         if not check_service_exists(oc, module, msg, name, database_name):

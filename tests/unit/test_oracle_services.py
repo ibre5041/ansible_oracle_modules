@@ -1091,6 +1091,38 @@ def test_main_non_gi_status_running(monkeypatch):
     assert len(oc_calls) == 1
 
 
+def test_main_non_gi_started_already_running(monkeypatch):
+    """Non-GI path: state=started, service already running → exit changed=False with 'already running'."""
+    mod = _load()
+    oc_calls = []
+
+    class _FakeCursor:
+        """Service exists (check_service_exists) and is active (check_service_status)."""
+        def execute(self, sql): return None
+        def fetchone(self): return ("test_svc",)
+
+    class _FakeConn:
+        def cursor(self): return _FakeCursor()
+
+    class _FakeOC:
+        conn = _FakeConn()
+
+    def fake_oc(module):
+        oc_calls.append(True)
+        return _FakeOC()
+
+    Mod = _make_main_mod("started", [])
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "OracleHomes", _FakeOracleHomesNonGi, raising=False)
+    monkeypatch.setattr(mod, "oracleConnection", fake_oc, raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    result = exc.value.args[0]
+    assert result["changed"] is False
+    assert "already running" in result["msg"]
+
+
 def test_main_absent_remove_returns_false(monkeypatch):
     """main(): state=absent, service exists, remove returns False → exit changed=False (line 591)."""
     mod = _load()
