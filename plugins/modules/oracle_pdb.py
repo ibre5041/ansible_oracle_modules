@@ -34,6 +34,14 @@ options:
     required: False
     default: None
     aliases: ['plug_file_xml']
+  nocopy:
+    description: >
+      Skip copying datafiles when plugging in a PDB from an XML descriptor (NOCOPY clause).
+      Use when the datafiles are already in the correct location and only the XML metadata
+      needs to be imported. Only meaningful when plug_file is set.
+    required: False
+    default: False
+    type: bool
   state:
     description: >
       The intended state of the pdb.
@@ -222,7 +230,7 @@ def create_pdb(conn, module):
     createsql = 'create pluggable database %s' % pdb_name
     #opensql = 'alter pluggable database %s open instances=all' % pdb_name
 
-    nocopy = module.params.get('nocopy', False)
+    nocopy = module.params['nocopy']
 
     if plug_file:
         createsql += " using '%s'" % plug_file

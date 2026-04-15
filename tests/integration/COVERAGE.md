@@ -84,7 +84,7 @@ Ces modules n'ont actuellement **aucune** cible d'intégration et sont bons cand
 | `oracle_jobschedule` | Scheduler | lié à `oracle_job` |
 | `oracle_jobwindow` | Scheduler | — |
 | `oracle_privs` | Sécurité | — |
-| `oracle_redo` | Storage | — | **Non testable en Docker/Oracle 26ai** : `ALTER DATABASE ADD LOGFILE` sans chemin explicite échoue ORA-02236 même avec OMF configuré |
+| `oracle_redo` | Storage | **Non testable en Docker/Oracle 26ai** : `ALTER DATABASE ADD LOGFILE` sans chemin explicite échoue ORA-02236 même avec OMF configuré |
 | `oracle_rsrc_consgroup` | Resource Manager | lié à `oracle_rsrc_plan` |
 | `oracle_rsrc_plan` | Resource Manager | — |
 | `oracle_services` | Services DB | via `DBMS_SERVICE` (non-CRS) |

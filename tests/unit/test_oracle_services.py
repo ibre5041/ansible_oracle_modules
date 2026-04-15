@@ -1016,7 +1016,6 @@ def test_main_non_gi_oracleconnection(monkeypatch):
     Mod = _make_main_mod("absent", [])  # no srvctl calls in non-GI path
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
     monkeypatch.setattr(mod, "OracleHomes", _FakeOracleHomesNonGi, raising=False)
-    monkeypatch.setattr(mod, "gimanaged", True, raising=False)
     monkeypatch.setattr(mod, "oracleConnection", fake_oc, raising=False)
 
     with pytest.raises(ExitJson) as exc:
@@ -1049,7 +1048,6 @@ def test_main_non_gi_present_idempotent(monkeypatch):
     Mod = _make_main_mod("present", [])
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
     monkeypatch.setattr(mod, "OracleHomes", _FakeOracleHomesNonGi, raising=False)
-    monkeypatch.setattr(mod, "gimanaged", True, raising=False)
     monkeypatch.setattr(mod, "oracleConnection", fake_oc, raising=False)
 
     with pytest.raises(ExitJson) as exc:
@@ -1083,7 +1081,6 @@ def test_main_non_gi_status_running(monkeypatch):
     Mod = _make_main_mod("status", [])
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
     monkeypatch.setattr(mod, "OracleHomes", _FakeOracleHomesNonGi, raising=False)
-    monkeypatch.setattr(mod, "gimanaged", True, raising=False)
     monkeypatch.setattr(mod, "oracleConnection", fake_oc, raising=False)
 
     with pytest.raises(ExitJson) as exc:

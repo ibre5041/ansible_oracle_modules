@@ -524,6 +524,7 @@ def main():
             force               = dict(default=False, type='bool'),
             gi_managed          = dict(required=False, type='bool', default=None),
         ),
+        supports_check_mode=True,
     )
     sanitize_string_params(module.params)
 
@@ -574,6 +575,9 @@ def main():
     if pdb and not service_name:
         service_name  = pdb
         database_name = pdb
+
+    if module.check_mode and state != 'status':
+        module.exit_json(msg="check_mode: no changes applied", changed=False)
 
     if state in ('present', 'started', 'stopped'):
         if not check_service_exists(oc, module, msg, name, database_name):

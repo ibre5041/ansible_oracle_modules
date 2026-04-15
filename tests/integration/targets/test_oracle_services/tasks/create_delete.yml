@@ -69,7 +69,7 @@
     name: TEST_SVC
     state: status
   register: _
-  failed_when: _.failed
+  failed_when: _.failed or "running" not in _.msg
 
 - name: "stop service"
   oracle_services:
