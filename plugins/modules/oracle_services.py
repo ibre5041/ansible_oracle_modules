@@ -602,7 +602,16 @@ def main():
                 changed = running
                 msg = ('Service %s (%s) would be stopped' % (name, database_name)) if running \
                     else ('Service %s (%s) is already stopped' % (name, database_name))
-        else:  # present, started
+        elif state == 'started':
+            if not exists:
+                changed = True
+                msg = 'Service %s (%s) would be created' % (name, database_name)
+            else:
+                running = check_service_status(cursor, module, msg, name, database_name, 'started')
+                changed = not running
+                msg = ('Service %s (%s) is already running' % (name, database_name)) if running \
+                    else ('Service %s (%s) would be started' % (name, database_name))
+        else:  # present
             changed = not exists
             msg = ('Service %s (%s) would be created' % (name, database_name)) if not exists \
                 else ('Service %s (%s) already exists' % (name, database_name))
