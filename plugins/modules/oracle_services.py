@@ -593,7 +593,16 @@ def main():
             changed = exists
             msg = ('Service %s (%s) would be restarted' % (name, database_name)) if exists \
                 else ('Service %s (%s) does not exist' % (name, database_name))
-        else:  # present, started, stopped
+        elif state == 'stopped':
+            if not exists:
+                changed = False
+                msg = 'Service %s (%s) does not exist' % (name, database_name)
+            else:
+                running = check_service_status(cursor, module, msg, name, database_name, 'started')
+                changed = running
+                msg = ('Service %s (%s) would be stopped' % (name, database_name)) if running \
+                    else ('Service %s (%s) is already stopped' % (name, database_name))
+        else:  # present, started
             changed = not exists
             msg = ('Service %s (%s) would be created' % (name, database_name)) if not exists \
                 else ('Service %s (%s) already exists' % (name, database_name))
@@ -621,22 +630,6 @@ def main():
         else:
             msg = 'Service %s (%s) doesn\'t exist' % (name, database_name)
             module.exit_json(msg=msg, changed=False)
-
-    # elif state == 'started':
-    #     if start_service(oc, module, msg, name, database_name):
-    #         msg = "Service %s started successfully in database %s" % (name, database_name)
-    #         module.exit_json(msg=msg, changed=True)
-    #     else:
-    #         msg = "Service %s already running in database %s" % (name, database_name)
-    #         module.exit_json(msg=msg, changed=False)
-    #
-    # elif state == 'stopped':
-    #     if stop_service(oc, module, msg, name, database_name):
-    #         msg = "Service %s stopped successfully in database %s" % (name, database_name)
-    #         module.exit_json(msg=msg, changed=True)
-    #     else:
-    #         msg = "Service %s already stopped in database %s" % (name, database_name)
-    #         module.exit_json(msg=msg, changed=False)
 
     elif state == 'restarted':
         if stop_service(oc, module, msg, name, database_name):

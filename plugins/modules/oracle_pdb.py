@@ -441,6 +441,9 @@ def main():
     pdb_name = module.params["pdb_name"]
     state = module.params["state"]
 
+    if module.params['nocopy'] and not module.params.get('plug_file'):
+        module.fail_json(msg="nocopy=True requires plug_file to be set", changed=False)
+
     oc = oracleConnection(module)
     pdb = check_pdb_exists(oc, pdb_name)
     if state == 'present':

@@ -17,10 +17,10 @@ Ce document recense, pour chaque module de la collection `ibre5041.ansible_oracl
 |---|---:|
 | Modules totaux | 45 |
 | Modules testés en CI Docker (`test-docker`) | 17 |
-| Modules sans tests mais **testables en Docker** (cibles à créer) | 14 |
-| Modules **non testables en Docker** (documentation seulement) | 14 |
+| Modules sans tests mais **testables en Docker** (cibles à créer) | 13 |
+| Modules **non testables en Docker** (documentation seulement) | 15 |
 
-> 17 + 14 + 14 = 45. La section 3 liste des cibles de test existantes pour des modules déjà comptés ci-dessus (partiels ou CRS-only) — elle ne s'additionne pas à ce total.
+> 17 + 13 + 15 = 45. La section 3 liste des cibles de test existantes pour des modules déjà comptés ci-dessus (partiels ou CRS-only) — elle ne s'additionne pas à ce total.
 
 ---
 
@@ -69,7 +69,7 @@ Ces cibles existent dans `tests/integration/targets/` mais sont incomplètes ou 
 
 ---
 
-## 4. Modules sans tests mais testables en Docker (14)
+## 4. Modules sans tests mais testables en Docker (13)
 
 Ces modules n'ont actuellement **aucune** cible d'intégration et sont bons candidats pour une exécution CI dans le conteneur Oracle Free.
 
@@ -84,7 +84,6 @@ Ces modules n'ont actuellement **aucune** cible d'intégration et sont bons cand
 | `oracle_jobschedule` | Scheduler | lié à `oracle_job` |
 | `oracle_jobwindow` | Scheduler | — |
 | `oracle_privs` | Sécurité | — |
-| `oracle_redo` | Storage | **Non testable en Docker/Oracle 26ai** : `ALTER DATABASE ADD LOGFILE` sans chemin explicite échoue ORA-02236 même avec OMF configuré |
 | `oracle_rsrc_consgroup` | Resource Manager | lié à `oracle_rsrc_plan` |
 | `oracle_rsrc_plan` | Resource Manager | — |
 | `oracle_services` | Services DB | via `DBMS_SERVICE` (non-CRS) |
@@ -92,7 +91,7 @@ Ces modules n'ont actuellement **aucune** cible d'intégration et sont bons cand
 
 ---
 
-## 5. Modules non testables en Docker (14)
+## 5. Modules non testables en Docker (15)
 
 À documenter dans ce fichier mais **pas** à couvrir dans la CI Docker.
 
@@ -110,6 +109,7 @@ Ces modules n'ont actuellement **aucune** cible d'intégration et sont bons cand
 | `oracle_opatch` | Requiert OPatch et home patché |
 | `oracle_ldapuser` | Requiert serveur LDAP/AD |
 | `oracle_oratab` | Requiert accès OS local (`running_on_server`) |
+| `oracle_redo` | `ALTER DATABASE ADD LOGFILE` sans chemin explicite échoue ORA-02236 même avec OMF configuré (Oracle 26ai Free) |
 | `oracle_sqldba` | Requiert sqlplus/catcon.pl local |
 | `oracle_db` | Requiert DBCA / création de DB complète |
 
