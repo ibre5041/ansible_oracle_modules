@@ -605,6 +605,7 @@ def _pdb_params(**overrides):
         "datafile_dest": None,
         "file_name_convert": None,
         "service_name_convert": None,
+        "nocopy": False,
         "default_tablespace_type": "smallfile",
         "default_tablespace": None,
         "default_temp_tablespace": None,
