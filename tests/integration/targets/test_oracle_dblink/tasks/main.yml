@@ -1,0 +1,11 @@
+---
+
+- name: Database link tests
+  block:
+    - include_tasks: "create_delete.yml"
+
+  environment:
+    ORACLE_SID: "{{ oracle_sid | default(omit) }}"
+    ORACLE_HOME: "{{ oracle_home | default(omit) }}"
+
+...

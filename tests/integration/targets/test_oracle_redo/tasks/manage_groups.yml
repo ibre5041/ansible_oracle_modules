@@ -1,0 +1,141 @@
+---
+# oracle_redo uses old-style 'user' parameter (not 'username').
+# The module is declarative: it ensures exactly N groups of the given size exist.
+# Redo logs are CDB-level objects: connect to CDB (oracle_service_name).
+#
+# Strategy: query current group count, add one group, verify, restore.
+# NOTE: Dropping groups only works on non-current (inactive) log groups.
+# The restore step uses failed_when: false to avoid test failure if the
+# database cannot immediately switch to make a group inactive.
+#
+# oracle_sql returns data as list of dicts (column name as key).
+# Use (result.data | first)['alias'] — never numeric indices.
+
+- name: "define CDB connection parameters"
+  set_fact:
+    connection_parameters: &con_param
+      hostname: "{{ oracle_hostname }}"
+      port: "{{ oracle_port }}"
+      service_name: "{{ oracle_service_name }}"
+      user: "{{ oracle_username }}"
+      password: "{{ oracle_password }}"
+      mode: "{{ mode }}"
+      # oracle_redo does not accept oracle_home in its argument_spec
+
+- name: "define new-style CDB connection for oracle_sql"
+  set_fact:
+    con_new: &con_new
+      hostname: "{{ oracle_hostname }}"
+      port: "{{ oracle_port }}"
+      service_name: "{{ oracle_service_name }}"
+      username: "{{ oracle_username }}"
+      password: "{{ oracle_password }}"
+      dsn: "{{ oracle_dsn | default() }}"
+      mode: "{{ mode }}"
+      oracle_home: "{{ oracle_home | default() }}"
+
+# ── Ensure OMF is configured so Oracle can auto-name the new redo log ─────────
+# Oracle 26ai requires db_create_file_dest (or db_create_online_log_dest_n)
+# to generate a file path when none is supplied to ALTER DATABASE ADD LOGFILE.
+
+- name: "query current db_create_file_dest value"
+  oracle_sql:
+    <<: *con_new
+    sql: "SELECT value AS val FROM v$parameter WHERE name = 'db_create_file_dest'"
+  register: omf_check
+
+- name: "record whether OMF destination was already set"
+  set_fact:
+    omf_was_empty: "{{ (omf_check.data | first)['val'] | default('') == '' }}"
+
+- name: "derive data directory from an existing datafile (used as OMF root)"
+  oracle_sql:
+    <<: *con_new
+    sql: "SELECT REGEXP_REPLACE(MAX(name), '[^/]+$', '') AS dir FROM v$datafile"
+  register: df_dir_result
+  when: omf_was_empty
+
+- name: "set db_create_file_dest so Oracle can place the new redo log"
+  oracle_sql:
+    <<: *con_new
+    sql: "ALTER SYSTEM SET db_create_file_dest = '{{ (df_dir_result.data | first)['dir'] }}' SCOPE=MEMORY"
+  when: omf_was_empty
+  failed_when: false
+
+# ── Read current state ────────────────────────────────────────────────────────
+
+- name: "query current redo log group count and size"
+  oracle_sql:
+    <<: *con_new
+    sql: "SELECT count(*) AS cnt, max(bytes)/1024/1024 AS size_mb FROM v$log"
+  register: current_redo
+  failed_when: current_redo.failed
+
+- name: "set baseline facts"
+  set_fact:
+    baseline_groups: "{{ (current_redo.data | first)['cnt'] | int }}"
+    baseline_size_mb: "{{ (current_redo.data | first)['size_mb'] | int }}"
+
+- name: "debug: current redo configuration"
+  debug:
+    msg: "Current redo: {{ baseline_groups }} groups × {{ baseline_size_mb }}M"
+
+# ── Add one group ─────────────────────────────────────────────────────────────
+
+- name: "add one redo log group ({{ baseline_groups | int + 1 }} groups)"
+  oracle_redo:
+    <<: *con_param
+    log_type: redo
+    size: "{{ baseline_size_mb }}M"
+    groups: "{{ baseline_groups | int + 1 }}"
+  register: _
+  failed_when: _.failed or _.changed == false
+
+- name: "verify group count increased"
+  oracle_sql:
+    <<: *con_new
+    sql: "SELECT count(*) AS cnt FROM v$log"
+  register: new_count
+  failed_when: >
+    new_count.failed or
+    (new_count.data | first)['cnt'] | int != baseline_groups | int + 1
+
+- name: "idempotence: same group count, no change"
+  oracle_redo:
+    <<: *con_param
+    log_type: redo
+    size: "{{ baseline_size_mb }}M"
+    groups: "{{ baseline_groups | int + 1 }}"
+  register: _
+  failed_when: _.failed or _.changed == true
+
+# ── Restore original group count ──────────────────────────────────────────────
+# Oracle can only drop non-current (INACTIVE) log groups.
+# If only one group is inactive (the newly added one), this should succeed.
+
+- name: "restore original redo log count ({{ baseline_groups }} groups)"
+  oracle_redo:
+    <<: *con_param
+    log_type: redo
+    size: "{{ baseline_size_mb }}M"
+    groups: "{{ baseline_groups }}"
+  register: restore_result
+  # Use failed_when: false — active log group cannot be dropped.
+  # The test verifies the add succeeded; restore is best-effort.
+  failed_when: false
+
+- name: "warn if restore did not succeed"
+  debug:
+    msg: "WARNING: Could not restore original redo group count — manual cleanup may be needed"
+  when: restore_result.failed | default(false) or restore_result.changed == false
+
+# ── Restore db_create_file_dest if we set it ──────────────────────────────────
+
+- name: "reset db_create_file_dest if we set it for this test"
+  oracle_sql:
+    <<: *con_new
+    sql: "ALTER SYSTEM RESET db_create_file_dest SCOPE=MEMORY"
+  when: omf_was_empty | default(false)
+  failed_when: false
+
+...

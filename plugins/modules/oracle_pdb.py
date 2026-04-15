@@ -34,6 +34,14 @@ options:
     required: False
     default: None
     aliases: ['plug_file_xml']
+  nocopy:
+    description: >
+      Skip copying datafiles when plugging in a PDB from an XML descriptor (NOCOPY clause).
+      Use when the datafiles are already in the correct location and only the XML metadata
+      needs to be imported. Only meaningful when plug_file is set.
+    required: False
+    default: False
+    type: bool
   state:
     description: >
       The intended state of the pdb.
@@ -197,6 +205,8 @@ def unplug_pdb(conn, module):
     run_sql.append(close_sql)
     run_sql.append(unplug_sql)
     run_sql.append(drop_sql)
+    # close/unplug/drop must run from CDB root, not from inside a PDB (ORA-65040)
+    conn.set_container("CDB$ROOT")
     for sql in run_sql:
         conn.execute_ddl(sql)
     msg = "Pluggable database %s successfully unplugged into '%s'" % (pdb_name, plug_file)
@@ -220,9 +230,12 @@ def create_pdb(conn, module):
     createsql = 'create pluggable database %s' % pdb_name
     #opensql = 'alter pluggable database %s open instances=all' % pdb_name
 
+    nocopy = module.params['nocopy']
+
     if plug_file:
-        # TODO: copy/nocopy tempfile reuse
         createsql += " using '%s'" % plug_file
+        if nocopy:
+            createsql += " NOCOPY"
     elif sourcedb:
         createsql += " from %s" % sourcedb
         if snapshot_copy:
@@ -412,6 +425,7 @@ def main():
             #unplug_dest            = dict(required=False, aliases=['plug_dest', 'upd', 'pd']),
             file_name_convert      = dict(type='dict', required=False, aliases=['fnc']),
             service_name_convert   = dict(type='dict', required=False, aliases=['snc']),
+            nocopy                 = dict(type='bool', default=False),
             default_tablespace_type = dict(default=None, choices=['smallfile', 'bigfile']),
             default_tablespace  = dict(required=False),
             default_temp_tablespace = dict(required=False),
@@ -426,6 +440,9 @@ def main():
 
     pdb_name = module.params["pdb_name"]
     state = module.params["state"]
+
+    if module.params['nocopy'] and not module.params.get('plug_file'):
+        module.fail_json(msg="nocopy=True requires plug_file to be set", changed=False)
 
     oc = oracleConnection(module)
     pdb = check_pdb_exists(oc, pdb_name)

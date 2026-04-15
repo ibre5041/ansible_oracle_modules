@@ -1,67 +1,146 @@
 ---
-- name: "define connection parameters"
+# Unplug / plug test rewritten for Docker (running_on_client=true).
+#
+# File existence cannot be verified via the Ansible 'file' module because
+# that module operates on the controller, not on the Oracle server inside
+# the container.  PDB state is verified via oracle_sql queries on v$pdbs.
+#
+# Sequence:
+#   1. Create TESTPDB2 from pdbseed (datafiles under oracle_datadir/TESTPDB2)
+#   2. Unplug TESTPDB2 → XML manifest at /tmp/testpdb2.xml on the Oracle host
+#   3. Verify TESTPDB2 is gone from v$pdbs
+#   4. Plug as TESTPDB3 (copying datafiles to oracle_datadir/TESTPDB3)
+#   5. Verify TESTPDB3 visible in v$pdbs
+#   6. Drop TESTPDB3 (including its copied datafiles)
+#   7. Re-plug original TESTPDB2 datafiles from the XML manifest
+#   8. Drop TESTPDB2
+
+- name: "define CDB connection parameters"
   set_fact:
-    connection_parameters: &con_param
-      service_name: "{{ service_name }}"
-      username: "SYS"
-      password: "{{ sys_password }}"
+    connection_parameters: &con_cdb
+      hostname: "{{ oracle_hostname }}"
+      port: "{{ oracle_port }}"
+      service_name: "{{ oracle_service_name }}"
+      username: "{{ oracle_username }}"
+      password: "{{ oracle_password }}"
+      dsn: "{{ oracle_dsn | default() }}"
       mode: "sysdba"
+      oracle_home: "{{ oracle_home | default() }}"
 
-- name: create an opened PDB2
+# ── Cleanup from any previous failed run ──────────────────────────────────────
+
+- name: "cleanup: drop TESTPDB2 if it exists"
   oracle_pdb:
-    <<: *con_param
-    pdb_name: "TESTPDB2"
-    state: "opened"
-    pdb_admin_username: foo
-    pdb_admin_password: bar
-    file_name_convert: "{{ {pdbseed_path: '/tmp/testpdb2/dbf01'} }}"
+    <<: *con_cdb
+    pdb_name: TESTPDB2
+    state: absent
+  failed_when: false
 
-- name: XML file doesn't exist
-  file:
-    path: "/tmp/testpdb2.xml"
-    state: "absent"
-
-- name: unplug PDB2
+- name: "cleanup: drop TESTPDB3 if it exists"
   oracle_pdb:
-    <<: *con_param
-    pdb_name: "TESTPDB2"
-    state: "absent"
-    unplug_file: "/tmp/testpdb2.xml"
+    <<: *con_cdb
+    pdb_name: TESTPDB3
+    state: absent
+  failed_when: false
 
-- name: XML file was created exists
-  file:
-    path: "/tmp/testpdb2.xml"
-    state: "file"
+# ── Step 1: Create TESTPDB2 from seed ────────────────────────────────────────
 
-- name: DBF file still exists (check only one DBF)
-  file:
-    path: "/tmp/testpdb2/dbf01/system01.dbf"
-    state: "file"
-
-- name: plug in a PDB3
+- name: "create TESTPDB2 from pdbseed"
   oracle_pdb:
-    <<: *con_param
-    pdb_name: "TESTPDB3"
-    state: "opened"
-    plug_file: "/tmp/testpdb2.xml"
-    file_name_convert: "{{ {'/tmp/testpdb2/dbf01': '/tmp/testpdb3/dbf01'} }}"
+    <<: *con_cdb
+    pdb_name: TESTPDB2
+    state: opened
+    pdb_admin_username: pdbadmin
+    pdb_admin_password: Oracle_4U_Pdb1
+    file_name_convert: "{{ {pdbseed_path: oracle_datadir + '/TESTPDB2'} }}"
+  register: _
+  failed_when: _.failed or _.changed == false
 
-- name: drop PDB3
-  oracle_pdb:
-    <<: *con_param
-    pdb_name: "TESTPDB3"
-    state: "absent"
+- name: "verify TESTPDB2 is visible in v$pdbs"
+  oracle_sql:
+    <<: *con_cdb
+    sql: "SELECT count(*) FROM v$pdbs WHERE name = 'TESTPDB2'"
+  register: pdb_check
+  failed_when: pdb_check.failed or (pdb_check.data | first)['count(*)'] | int != 1
 
-- name: replug the PDB2
-  oracle_pdb:
-    <<: *con_param
-    pdb_name: "TESTPDB2"
-    state: "opened"
-    plug_file: "/tmp/testpdb2.xml"
+# ── Step 2: Unplug TESTPDB2 ───────────────────────────────────────────────────
 
-- name: drop PDB2
+- name: "unplug TESTPDB2 to /tmp/testpdb2_unplug.xml"
   oracle_pdb:
-    <<: *con_param
-    pdb_name: "TESTPDB2"
-    state: "absent"
+    <<: *con_cdb
+    pdb_name: TESTPDB2
+    state: unplugged
+    plug_file: "/tmp/testpdb2_unplug.xml"
+  register: _
+  failed_when: _.failed or _.changed == false
+
+# ── Step 3: Verify TESTPDB2 is gone ──────────────────────────────────────────
+
+- name: "verify TESTPDB2 no longer appears in v$pdbs"
+  oracle_sql:
+    <<: *con_cdb
+    sql: "SELECT count(*) FROM v$pdbs WHERE name = 'TESTPDB2'"
+  register: pdb_check
+  failed_when: pdb_check.failed or (pdb_check.data | first)['count(*)'] | int != 0
+
+# ── Step 4: Plug as TESTPDB3 (copy datafiles to new path) ────────────────────
+
+- name: "plug XML as TESTPDB3 with new datafile path"
+  oracle_pdb:
+    <<: *con_cdb
+    pdb_name: TESTPDB3
+    state: opened
+    plug_file: "/tmp/testpdb2_unplug.xml"
+    file_name_convert: "{{ {oracle_datadir + '/TESTPDB2': oracle_datadir + '/TESTPDB3'} }}"
+  register: _
+  failed_when: _.failed or _.changed == false
+
+# ── Step 5: Verify TESTPDB3 ───────────────────────────────────────────────────
+
+- name: "verify TESTPDB3 is visible in v$pdbs"
+  oracle_sql:
+    <<: *con_cdb
+    sql: "SELECT count(*) FROM v$pdbs WHERE name = 'TESTPDB3'"
+  register: pdb_check
+  failed_when: pdb_check.failed or (pdb_check.data | first)['count(*)'] | int != 1
+
+# ── Step 6: Drop TESTPDB3 (including its copied datafiles) ───────────────────
+
+- name: "drop TESTPDB3 including datafiles"
+  oracle_pdb:
+    <<: *con_cdb
+    pdb_name: TESTPDB3
+    state: absent
+  register: _
+  failed_when: _.failed or _.changed == false
+
+# ── Step 7: Re-plug original TESTPDB2 datafiles ───────────────────────────────
+
+- name: "re-plug TESTPDB2 from original XML (original datafiles still on disk)"
+  oracle_pdb:
+    <<: *con_cdb
+    pdb_name: TESTPDB2
+    state: opened
+    plug_file: "/tmp/testpdb2_unplug.xml"
+    nocopy: true
+  register: _
+  failed_when: _.failed or _.changed == false
+
+- name: "verify TESTPDB2 is open again"
+  oracle_sql:
+    <<: *con_cdb
+    sql: "SELECT count(*) FROM v$pdbs WHERE name = 'TESTPDB2' AND open_mode = 'READ WRITE'"
+  register: pdb_check
+  failed_when: pdb_check.failed or (pdb_check.data | first)['count(*)'] | int != 1
+
+# ── Step 8: Final cleanup ─────────────────────────────────────────────────────
+
+- name: "drop TESTPDB2 including datafiles"
+  oracle_pdb:
+    <<: *con_cdb
+    pdb_name: TESTPDB2
+    state: absent
+  register: _
+  failed_when: _.failed or _.changed == false
+
 ...

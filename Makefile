@@ -36,7 +36,18 @@ test-docker: build integration-config-docker
 	    test_oracle_parameter test_oracle_grant test_oracle_pdb \
 	    test_oracle_facts \
 	    test_oracle_wallet test_oracle_tde test_oracle_orapki \
-	    test_oracle_dataguard; do \
+	    test_oracle_dataguard \
+	    test_oracle_dblink \
+	    test_oracle_jobclass test_oracle_jobschedule test_oracle_jobwindow \
+	    test_oracle_job \
+	    test_oracle_audit \
+	    test_oracle_flashback \
+	    test_oracle_quota \
+	    test_oracle_privs \
+	    test_oracle_acl \
+	    test_oracle_stats_prefs \
+	    test_oracle_rsrc_consgroup test_oracle_rsrc_plan \
+	    test_oracle_services; do \
 	  echo ""; \
 	  echo "=== $$ROLE ==="; \
 	  $(MAKE) test ROLE=$$ROLE || FAILED="$$FAILED $$ROLE"; \
@@ -54,7 +65,18 @@ test-docker-ee: build integration-config-ee
 	    test_oracle_parameter test_oracle_grant test_oracle_pdb \
 	    test_oracle_facts \
 	    test_oracle_wallet test_oracle_tde test_oracle_orapki \
-	    test_oracle_dataguard; do \
+	    test_oracle_dataguard \
+	    test_oracle_dblink \
+	    test_oracle_jobclass test_oracle_jobschedule test_oracle_jobwindow \
+	    test_oracle_job \
+	    test_oracle_audit \
+	    test_oracle_flashback \
+	    test_oracle_quota \
+	    test_oracle_privs \
+	    test_oracle_acl \
+	    test_oracle_stats_prefs \
+	    test_oracle_rsrc_consgroup test_oracle_rsrc_plan \
+	    test_oracle_services; do \
 	  echo ""; \
 	  echo "=== $$ROLE ==="; \
 	  $(MAKE) test ROLE=$$ROLE || FAILED="$$FAILED $$ROLE"; \
