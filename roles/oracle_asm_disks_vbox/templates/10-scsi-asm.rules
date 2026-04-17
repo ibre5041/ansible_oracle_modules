@@ -8,6 +8,6 @@ SUBSYSTEM=="block", IMPORT{program}="/etc/udev/udevasm.sh"
 ENV{ASMNAME}!="?*", GOTO="asm_end"
 
 # Otherwise set user, group, privs and also creat a symlink
-OWNER:="oracle", GROUP:="asmdba", MODE:="660",SYMLINK+="$env{ASMNAME}"
+OWNER:="oracle", GROUP:="{{ oracle_asm_disk_group }}", MODE:="660",SYMLINK+="$env{ASMNAME}"
 
 LABEL="asm_end"

@@ -1,4 +1,5 @@
 ---
+
 # defaults file for default_vars_only
 
 # default instalation type, possible values are:
@@ -57,6 +58,7 @@ oracle_install_space:
     oracle_db_ver_path: 23.26.0.0
     oracle_db_media: V1054592-01.zip
     oracle_gi_media: V1054596-01.zip
+    oracle_asm_disk_group: asmdba
   
   21c:
     oracle_sid:         "TEST21C"
@@ -69,7 +71,8 @@ oracle_install_space:
     oracle_db_ver_path: 21.3.0.0
     oracle_db_media: LINUX.X64_213000_db_home.zip
     oracle_gi_media: LINUX.X64_213000_grid_home.zip
-
+    oracle_asm_disk_group: asmadmin
+    
   19c:
     oracle_sid:         "TEST19C"
     oracle_db_name:     "TEST19C"
@@ -82,7 +85,8 @@ oracle_install_space:
     oracle_db_media: db_home_2022_Oct.zip
     # oracle_gi_media: grid_home_2022_Oct.zip
     oracle_gi_media: LINUX.X64_193000_grid_home.zip
-
+    oracle_asm_disk_group: asmadmin
+    
   18c:
     oracle_sid:         "TEST18C"
     oracle_db_name:     "TEST18C"
@@ -94,7 +98,8 @@ oracle_install_space:
     oracle_db_ver_path: 18.0.0.0
     oracle_db_media: LINUX.X64_180000_db_home.zip
     oracle_gi_media: LINUX.X64_180000_grid_home.zip
-
+    oracle_asm_disk_group: asmadmin
+    
 oracle_os_sysctl:
   - sysctl: kernel.shmmni
     value: "4096"

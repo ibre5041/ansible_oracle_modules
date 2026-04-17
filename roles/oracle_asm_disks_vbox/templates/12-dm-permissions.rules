@@ -2,7 +2,7 @@
 ACTION!="add|change", GOTO="dm_end"
 ENV{DM_UDEV_RULES_VSN}!="?*", GOTO="dm_end"
 
-ENV{DM_NAME}=="asmshared*p1", OWNER:="oracle", GROUP:="asmdba", MODE:="660"
+ENV{DM_NAME}=="asmshared*p1", OWNER:="oracle", GROUP:="{{ oracle_asm_disk_group }}", MODE:="660"
 
 LABEL="dm_end"
 
