@@ -21,12 +21,10 @@
     tags: [ base, baseoracle ]
     when: is_vbox_environment
     
-  - role: oracle_crs_19c
-    #oracle_gi_media: "{{ oracle_gi_media | default('LINUX.X64_193000_grid_home.zip') }}"
+  - role: oracle_crs_26ai
     tags: [ oracle, oraclecrs ]
 
   - role: oracle_db_home
-    #oracle_db_media: "{{ oracle_db_media | default('LINUX.X64_193000_db_home.zip') }}"
     tags: [ oracle, oracledbhome ]
 
   - role: oracle_post_install
@@ -36,13 +34,12 @@
     - name: create database
       oracle_db:
         oracle_home: "{{ oracle_install_dir_prod }}/{{ oracle_db_ver_path }}"
-        db_name: 'TEST19C'
-        sid: 'TEST19C'
-        db_unique_name: 'TEST19C_1'
+        db_name: 'TEST26C'
+        sid: 'TEST26C'
+        db_unique_name: 'TEST26C_1'
         sys_password: X43ofljfksjfkhfr3fkh
-        #system_password:
-        #dbsnmp_password:
-        #template:
+        archivelog: true
+        flashback: true
         db_options:
           JSERVER: false
           ORACLE_TEXT: false
@@ -53,15 +50,14 @@
           APEX: false
           DV: false
         initparams:
-          memory_target: 0
-          memory_max_target: 0
-          sga_target: 1500MB
-          sga_max_size: 1500MB
+          sga_target: 4G
+          sga_max_size: 4G
         storage_type: ASM
         datafile_dest: +XDATA
         recoveryfile_dest: +XDATA
         #state: absent
         state: present
+        cdb: true
       tags: [oracledb]
       become_user: "{{ oracle_os_user }}"
       become: yes

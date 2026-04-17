@@ -6,45 +6,44 @@
   become: yes
   become_user: root
   become_method: sudo
-  vars:
-
+    #oracle_db_ver_path: 19.21.0.0
   any_errors_fatal: true
-  roles:    
+  roles:
   - role: default_vars_only
     tags: [always,default_vars_only]
-
+    
   - role: base_oracle_vmware
     tags: [ base, baseoracle ]
     when: is_vmware_environment
-    
+
   - role: base_oracle_vbox
     tags: [ base, baseoracle ]
     when: is_vbox_environment
     
-  - role: oracle_crs_19c
-    #oracle_gi_media: "{{ oracle_gi_media | default('LINUX.X64_193000_grid_home.zip') }}"
-    tags: [ oracle, oraclecrs ]
-
+  - role: oracle_restart_19c
+    oracle_gi_media: "{{ oracle_gi_image | default('LINUX.X64_193000_grid_home.zip') }}"
+    tags: [ oraclerestart ]
+    
   - role: oracle_db_home
-    #oracle_db_media: "{{ oracle_db_media | default('LINUX.X64_193000_db_home.zip') }}"
+    oracle_db_media: "{{ oracle_db_image | default('LINUX.X64_193000_db_home.zip') }}"
     tags: [ oracle, oracledbhome ]
-
+    
   - role: oracle_post_install
     tags: [ oraclepost ]
 
-  tasks:      
+  tasks:
     - name: create database
       oracle_db:
-        oracle_home: "{{ oracle_install_dir_prod }}/{{ oracle_db_ver_path }}"
+        oracle_home: "/oracle/u01/product/{{ oracle_db_ver_path }}"
         db_name: 'TEST19C'
         sid: 'TEST19C'
         db_unique_name: 'TEST19C_1'
-        sys_password: X43ofljfksjfkhfr3fkh
+        sys_password: X43ofljfksjfkhfr3fkh        
         #system_password:
         #dbsnmp_password:
         #template:
         db_options:
-          JSERVER: false
+          SERVER: true
           ORACLE_TEXT: false
           IMEDIA: false
           CWMLITE: false
@@ -65,4 +64,3 @@
       tags: [oracledb]
       become_user: "{{ oracle_os_user }}"
       become: yes
-      when: ansible_hostname == first_rac_node
