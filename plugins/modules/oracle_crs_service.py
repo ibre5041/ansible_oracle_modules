@@ -300,7 +300,7 @@ class oracle_crs_service:
         for rac_param in ['serverpool', 'preferred', 'available', 'cardinality']:
             val = self.module.params.get(rac_param)
             if val:
-                wanted_set.add((rac_param, val.upper()))
+                wanted_set.add((rac_param, val))
 
         current_set = set()
         # current_set.add(("db", self.curent_resource.get('???', None)))
