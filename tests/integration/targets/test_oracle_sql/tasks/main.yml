@@ -10,6 +10,8 @@
     - include_tasks: "special_cases.yml"
     - include_tasks: "check_mode.yml"
     - include_tasks: "dbms_output.yml"
+    - include_tasks: "cdb.yml"
+      when: running_on_cdb | default(false)
 
   environment:
     ORACLE_SID: "{{ oracle_sid | default() }}"
