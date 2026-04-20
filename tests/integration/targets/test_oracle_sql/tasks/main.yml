@@ -4,7 +4,7 @@
   block:
     - include_tasks: "select.yml"
     - include_tasks: "ddl.yml"
-      when: not (running_on_cdb | default(false)) or (oracle_pdb_service_name is defined and oracle_pdb_service_name)
+      when: not (running_on_cdb | default(false)) or (oracle_pdb_service_name is defined and oracle_pdb_service_name | length > 0)
     - include_tasks: "plsql_block.yml"
     - include_tasks: "sql_file.yml"
     - include_tasks: "special_cases.yml"
