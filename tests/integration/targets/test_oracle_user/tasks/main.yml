@@ -1,6 +1,7 @@
 ---
 
 - name: Role tasks with env
+  when: not (running_on_cdb | default(false)) or (oracle_pdb_service_name is defined and oracle_pdb_service_name)
   block:
     - include_tasks: "change_state.yml"
     - include_tasks: "check_mode.yml"

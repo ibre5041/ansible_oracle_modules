@@ -98,13 +98,13 @@ def check_parameter_exists(conn, parameter_name):
         # 'display_value': '19.0.0'}
     else:
         sql = """
-        select lower(name) as name, 
-        value as CURRENT_VALUE, 
-        ISMODIFIED,-- was modified since startup
+        select lower(name) as name,
+        value as CURRENT_VALUE,
+        ISMODIFIED,
         ISDEFAULT,
         DEFAULT_VALUE,
-        DISPLAY_VALUE  
-        from v$parameter where name = lower(:parameter_name)
+        DISPLAY_VALUE
+        from v$system_parameter where name = lower(:parameter_name)
         """
         p = conn.execute_select_to_dict(sql, {"parameter_name": parameter_name}, fetchone=True)
 
