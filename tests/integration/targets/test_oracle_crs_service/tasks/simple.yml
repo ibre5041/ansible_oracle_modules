@@ -19,7 +19,16 @@
 - name: database facts
   set_fact:
     db_name: "{{ database_facts.ansible_facts[oracle_sid].parameter['db_unique_name'].value }}"
+    instance_names: "{{ database_facts.ansible_facts[oracle_sid].rac | map(attribute='instance_name') | list }}"
 
+- name: database_facts
+  debug:
+    var: database_facts
+
+- name: instance_names
+  debug:
+    var: instance_names
+    
 - name: First remove the service
   oracle_crs_service:
     name: "{{ db_name }}_PRIMARY"
@@ -36,6 +45,7 @@
     name: "{{ db_name }}_PRIMARY"
     db: "{{ db_name }}"  
     state: present
+    preferred: "{{ instance_names | join(',') }}"
   check_mode: yes    
   register: _
   failed_when: not 'add service' in _.commands[0] or not _.changed or _.failed
@@ -48,6 +58,7 @@
     name: "{{ db_name }}_PRIMARY"
     db: "{{ db_name }}"
     state: present
+    preferred: "{{ instance_names | join(',') }}"
   check_mode: no
   register: _
   failed_when: not 'add service' in _.commands[0] or not _.changed or _.failed
@@ -60,6 +71,7 @@
     name: "{{ db_name }}_PRIMARY"
     db: "{{ db_name }}"
     state: present
+    preferred: "{{ instance_names | join(',') }}"
   check_mode: yes    
   register: _
   failed_when: _.commands or _.changed or _.failed
