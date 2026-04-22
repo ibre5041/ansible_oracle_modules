@@ -1,4 +1,5 @@
 ---
+
 - name: "define connection parameters"
   set_fact:
     connection_parameters: &con_param
