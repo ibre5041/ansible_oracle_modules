@@ -1,6 +1,7 @@
 ---
 
 - name: Role tasks with env
+  when: not (running_on_cdb | default(false)) or (oracle_pdb_service_name is defined and oracle_pdb_service_name | length > 0)
   block:
     - include_tasks: "simple.yml"
     - include_tasks: "issue_4.yml"

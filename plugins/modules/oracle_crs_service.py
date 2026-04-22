@@ -136,6 +136,23 @@ options:
       - "-stopoption <stop_options>     Options to stop service (e.g. TRANSACTIONAL or IMMEDIATE)"
     choices: ['TRANSACTIONAL', 'IMMEDIATE']
     required: false
+  preferred:
+    description:
+      - "-preferred <node_list> Comma-separated list of preferred nodes for administrator-managed RAC services"
+    required: false
+  available:
+    description:
+      - "-available <node_list> Comma-separated list of available nodes for administrator-managed RAC services"
+    required: false
+  serverpool:
+    description:
+      - "-serverpool <pool_name> Server pool name for policy-managed RAC services"
+    required: false
+  cardinality:
+    description:
+      - "-cardinality (UNIFORM | SINGLETON) Cardinality for policy-managed RAC services"
+    choices: ['UNIFORM', 'SINGLETON']
+    required: false
 notes:
   - Should be executed with privileges of Oracle CRS installation owner
 author: Ivan Brezina
@@ -280,6 +297,10 @@ class oracle_crs_service:
                 wanted_set.add((pname, param))
             elif param:
                 wanted_set.add((pname, param.upper()))
+        for rac_param in ['serverpool', 'preferred', 'available', 'cardinality']:
+            val = self.module.params.get(rac_param)
+            if val:
+                wanted_set.add((rac_param, val))
 
         current_set = set()
         # current_set.add(("db", self.curent_resource.get('???', None)))
@@ -306,6 +327,10 @@ class oracle_crs_service:
         current_set.add(("tablefamilyid", self.curent_resource.get('TABLE_FAMILY_ID', None)))
         current_set.add(("drain_timeout", self.curent_resource.get('DRAIN_TIMEOUT', None)))
         current_set.add(("stopoption", self.curent_resource.get('STOP_OPTION', '').upper())) # CRS stores is as lowercase
+        current_set.add(("serverpool", self.curent_resource.get('SERVER_POOL', None)))
+        current_set.add(("cardinality", self.curent_resource.get('CARDINALITY', None)))
+        current_set.add(("preferred", self.curent_resource.get('PREFERRED', None)))
+        current_set.add(("available", self.curent_resource.get('AVAILABLE', None)))
 
         apply = False
         changes = wanted_set.difference(current_set)
@@ -436,6 +461,11 @@ def main():
         drain_timeout=dict(required=False),
         # <stop_options> Options to stop service (e.g. TRANSACTIONAL or IMMEDIATE)
         stopoption=dict(required=False, choices=['TRANSACTIONAL', 'IMMEDIATE']),
+        # RAC placement options (required for srvctl add service on RAC)
+        preferred=dict(required=False),
+        available=dict(required=False),
+        serverpool=dict(required=False),
+        cardinality=dict(required=False, choices=['UNIFORM', 'SINGLETON']),
     )
     # global is Python keyword, use this hack to use 'global' as ansible module parameter
     argument_spec.update({'global': dict(required=False, type='bool')})
