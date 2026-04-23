@@ -435,6 +435,7 @@ def test_crs_service_present_existing_no_change(monkeypatch):
     svc_out = _svc_crsctl_output("MYDB", "MYSVC")
     responses = [
         (0, svc_out, ""),                                # crsctl stat res → found
+        (0, "", ""),                                     # srvctl config service
         (0, "Service MYSVC is running on MYDB.", ""),    # srvctl status service
     ]
     Mod = _make_mod(_crs_svc_params(), responses)
@@ -453,6 +454,7 @@ def test_crs_service_present_existing_modifies(monkeypatch):
     svc_out = _svc_crsctl_output("MYDB", "MYSVC", {"CLB_GOAL": "LONG"})
     responses = [
         (0, svc_out, ""),                                # crsctl stat res → found
+        (0, "", ""),                                     # srvctl config service
         (0, "", ""),                                     # srvctl modify service
         (0, "Service MYSVC is running on MYDB.", ""),    # srvctl status service
     ]
@@ -472,6 +474,7 @@ def test_crs_service_absent_existing_removes(monkeypatch):
     svc_out = _svc_crsctl_output("MYDB", "MYSVC")
     responses = [
         (0, svc_out, ""),    # crsctl stat res → found
+        (0, "", ""),         # srvctl config service
     ]
     Mod = _make_mod(_crs_svc_params(state="absent"), responses, check_mode=True)
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
@@ -489,6 +492,7 @@ def test_crs_service_state_started_running(monkeypatch):
     svc_out = _svc_crsctl_output("MYDB", "MYSVC")
     responses = [
         (0, svc_out, ""),                                # crsctl stat res → found
+        (0, "", ""),                                     # srvctl config service
         (0, "Service MYSVC is running on MYDB.", ""),    # srvctl status service
     ]
     Mod = _make_mod(_crs_svc_params(state="started"), responses)
@@ -508,6 +512,7 @@ def test_crs_service_state_started_not_running(monkeypatch):
     svc_out = _svc_crsctl_output("MYDB", "MYSVC")
     responses = [
         (0, svc_out, ""),                                        # crsctl stat res → found
+        (0, "", ""),                                             # srvctl config service
         (0, "Service MYSVC is not running on MYDB.", ""),        # srvctl status service
         (0, "", ""),                                             # srvctl start service
     ]
@@ -528,6 +533,7 @@ def test_crs_service_state_stopped_running(monkeypatch):
     svc_out = _svc_crsctl_output("MYDB", "MYSVC")
     responses = [
         (0, svc_out, ""),                                # crsctl stat res → found
+        (0, "", ""),                                     # srvctl config service
         (0, "Service MYSVC is running on MYDB.", ""),    # srvctl status service
         (0, "", ""),                                     # srvctl stop service
     ]
@@ -548,6 +554,7 @@ def test_crs_service_state_restarted(monkeypatch):
     svc_out = _svc_crsctl_output("MYDB", "MYSVC")
     responses = [
         (0, svc_out, ""),                                # crsctl stat res → found
+        (0, "", ""),                                     # srvctl config service
         (0, "Service MYSVC is running on MYDB.", ""),    # srvctl status service
         (0, "", ""),                                     # srvctl stop service
         (0, "", ""),                                     # srvctl start service

@@ -297,10 +297,11 @@ class oracle_crs_service:
         for line in stdout.splitlines():
             if line.startswith('Service is enabled'):
                 self.curent_resource['ENABLED'] = True
-                continue
             
             if line.startswith('Service is disabled'):
                 self.curent_resource['ENABLED'] = False
+
+            if ': ' not in line:
                 continue
             
             (key, value) = line.split(': ', 1)
