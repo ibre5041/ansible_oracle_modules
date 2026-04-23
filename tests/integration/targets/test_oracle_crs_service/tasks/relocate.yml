@@ -1,0 +1,142 @@
+---
+
+- name: Oracle DB facts
+  oracle_facts:
+    mode: sysdba
+    userenv: false
+    database: true
+    instance: false
+    redo: summary
+    standby: summary
+    parameter:
+      - audit_file_dest
+      - db_name
+      - db_unique_name
+      - instance_name
+      - service_names
+  register: database_facts
+
+- name: database_facts
+  debug:
+    var: database_facts
+  
+- name: "database facts {{ item }}"
+  set_fact:
+    "{{ item.name }}": "{{ item.value }}"
+  loop:
+    - { "name": "db_unique_name", "value": "{{ database_facts.ansible_facts[oracle_sid].parameter['db_unique_name'].value }}" }
+    - { "name": "db_name", "value": "{{ database_facts.ansible_facts[oracle_sid].parameter['db_name'].value }}" }    
+    - { "name": "instance_names", "value": "{{ database_facts.ansible_facts[oracle_sid].rac | map(attribute='instance_name') | list }}" }
+
+- name: instance_names
+  debug:
+    var: instance_names
+    
+- name: First remove the service
+  oracle_crs_service:
+    name: "{{ db_name }}_PRIMARY"
+    db: "{{ db_unique_name }}"
+    state: absent
+    force: true
+  register: _
+  
+- name: First remove the service
+  debug: var=_
+  
+- name: Register database service (check mode)
+  oracle_crs_service:
+    name: "{{ db_name }}_PRIMARY"
+    db: "{{ db_unique_name }}"
+    state: present
+    preferred: "{{ instance_names | join(',') }}"
+  check_mode: yes    
+  register: _
+  failed_when: not 'add service' in _.commands[0] or not _.changed or _.failed
+
+- name: Register database service (check mode)
+  debug: var=_
+  
+- name: Register database service (apply mode)
+  oracle_crs_service:
+    name: "{{ db_name }}_PRIMARY"
+    db: "{{ db_unique_name }}"
+    state: present
+    preferred: "{{ instance_names | join(',') }}"
+  check_mode: no
+  register: _
+  failed_when: not 'add service' in _.commands[0] or not _.changed or _.failed
+
+- name: Register database service (apply mode)
+  debug: var=_
+
+- name: Register database service (apply mode - no change)
+  oracle_crs_service:
+    name: "{{ db_name }}_PRIMARY"
+    db: "{{ db_unique_name }}"
+    state: present
+    preferred: "{{ instance_names | join(',') }}"
+  check_mode: yes    
+  register: _
+  failed_when: _.commands or _.changed or _.failed
+
+- name: Register database service (apply mode - no change)
+  debug: var=_
+
+- name: Alter service attributes preferred1, available2
+  oracle_crs_service:
+    name: "{{ db_name }}_PRIMARY"
+    db: "{{ db_unique_name }}"
+    state: present
+    preferred: "{{ instance_names | first }}"
+    available: "{{ instance_names | last }}"
+  register: _
+
+- name: Alter service attributes preferred1, available2
+  debug: var=_
+
+- name: Alter service attributes preferred2, available1
+  oracle_crs_service:
+    name: "{{ db_name }}_PRIMARY"
+    db: "{{ db_unique_name }}"
+    state: present
+    preferred: "{{ instance_names | last }}"
+    available: "{{ instance_names | first }}"
+  register: _
+  failed_when: _.failed
+  
+- name: Alter service attributes preferred2, available1
+  debug: var=_
+
+- name: Alter service attributes preferred12
+  oracle_crs_service:
+    name: "{{ db_name }}_PRIMARY"
+    db: "{{ db_unique_name }}"
+    state: present
+    preferred: "{{ instance_names | join(',') }}"
+  register: _
+  failed_when: _.failed
+  
+- name: Alter database attributes preferred2, available1
+  debug: var=_
+  
+- name: Start database service
+  oracle_crs_service:
+    name: "{{ db_name }}_PRIMARY"
+    db: "{{ db_unique_name }}"
+    state: started
+  register: _
+  failed_when: _.failed
+
+- name: Start database service
+  debug: var=_
+
+- name: Restart database service
+  oracle_crs_service:
+    name: "{{ db_name }}_PRIMARY"
+    db: "{{ db_unique_name }}"
+    state: restarted
+  register: _
+  failed_when: not _.changed
+
+- name: Restart database service
+  debug: var=_

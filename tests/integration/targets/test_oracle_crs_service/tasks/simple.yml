@@ -16,14 +16,17 @@
       - service_names
   register: database_facts
 
-- name: database facts
-  set_fact:
-    db_name: "{{ database_facts.ansible_facts[oracle_sid].parameter['db_unique_name'].value }}"
-    instance_names: "{{ database_facts.ansible_facts[oracle_sid].rac | map(attribute='instance_name') | list }}"
-
 - name: database_facts
   debug:
     var: database_facts
+  
+- name: "database facts {{ item }}"
+  set_fact:
+    "{{ item.name }}": "{{ item.value }}"
+  loop:
+    - { "name": "db_unique_name", "value": "{{ database_facts.ansible_facts[oracle_sid].parameter['db_unique_name'].value }}" }
+    - { "name": "db_name", "value": "{{ database_facts.ansible_facts[oracle_sid].parameter['db_name'].value }}" }    
+    - { "name": "instance_names", "value": "{{ database_facts.ansible_facts[oracle_sid].rac | map(attribute='instance_name') | list }}" }
 
 - name: instance_names
   debug:
@@ -32,7 +35,7 @@
 - name: First remove the service
   oracle_crs_service:
     name: "{{ db_name }}_PRIMARY"
-    db: "{{ db_name }}"
+    db: "{{ db_unique_name }}"
     state: absent
     force: true
   register: _
@@ -43,7 +46,7 @@
 - name: Register database service (check mode)
   oracle_crs_service:
     name: "{{ db_name }}_PRIMARY"
-    db: "{{ db_name }}"  
+    db: "{{ db_unique_name }}"
     state: present
     preferred: "{{ instance_names | join(',') }}"
   check_mode: yes    
@@ -56,7 +59,7 @@
 - name: Register database service (apply mode)
   oracle_crs_service:
     name: "{{ db_name }}_PRIMARY"
-    db: "{{ db_name }}"
+    db: "{{ db_unique_name }}"
     state: present
     preferred: "{{ instance_names | join(',') }}"
   check_mode: no
@@ -69,7 +72,7 @@
 - name: Register database service (apply mode - no change)
   oracle_crs_service:
     name: "{{ db_name }}_PRIMARY"
-    db: "{{ db_name }}"
+    db: "{{ db_unique_name }}"
     state: present
     preferred: "{{ instance_names | join(',') }}"
   check_mode: yes    
@@ -79,10 +82,10 @@
 - name: Register database service (apply mode - no change)
   debug: var=_
 
-- name: Alter database attributes (DG Standby)
+- name: Alter service attributes (DG Standby)
   oracle_crs_service:
     name: "{{ db_name }}_PRIMARY"
-    db: "{{ db_name }}"
+    db: "{{ db_unique_name }}"
     state: present
     role: PHYSICAL_STANDBY
     # policy: MANUAL
@@ -96,13 +99,13 @@
     # stopoption: IMMEDIATE
   register: _
 
-- name: Alter database attributes (DG Standby)
+- name: Alter service attributes (DG Standby)
   debug: var=_
 
-- name: Alter database attributes (DG Standby) (Again no change)
+- name: Alter service attributes (DG Standby) (Again no change)
   oracle_crs_service:
     name: "{{ db_name }}_PRIMARY"
-    db: "{{ db_name }}"
+    db: "{{ db_unique_name }}"
     state: present
     role: PHYSICAL_STANDBY
     # policy: MANUAL
@@ -117,14 +120,14 @@
   register: _
   failed_when: _.changed or _.failed
   
-- name: Alter database attributes (DG Standby)
+- name: Alter service attributes (DG Standby)
   debug: var=_
 
 # https://www.dbgenre.com/post/creating-readonly-service-in-oracle-adg-active-dataguard
 - name: Start database service (1st start usually fails in PHYSICAL_STANDBY)
   oracle_crs_service:
     name: "{{ db_name }}_PRIMARY"
-    db: "{{ db_name }}"
+    db: "{{ db_unique_name }}"
     state: started
   register: _
   failed_when: not _.changed
@@ -135,7 +138,7 @@
 - name: Restart database service
   oracle_crs_service:
     name: "{{ db_name }}_PRIMARY"
-    db: "{{ db_name }}"
+    db: "{{ db_unique_name }}"
     state: restarted
   register: _
   failed_when: not _.changed
@@ -143,22 +146,22 @@
 - name: Restart database service
   debug: var=_
 
-- name: Disable database
+- name: Disable database service
   oracle_crs_service:
     name: "{{ db_name }}_PRIMARY"
-    db: "{{ db_name }}"
+    db: "{{ db_unique_name }}"
     state: present
     enabled: false
   register: _
   failed_when: not 'disable service' in _.commands[0] or not _.changed or _.failed
 
-- name: Disable database
+- name: Disable database service
   debug: var=_
   
 - name: Enable database service
   oracle_crs_service:
     name: "{{ db_name }}_PRIMARY"
-    db: "{{ db_name }}"
+    db: "{{ db_unique_name }}"
     state: present
     enabled: true
   register: _
@@ -170,7 +173,7 @@
 - name: Stop database service
   oracle_crs_service:
     name: "{{ db_name }}_PRIMARY"
-    db: "{{ db_name }}"
+    db: "{{ db_unique_name }}"
     state: stopped
     enabled: false
   register: _
@@ -179,61 +182,60 @@
 - name: Stop database service
   debug: var=_
 
-- name: Start disabled database - should fail
+- name: Start disabled service - should fail
   oracle_crs_service:
     name: "{{ db_name }}_PRIMARY"
-    db: "{{ db_name }}"
+    db: "{{ db_unique_name }}"
     state: started
     enabled: false 
   register: _
   failed_when: not _.failed
 
-- name: Start disabled database - should fail
+- name: Start disabled service - should fail
   debug: var=_
 
-- name: Restart database (and enable it) I
+- name: Restart service (and enable it) I
   oracle_crs_service:
     name: "{{ db_name }}_PRIMARY"
-    db: "{{ db_name }}"
+    db: "{{ db_unique_name }}"
     state: restarted
     enabled: true
   register: _
   failed_when: not _.changed or _.failed
 
-- name: Restart database (and enable it) I
+- name: Restart service (and enable it) I
   debug: var=_
 
-- name: Restart database (and enable it) II
+- name: Restart service (and enable it) II
   oracle_crs_service:
     name: "{{ db_name }}_PRIMARY"
-    db: "{{ db_name }}"    
+    db: "{{ db_unique_name }}"    
     state: restarted
   register: _
   failed_when: not _.changed or _.failed
 
-- name: Restart database (and enable it) II
+- name: Restart service (and enable it) II
   debug: var=_
   
-- name: Stop database
+- name: Stop service
   oracle_crs_service:
     name: "{{ db_name }}_PRIMARY"
-    db: "{{ db_name }}"    
+    db: "{{ db_unique_name }}"    
     state: stopped
     enabled: true
   register: _
   failed_when: not _.changed or _.failed
 
-- name: Stop database
+- name: Stop service
   debug: var=_
   
-- name: Restart database III
+- name: Restart service III
   oracle_crs_service:
     name: "{{ db_name }}_PRIMARY"
-    db: "{{ db_name }}"    
+    db: "{{ db_unique_name }}"    
     state: restarted
   register: _
   failed_when: not (_.commands | length == 1) or not _.changed or _.failed
 
-- name: Restart database III
+- name: Restart service III
   debug: var=_
-  
