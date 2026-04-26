@@ -21,4 +21,12 @@
   register: _
   failed_when: _.failed
 
+- name: make sure wallet directory exists {{ oracle_wallet_location }}
+  file:
+    path: "{{ oracle_wallet_location }}"
+    state: absent
+    #owner: "{{ oracle_os_user }}"
+    #group: "{{ oracle_os_group }}"
+    recurse: yes
+
 ...

@@ -24,3 +24,6 @@ running_on_client: false
 running_on_adb: false
 
 --mode: "sysdba"
+
+#
+oracle_wallet_location: /home/oracle/wallet
