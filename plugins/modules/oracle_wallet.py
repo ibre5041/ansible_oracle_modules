@@ -401,6 +401,24 @@ def _aggregate_wallet_rows(rows):
     }
 
 
+def tde_key_exists(conn):
+    """Return True if at least one TDE master key has been activated.
+
+    Queries V$ENCRYPTION_KEYS which is only populated after
+    ADMINISTER KEY MANAGEMENT SET KEY has been run at least once.
+    Returns False (not raises) on any error so that callers on editions or
+    versions where the view is unavailable degrade gracefully.
+    """
+    try:
+        sql = "SELECT COUNT(*) as CNT FROM V$ENCRYPTION_KEYS"
+        row = conn.execute_select_to_dict(sql, fetchone=True)
+        if row:
+            return int(row.get('CNT', 0)) > 0
+        return False
+    except Exception:
+        return False
+
+
 def get_wallet_status(conn, container=None):
     """Query V$ENCRYPTION_WALLET for keystore status.
 
@@ -749,6 +767,7 @@ def main():
             wrl_type=status.get('wrl_type', '') if status else '',
             wrl_parameter=status.get('wrl_parameter', '') if status else '',
             secrets=[{'client': _vwallet_field(s, 'CLIENT'), 'tag': _vwallet_field(s, 'SECRET_TAG')} for s in secrets],
+            tde_key_present=tde_key_exists(conn_),
         )
 
     if module.check_mode:
@@ -770,6 +789,7 @@ def main():
             wallet_status=status.get('status', '') if status else '',
             wallet_type=status.get('wallet_type', '') if status else '',
             keystore_mode=status.get('keystore_mode', '') if status else '',
+            tde_key_present=tde_key_exists(conn),
         )
 
     if state == 'status':
@@ -813,6 +833,7 @@ def main():
             wallet_status=status.get('status', '') if status else '',
             wallet_type=status.get('wallet_type', '') if status else '',
             keystore_mode=status.get('keystore_mode', '') if status else '',
+            tde_key_present=tde_key_exists(conn),
         )
 
 
