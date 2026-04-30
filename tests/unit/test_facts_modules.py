@@ -772,6 +772,39 @@ def test_gather_subset_redolog_does_not_override_existing_redo(monkeypatch):
     assert "redo" in exc.value.args[0]["ansible_facts"]["ORCL"]
 
 
+def test_gather_subset_unknown_warns(monkeypatch):
+    """Unknown gather_subset values trigger module.warn()."""
+    mod = _load()
+    os.environ["ORACLE_SID"] = "ORCL"
+
+    class Mod(BaseFakeModule):
+        params = _facts_params(database=False, userenv=False,
+                               gather_subset=['database', 'nonexistent_subset'])
+
+    module_instance = None
+
+    original_mod_class = Mod
+
+    class CapturingMod(original_mod_class):
+        def __init__(self, **kwargs):
+            super().__init__(**kwargs)
+            nonlocal module_instance
+            module_instance = self
+
+    monkeypatch.setattr(mod, "AnsibleModule", CapturingMod)
+    monkeypatch.setattr(mod, "oracleConnection", lambda m: _FactsConn(m), raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    # Module must succeed (not fail)
+    assert exc.value.args[0]["changed"] is False
+    # 'database' subset must be honoured
+    assert "database" in exc.value.args[0]["ansible_facts"]["ORCL"]
+    # The unknown subset must have triggered a warning
+    assert module_instance is not None
+    assert any("nonexistent_subset" in w for w in module_instance._warnings)
+
+
 # ===========================================================================
 # detect_paths tests (lines 97-156)
 # ===========================================================================

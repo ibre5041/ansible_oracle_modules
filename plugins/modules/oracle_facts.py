@@ -58,6 +58,18 @@ options:
     required: false
     default: None
     choices: [None, 'detail', 'summary']
+  gather_subset:
+    description:
+      - Specify the subset of facts to gather.
+      - C(min) and C(database) are aliases and gather the same database facts.
+      - C(all) gathers all available facts.
+      - Unrecognized values produce a warning but do not fail.
+    type: list
+    elements: str
+    required: false
+    default: null
+    choices: ['all', 'database', 'instance', 'min', 'option', 'parameter',
+              'pdb', 'rac', 'redolog', 'tablespace', 'userenv', 'user']
 notes:
   - oracledb needs to be installed
   - Oracle RDBMS 10gR2 or later required
@@ -354,7 +366,7 @@ def main():
                 module.params['redo'] = 'summary'
         if enable_all or 'parameter' in subset:
             if not module.params.get('parameter'):
-                module.params['parameter'] = ['all']
+                module.params['parameter'] = '@all@'
         # 'pdb', 'rac', 'user', 'option' recognized but not yet implemented
         unsupported = subset - {'all', 'database', 'min', 'instance', 'tablespace',
                                 'userenv', 'redolog', 'parameter', 'pdb', 'rac', 'user', 'option'}
