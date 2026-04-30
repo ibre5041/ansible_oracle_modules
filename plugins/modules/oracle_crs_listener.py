@@ -181,7 +181,7 @@ class oracle_crs_listener:
             srvctl_status = [self.srvctl, 'status', 'listener', '-l', resource_name]
             (rc, stdout, _) = self.module.run_command(srvctl_status)
             running = any('is running' in line for line in stdout.splitlines())
-            if running and not self.module.check_mode:
+            if running:
                 srvctl_stop = [self.srvctl, 'stop', 'listener', '-l', resource_name]
                 self.run_change_command(srvctl_stop)
             srvctl.extend(['remove', 'listener', '-l', resource_name])

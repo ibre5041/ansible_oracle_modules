@@ -320,13 +320,13 @@ def test_crs_listener_present_existing_no_change(monkeypatch):
 
 
 def test_crs_listener_absent_existing_check_mode(monkeypatch):
-    """state=absent, listener exists → remove (check_mode); status checked but stop skipped."""
+    """state=absent, running listener, check_mode → stop and remove recorded but not executed."""
     mod = _load("oracle_crs_listener")
     lsnr_out = _crsctl_output("listener", "listener")
     responses = [
         (0, lsnr_out, ""),                            # crsctl stat res → found
         (0, "Listener is running.", ""),              # srvctl status listener (read-only check)
-        # check_mode=True: srvctl stop/remove not executed
+        # check_mode=True: run_change_command records stop+remove without calling run_command
     ]
     Mod = _make_mod(_listener_params(state="absent"), responses, check_mode=True)
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
@@ -334,7 +334,13 @@ def test_crs_listener_absent_existing_check_mode(monkeypatch):
 
     with pytest.raises(ExitJson) as exc:
         mod.main()
-    assert exc.value.args[0]["changed"] is True
+    result = exc.value.args[0]
+    assert result["changed"] is True
+    commands = result["commands"]
+    assert any("stop" in c for c in commands), "stop must appear in check-mode output"
+    stop_idx = next(i for i, c in enumerate(commands) if "stop" in c)
+    remove_idx = next(i for i, c in enumerate(commands) if "remove" in c)
+    assert stop_idx < remove_idx
 
 
 # ===========================================================================
