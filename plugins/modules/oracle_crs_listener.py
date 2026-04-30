@@ -177,9 +177,16 @@ class oracle_crs_listener:
         elif self.curent_resource and state in ['present', 'started', 'stopped', 'restarted']:
             srvctl.extend(['modify', 'listener', '-l', resource_name])
         elif self.curent_resource and state == 'absent':
+            # Stop listener first — port stays reserved until stopped (PRCN-2065)
+            srvctl_status = [self.srvctl, 'status', 'listener', '-l', resource_name]
+            (rc, stdout, _) = self.module.run_command(srvctl_status)
+            running = any('is running' in line for line in stdout.splitlines())
+            if running and not self.module.check_mode:
+                srvctl_stop = [self.srvctl, 'stop', 'listener', '-l', resource_name]
+                self.run_change_command(srvctl_stop)
             srvctl.extend(['remove', 'listener', '-l', resource_name])
             if self.module.params['force']:
-                srvctl.append('-force')            
+                srvctl.append('-force')
             apply = True
         elif (not self.curent_resource) and state == 'absent':
             self.module.exit_json(msg='Listener resource is already absent', commands=self.commands, changed=self.changed)
