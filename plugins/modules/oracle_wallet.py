@@ -410,10 +410,10 @@ def tde_key_exists(conn):
     versions where the view is unavailable degrade gracefully.
     """
     try:
-        sql = "SELECT COUNT(*) as CNT FROM V$ENCRYPTION_KEYS"
+        sql = "SELECT COUNT(*) as cnt FROM V$ENCRYPTION_KEYS"
         row = conn.execute_select_to_dict(sql, fetchone=True)
         if row:
-            return int(row.get('CNT', 0)) > 0
+            return int(row.get('cnt', 0)) > 0
         return False
     except Exception:
         return False

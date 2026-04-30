@@ -821,7 +821,7 @@ def test_tde_key_exists_returns_true_when_count_positive():
     class _KeyConn(BaseFakeConn):
         def execute_select_to_dict(self, sql, params=None, fetchone=False, fail_on_error=True):
             if 'V$ENCRYPTION_KEYS' in sql.upper():
-                return {'CNT': 3} if fetchone else [{'CNT': 3}]
+                return {'cnt': 3} if fetchone else [{'cnt': 3}]
             return {} if fetchone else []
 
     conn = _KeyConn(None)
@@ -835,7 +835,7 @@ def test_tde_key_exists_returns_false_when_count_zero():
     class _KeyConn(BaseFakeConn):
         def execute_select_to_dict(self, sql, params=None, fetchone=False, fail_on_error=True):
             if 'V$ENCRYPTION_KEYS' in sql.upper():
-                return {'CNT': 0} if fetchone else [{'CNT': 0}]
+                return {'cnt': 0} if fetchone else [{'cnt': 0}]
             return {} if fetchone else []
 
     conn = _KeyConn(None)
@@ -861,7 +861,7 @@ def test_wallet_status_includes_tde_key_present(monkeypatch):
     class _TdeWalletConn(_WalletConn):
         def execute_select_to_dict(self, sql, params=None, fetchone=False, fail_on_error=True):
             if 'V$ENCRYPTION_KEYS' in sql.upper():
-                return {'CNT': 1} if fetchone else [{'CNT': 1}]
+                return {'cnt': 1} if fetchone else [{'cnt': 1}]
             return super().execute_select_to_dict(sql, params=params, fetchone=fetchone, fail_on_error=fail_on_error)
 
     class Mod(BaseFakeModule):
@@ -884,7 +884,7 @@ def test_wallet_present_includes_tde_key_present(monkeypatch):
     class _TdeWalletConn(_WalletConn):
         def execute_select_to_dict(self, sql, params=None, fetchone=False, fail_on_error=True):
             if 'V$ENCRYPTION_KEYS' in sql.upper():
-                return {'CNT': 0} if fetchone else [{'CNT': 0}]
+                return {'cnt': 0} if fetchone else [{'cnt': 0}]
             return super().execute_select_to_dict(sql, params=params, fetchone=fetchone, fail_on_error=fail_on_error)
 
     class Mod(BaseFakeModule):
