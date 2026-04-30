@@ -12,7 +12,7 @@
       password: "{{ oracle_password }}"
       dsn: "{{ oracle_dsn }}"
       oracle_home: "{{ oracle_home }}"
-      mode: "{{ mode }}"
+      mode: "{{ mode | default(omit) }}"
 
 - name: select from dual on CDB root
   oracle_sql:
