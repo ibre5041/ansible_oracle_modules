@@ -172,7 +172,6 @@ oracle_os_packages_all:
   - strace
   - ksh
   - smartmontools
-  - virt-what
   - patch
   
 oracle_os_packages_rhel7:

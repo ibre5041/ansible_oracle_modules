@@ -1,38 +1,20 @@
 ---
 # tasks file for default_vars_only
 
-- name: virt-what
-  yum:
-    name: virt-what
-  failed_when: False            # This might be executed without root, but I do not want to fail it
-  
-- name: Check if inside AWS.
-  shell: "virt-what | grep aws"
-  register: aws_uri_check
-  failed_when: False
-  changed_when: False
+- name: Detect hypervisor type via DMI (no package required)
+  ansible.builtin.shell: cat /sys/class/dmi/id/sys_vendor 2>/dev/null || echo unknown
+  register: dmi_sys_vendor
+  changed_when: false
+  failed_when: false
 
-- name: "set_fact is_aws_environment: {{ aws_uri_check.stdout == 'aws' }}"
-  set_fact:
-    is_aws_environment: "{{ aws_uri_check.stdout == 'aws' }}"
+- name: Detect product name via DMI
+  ansible.builtin.shell: cat /sys/class/dmi/id/product_name 2>/dev/null || echo unknown
+  register: dmi_product_name
+  changed_when: false
+  failed_when: false
 
-- name: Check if inside VMware
-  shell: virt-what
-  register: vmware_virt_check
-  failed_when: False
-  changed_when: False
-
-- name: "set_fact is_vmware_environment: {{ vmware_virt_check.stdout == 'vmware' }}"
-  set_fact:
-    is_vmware_environment: "{{ vmware_virt_check.stdout == 'vmware' }}"
-
-- name: Check if inside VirtualBox
-  shell: "virt-what | grep virtualbox"
-  register: vbox_virt_check
-  failed_when: False
-  changed_when: False
-
-- name: "set_fact is_vbox_environment: {{ vbox_virt_check.stdout == 'virtualbox' }}"
-  set_fact:
-    is_vbox_environment: "{{ vbox_virt_check.stdout == 'virtualbox' }}"
-    
+- name: Set hypervisor facts from DMI
+  ansible.builtin.set_fact:
+    is_aws_environment: "{{ 'amazon' in (dmi_sys_vendor.stdout | lower) }}"
+    is_vmware_environment: "{{ 'vmware' in (dmi_sys_vendor.stdout | lower) }}"
+    is_vbox_environment: "{{ 'virtualbox' in (dmi_product_name.stdout | lower) }}"
