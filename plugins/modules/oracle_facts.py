@@ -341,8 +341,6 @@ def main():
                 type='list',
                 elements='str',
                 default=None,
-                choices=['all', 'database', 'instance', 'min', 'option', 'parameter',
-                         'pdb', 'rac', 'redolog', 'tablespace', 'userenv', 'user'],
             ),
         ),
         supports_check_mode=True
