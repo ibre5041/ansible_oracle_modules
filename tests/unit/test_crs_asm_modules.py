@@ -368,6 +368,11 @@ def _crs_svc_params(**overrides):
         "drain_timeout": None,
         "stopoption": None,
         "global": None,
+        # RAC placement params (should only be passed to srvctl on RAC)
+        "preferred": None,
+        "available": None,
+        "serverpool": None,
+        "cardinality": None,
     }
     base.update(overrides)
     return base
@@ -563,6 +568,75 @@ def test_crs_service_state_restarted(monkeypatch):
     commands = result["commands"]
     assert any("stop" in c for c in commands)
     assert any("start" in c for c in commands)
+
+
+def test_crs_service_rac_params_excluded_on_has(monkeypatch):
+    """On HAS (oracle_crs=False), RAC placement params must NOT appear in srvctl command.
+
+    Reproduces GitHub issue #39: srvctl add/modify service on HAS rejects
+    -preferred, -available, -cardinality, -serverpool with PRKO-2002.
+    """
+    mod = _load("oracle_crs_service")
+
+    class _HasHomes(FakeOracleHomes):
+        def __init__(self):
+            super().__init__()
+            self.oracle_crs = False      # HAS / Oracle Restart single-node
+            self.oracle_restart = True
+
+    # New service (not found in crsctl output) with user-supplied preferred param
+    responses = [
+        (0, "", ""),    # crsctl stat res → service not found
+        # check_mode=True: srvctl add not executed; ensure_db_state skipped for new add
+    ]
+    Mod = _make_mod(
+        _crs_svc_params(preferred="TESTDB", available="TESTDB2", cardinality="UNIFORM", serverpool="pool1"),
+        responses,
+        check_mode=True,
+    )
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "OracleHomes", _HasHomes, raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    result = exc.value.args[0]
+    assert result["changed"] is True
+    for cmd in result["commands"]:
+        assert "-preferred" not in cmd, f"HAS: unexpected -preferred in: {cmd}"
+        assert "-available" not in cmd, f"HAS: unexpected -available in: {cmd}"
+        assert "-cardinality" not in cmd, f"HAS: unexpected -cardinality in: {cmd}"
+        assert "-serverpool" not in cmd, f"HAS: unexpected -serverpool in: {cmd}"
+
+
+def test_crs_service_rac_params_included_on_rac(monkeypatch):
+    """On RAC (oracle_crs=True), RAC placement params MUST appear in srvctl add command."""
+    mod = _load("oracle_crs_service")
+
+    class _RacHomes(FakeOracleHomes):
+        def __init__(self):
+            super().__init__()
+            self.oracle_crs = True       # full RAC cluster
+            self.oracle_restart = False
+
+    # New service (not found) with preferred specified — should end up in the command
+    responses = [
+        (0, "", ""),    # crsctl stat res → service not found
+    ]
+    Mod = _make_mod(
+        _crs_svc_params(preferred="TESTDB"),
+        responses,
+        check_mode=True,
+    )
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "OracleHomes", _RacHomes, raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    result = exc.value.args[0]
+    assert result["changed"] is True
+    assert any("-preferred" in cmd for cmd in result["commands"]), (
+        "RAC: expected -preferred in srvctl command, got: " + str(result["commands"])
+    )
 
 
 # ===========================================================================
