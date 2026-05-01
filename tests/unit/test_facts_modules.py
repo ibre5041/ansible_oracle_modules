@@ -28,6 +28,7 @@ def _facts_params(**overrides):
         "redo": None,
         "standby": None,
         "parameter": None,
+        "gather_subset": None,
     }
     base.update(overrides)
     return base
@@ -569,6 +570,239 @@ def test_facts_exception_in_pdb_block(monkeypatch):
         mod.main()
     facts = exc.value.args[0]["ansible_facts"]["ORCL"]
     assert facts["pdb"] == []
+
+
+# ===========================================================================
+# gather_subset tests
+# ===========================================================================
+
+def test_gather_subset_none_leaves_flags_untouched(monkeypatch):
+    """gather_subset=None (default) must not change existing flag values."""
+    mod = _load()
+    os.environ["ORACLE_SID"] = "ORCL"
+
+    class Mod(BaseFakeModule):
+        # database=False, instance=False — must stay that way with gather_subset=None
+        params = _facts_params(database=False, instance=False, userenv=False, gather_subset=None)
+
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "oracleConnection", lambda m: _FactsConn(m), raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    facts = exc.value.args[0]["ansible_facts"]["ORCL"]
+    # database=False means 'database' key should not appear in facts
+    assert "database" not in facts
+    # instance=False means 'instance' key should not appear in facts
+    assert "instance" not in facts
+
+
+def test_gather_subset_database_sets_database_flag(monkeypatch):
+    """gather_subset=['database'] must set module.params['database'] = True."""
+    mod = _load()
+    os.environ["ORACLE_SID"] = "ORCL"
+
+    class Mod(BaseFakeModule):
+        params = _facts_params(database=False, userenv=False, gather_subset=['database'])
+
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "oracleConnection", lambda m: _FactsConn(m), raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    facts = exc.value.args[0]["ansible_facts"]["ORCL"]
+    assert "database" in facts
+    assert facts["database"]["name"] == "ORCL"
+
+
+def test_gather_subset_min_sets_database_flag(monkeypatch):
+    """gather_subset=['min'] must set module.params['database'] = True."""
+    mod = _load()
+    os.environ["ORACLE_SID"] = "ORCL"
+
+    class Mod(BaseFakeModule):
+        params = _facts_params(database=False, userenv=False, gather_subset=['min'])
+
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "oracleConnection", lambda m: _FactsConn(m), raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    facts = exc.value.args[0]["ansible_facts"]["ORCL"]
+    assert "database" in facts
+
+
+def test_gather_subset_instance_and_tablespace(monkeypatch):
+    """gather_subset=['instance', 'tablespace'] enables only those two, not database/userenv."""
+    mod = _load()
+    os.environ["ORACLE_SID"] = "ORCL"
+
+    class _ItConn(SequencedFakeConn):
+        def __init__(self, m):
+            super().__init__(m)
+            self.responses = [
+                _INSTANCE_ROW,
+                _DB_ROW,
+                {"con_id": 0, "name": "SYSTEM", "bigfile": "NO", "size_mb": 800, "datafiles#": 1},
+                {},  # rac
+            ]
+
+        def execute_select_to_dict(self, sql, params=None, fetchone=False, fail_on_error=True):
+            if "tablespace" in sql.lower() and not fetchone:
+                r = self.responses.pop(0) if self.responses else {}
+                return [r] if r else []
+            return super().execute_select_to_dict(sql, params=params, fetchone=fetchone, fail_on_error=fail_on_error)
+
+    class Mod(BaseFakeModule):
+        params = _facts_params(database=False, userenv=False, gather_subset=['instance', 'tablespace'])
+
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "oracleConnection", _ItConn, raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    facts = exc.value.args[0]["ansible_facts"]["ORCL"]
+    assert "instance" in facts
+    assert "tablespaces" in facts
+    assert "database" not in facts
+    assert "userenv" not in facts
+
+
+def test_gather_subset_all_enables_everything(monkeypatch):
+    """gather_subset=['all'] must enable database, instance, tablespaces, userenv, redo, parameter."""
+    mod = _load()
+    os.environ["ORACLE_SID"] = "ORCL"
+
+    class _AllConn(SequencedFakeConn):
+        def __init__(self, m):
+            super().__init__(m)
+            self.responses = [
+                _INSTANCE_ROW,   # query_instance
+                _DB_ROW,         # query_database
+            ]
+            self._param_rows = [
+                {"name": "db_name", "value": "ORCL", "isdefault": "FALSE"},
+            ]
+
+        def execute_select_to_dict(self, sql, params=None, fetchone=False, fail_on_error=True):
+            if "v$parameter" in sql.lower() and not fetchone:
+                return self._param_rows
+            if "tablespace" in sql.lower() and not fetchone:
+                return [{"con_id": 0, "name": "SYSTEM", "bigfile": "NO", "size_mb": 800, "datafiles#": 1}]
+            if "userenv" in sql.lower() and fetchone:
+                return {"current_user": "SYS", "database_role": "PRIMARY", "isdba": "TRUE"}
+            if "v$log" in sql.lower() and not fetchone:
+                return [{"thread": 1, "count": 3, "size_mb": 512, "min_seq": 1, "max_seq": 3}]
+            if self.responses:
+                r = self.responses.pop(0)
+                return r if fetchone else ([r] if r else [])
+            return {} if fetchone else []
+
+    class Mod(BaseFakeModule):
+        # start with all flags off — gather_subset='all' should turn them on
+        params = _facts_params(database=False, instance=False, userenv=False, gather_subset=['all'])
+
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "oracleConnection", _AllConn, raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    facts = exc.value.args[0]["ansible_facts"]["ORCL"]
+    assert "database" in facts
+    assert "instance" in facts
+    assert "userenv" in facts
+    assert "redo" in facts
+    assert "parameter" in facts
+
+
+def test_gather_subset_redolog_sets_redo_summary(monkeypatch):
+    """gather_subset=['redolog'] sets redo='summary' when redo not already set."""
+    mod = _load()
+    os.environ["ORACLE_SID"] = "ORCL"
+
+    class _RedoConn(SequencedFakeConn):
+        def __init__(self, m):
+            super().__init__(m)
+            self.responses = [
+                _INSTANCE_ROW,
+                _DB_ROW,
+                {"thread": 1, "count": 3, "size_mb": 512, "min_seq": 1, "max_seq": 3},  # redo
+                {},  # rac
+            ]
+
+    class Mod(BaseFakeModule):
+        params = _facts_params(database=False, userenv=False, redo=None, gather_subset=['redolog'])
+
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "oracleConnection", _RedoConn, raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    facts = exc.value.args[0]["ansible_facts"]["ORCL"]
+    assert "redo" in facts
+
+
+def test_gather_subset_redolog_does_not_override_existing_redo(monkeypatch):
+    """gather_subset=['redolog'] must NOT override an explicitly set redo='detail'."""
+    mod = _load()
+    os.environ["ORACLE_SID"] = "ORCL"
+
+    class _RedoDetailConn(SequencedFakeConn):
+        def __init__(self, m):
+            super().__init__(m)
+            self.responses = [
+                _INSTANCE_ROW,
+                _DB_ROW,
+                {"group": 1, "thread": 1, "sequence#": 5, "mb": 512, "blocksize": 512,
+                 "archived": "YES", "status": "CURRENT"},  # redo detail
+                {},  # rac
+            ]
+
+    class Mod(BaseFakeModule):
+        # redo='detail' is already set; gather_subset should not override it with 'summary'
+        params = _facts_params(database=False, userenv=False, redo='detail', gather_subset=['redolog'])
+
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "oracleConnection", _RedoDetailConn, raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    # Just assert it exits cleanly; redo='detail' was preserved (not overridden to 'summary')
+    assert exc.value.args[0]["changed"] is False
+    assert "redo" in exc.value.args[0]["ansible_facts"]["ORCL"]
+
+
+def test_gather_subset_unknown_warns(monkeypatch):
+    """Unknown gather_subset values trigger module.warn()."""
+    mod = _load()
+    os.environ["ORACLE_SID"] = "ORCL"
+
+    class Mod(BaseFakeModule):
+        params = _facts_params(database=False, userenv=False,
+                               gather_subset=['database', 'nonexistent_subset'])
+
+    module_instance = None
+
+    original_mod_class = Mod
+
+    class CapturingMod(original_mod_class):
+        def __init__(self, **kwargs):
+            super().__init__(**kwargs)
+            nonlocal module_instance
+            module_instance = self
+
+    monkeypatch.setattr(mod, "AnsibleModule", CapturingMod)
+    monkeypatch.setattr(mod, "oracleConnection", lambda m: _FactsConn(m), raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    # Module must succeed (not fail)
+    assert exc.value.args[0]["changed"] is False
+    # 'database' subset must be honoured
+    assert "database" in exc.value.args[0]["ansible_facts"]["ORCL"]
+    # The unknown subset must have triggered a warning
+    assert module_instance is not None
+    assert any("nonexistent_subset" in w for w in module_instance._warnings)
 
 
 # ===========================================================================

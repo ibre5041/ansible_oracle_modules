@@ -58,6 +58,18 @@ options:
     required: false
     default: None
     choices: [None, 'detail', 'summary']
+  gather_subset:
+    description:
+      - Specify the subset of facts to gather.
+      - C(min) and C(database) are aliases and gather the same database facts.
+      - C(all) gathers all available facts.
+      - Unrecognized values produce a warning but do not fail.
+    type: list
+    elements: str
+    required: false
+    default: null
+    choices: ['all', 'database', 'instance', 'min', 'option', 'parameter',
+              'pdb', 'rac', 'redolog', 'tablespace', 'userenv', 'user']
 notes:
   - oracledb needs to be installed
   - Oracle RDBMS 10gR2 or later required
@@ -323,12 +335,41 @@ def main():
             tablespaces=dict(default=False, type='bool'),
             temp=dict(default=False, type='bool'),
             redo=dict(default=None, choices=[None, "detail", "summary"]),
-            standby=dict(default=None, choices=[None, "detail", "summary"])
+            standby=dict(default=None, choices=[None, "detail", "summary"]),
+            gather_subset=dict(
+                required=False,
+                type='list',
+                elements='str',
+                default=None,
+            ),
         ),
         supports_check_mode=True
     )
     sanitize_string_params(module.params)
 
+    gather_subset = module.params.get('gather_subset')
+    if gather_subset is not None:
+        subset = set(gather_subset)
+        enable_all = 'all' in subset
+        if enable_all or 'database' in subset or 'min' in subset:
+            module.params['database'] = True
+        if enable_all or 'instance' in subset:
+            module.params['instance'] = True
+        if enable_all or 'tablespace' in subset:
+            module.params['tablespaces'] = True
+        if enable_all or 'userenv' in subset:
+            module.params['userenv'] = True
+        if enable_all or 'redolog' in subset:
+            if not module.params.get('redo'):
+                module.params['redo'] = 'summary'
+        if enable_all or 'parameter' in subset:
+            if not module.params.get('parameter'):
+                module.params['parameter'] = '@all@'
+        # 'pdb', 'rac', 'user', 'option' recognized but not yet implemented
+        unsupported = subset - {'all', 'database', 'min', 'instance', 'tablespace',
+                                'userenv', 'redolog', 'parameter', 'pdb', 'rac', 'user', 'option'}
+        if unsupported:
+            module.warn('gather_subset values not supported: {}'.format(unsupported))
 
     # Connect to database
     conn = oracleConnection(module)

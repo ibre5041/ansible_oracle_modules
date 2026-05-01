@@ -1100,3 +1100,61 @@ def test_main_db_unique_name_sets_service_name(monkeypatch):
     with pytest.raises(ExitJson) as exc:
         mod.main()
     assert exc.value.args[0]["changed"] is False
+
+
+# ---------------------------------------------------------------------------
+# remove_db: HAS path uses db_name not SID (issue #7)
+# ---------------------------------------------------------------------------
+
+def test_remove_db_has_uses_db_name(monkeypatch):
+    """remove_db: HAS (oracle_gi_managed=True, oracle_restart=True, oracle_crs=False)
+    must pass db_name to dbca -sourceDB, NOT the SID (which has _1 suffix on HAS).
+    Regression guard for issue #7: [FATAL] DBT-05511 Specified database does not exist."""
+    mod = _load()
+
+    captured_cmds = []
+
+    class _CapturingMod(BaseFakeModule):
+        def run_command(self, cmd, **kw):
+            captured_cmds.append(list(cmd))
+            return (0, "", "")
+
+    _CapturingMod.params = _db_params(
+        db_name="TEST19C",
+        db_unique_name=None,
+        sys_password="secret",
+    )
+
+    class _HasRunningDb(FakeOracleHomes):
+        def __init__(self):
+            super().__init__()
+            self.oracle_gi_managed = True
+            self.oracle_crs = False
+            self.oracle_restart = True
+            self.facts_item = {
+                "TEST19C_1": {
+                    "running": True,
+                    "crsname": None,
+                    "ORACLE_HOME": "/fake/oracle",
+                    "israc": False,
+                }
+            }
+
+    # ORACLE_SID is set to TEST19C_1 (instance SID on HAS)
+    os.environ["ORACLE_SID"] = "TEST19C_1"
+    try:
+        m = _CapturingMod()
+        ohomes = _HasRunningDb()
+        with pytest.raises(ExitJson):
+            mod.remove_db(m, ohomes)
+    finally:
+        os.environ.pop("ORACLE_SID", None)
+
+    assert captured_cmds, "remove_db did not call run_command"
+    dbca_cmd = captured_cmds[0]
+    assert "-sourceDB" in dbca_cmd
+    source_db = dbca_cmd[dbca_cmd.index("-sourceDB") + 1]
+    assert source_db == "TEST19C", (
+        f"Expected sourceDB=TEST19C (db_name), got {source_db!r}. "
+        "On HAS, dbca -deleteDatabase requires db_name, not the SID with _1 suffix."
+    )

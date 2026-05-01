@@ -320,11 +320,13 @@ def test_crs_listener_present_existing_no_change(monkeypatch):
 
 
 def test_crs_listener_absent_existing_check_mode(monkeypatch):
-    """state=absent, listener exists → remove (check_mode)."""
+    """state=absent, running listener, check_mode → stop and remove recorded but not executed."""
     mod = _load("oracle_crs_listener")
     lsnr_out = _crsctl_output("listener", "listener")
     responses = [
-        (0, lsnr_out, ""),
+        (0, lsnr_out, ""),                            # crsctl stat res → found
+        (0, "Listener is running.", ""),              # srvctl status listener (read-only check)
+        # check_mode=True: run_change_command records stop+remove without calling run_command
     ]
     Mod = _make_mod(_listener_params(state="absent"), responses, check_mode=True)
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
@@ -332,7 +334,13 @@ def test_crs_listener_absent_existing_check_mode(monkeypatch):
 
     with pytest.raises(ExitJson) as exc:
         mod.main()
-    assert exc.value.args[0]["changed"] is True
+    result = exc.value.args[0]
+    assert result["changed"] is True
+    commands = result["commands"]
+    assert any("stop" in c for c in commands), "stop must appear in check-mode output"
+    stop_idx = next(i for i, c in enumerate(commands) if "stop" in c)
+    remove_idx = next(i for i, c in enumerate(commands) if "remove" in c)
+    assert stop_idx < remove_idx
 
 
 # ===========================================================================
@@ -368,6 +376,11 @@ def _crs_svc_params(**overrides):
         "drain_timeout": None,
         "stopoption": None,
         "global": None,
+        # RAC placement params (should only be passed to srvctl on RAC)
+        "preferred": None,
+        "available": None,
+        "serverpool": None,
+        "cardinality": None,
     }
     base.update(overrides)
     return base
@@ -563,6 +576,75 @@ def test_crs_service_state_restarted(monkeypatch):
     commands = result["commands"]
     assert any("stop" in c for c in commands)
     assert any("start" in c for c in commands)
+
+
+def test_crs_service_rac_params_excluded_on_has(monkeypatch):
+    """On HAS (oracle_crs=False), RAC placement params must NOT appear in srvctl command.
+
+    Reproduces GitHub issue #39: srvctl add/modify service on HAS rejects
+    -preferred, -available, -cardinality, -serverpool with PRKO-2002.
+    """
+    mod = _load("oracle_crs_service")
+
+    class _HasHomes(FakeOracleHomes):
+        def __init__(self):
+            super().__init__()
+            self.oracle_crs = False      # HAS / Oracle Restart single-node
+            self.oracle_restart = True
+
+    # New service (not found in crsctl output) with user-supplied preferred param
+    responses = [
+        (0, "", ""),    # crsctl stat res → service not found
+        # check_mode=True: srvctl add not executed; ensure_db_state skipped for new add
+    ]
+    Mod = _make_mod(
+        _crs_svc_params(preferred="TESTDB", available="TESTDB2", cardinality="UNIFORM", serverpool="pool1"),
+        responses,
+        check_mode=True,
+    )
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "OracleHomes", _HasHomes, raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    result = exc.value.args[0]
+    assert result["changed"] is True
+    for cmd in result["commands"]:
+        assert "-preferred" not in cmd, f"HAS: unexpected -preferred in: {cmd}"
+        assert "-available" not in cmd, f"HAS: unexpected -available in: {cmd}"
+        assert "-cardinality" not in cmd, f"HAS: unexpected -cardinality in: {cmd}"
+        assert "-serverpool" not in cmd, f"HAS: unexpected -serverpool in: {cmd}"
+
+
+def test_crs_service_rac_params_included_on_rac(monkeypatch):
+    """On RAC (oracle_crs=True), RAC placement params MUST appear in srvctl add command."""
+    mod = _load("oracle_crs_service")
+
+    class _RacHomes(FakeOracleHomes):
+        def __init__(self):
+            super().__init__()
+            self.oracle_crs = True       # full RAC cluster
+            self.oracle_restart = False
+
+    # New service (not found) with preferred specified — should end up in the command
+    responses = [
+        (0, "", ""),    # crsctl stat res → service not found
+    ]
+    Mod = _make_mod(
+        _crs_svc_params(preferred="TESTDB"),
+        responses,
+        check_mode=True,
+    )
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "OracleHomes", _RacHomes, raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    result = exc.value.args[0]
+    assert result["changed"] is True
+    assert any("-preferred" in cmd for cmd in result["commands"]), (
+        "RAC: expected -preferred in srvctl command, got: " + str(result["commands"])
+    )
 
 
 # ===========================================================================
@@ -1303,6 +1385,59 @@ def test_crs_listener_state_restarted_not_running(monkeypatch):
     assert result["changed"] is True
     assert any("start" in c for c in result["commands"])
     assert not any("stop" in c for c in result["commands"])
+
+
+def test_crs_listener_absent_running_stops_before_remove(monkeypatch):
+    """state=absent, listener running → srvctl stop issued before srvctl remove (PRCN-2065 fix).
+
+    Reproduces GitHub issues #36, #37, #38: port stays reserved until listener
+    is stopped; re-adding fails with PRCN-2065 unless stop precedes remove.
+    """
+    mod = _load("oracle_crs_listener")
+    lsnr_out = _crsctl_output("listener", "listener")
+    responses = [
+        (0, lsnr_out, ""),                                              # crsctl stat res → found
+        (0, "Listener LISTENER is running on node myhost.", ""),        # srvctl status listener → running
+        (0, "", ""),                                                    # srvctl stop listener
+        (0, "", ""),                                                    # srvctl remove listener
+    ]
+    Mod = _make_mod(_listener_params(state="absent"), responses)
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "OracleHomes", FakeOracleHomes, raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    result = exc.value.args[0]
+    assert result["changed"] is True
+    commands = result["commands"]
+    # stop must appear before remove
+    stop_idx = next((i for i, c in enumerate(commands) if "stop" in c), None)
+    remove_idx = next((i for i, c in enumerate(commands) if "remove" in c), None)
+    assert stop_idx is not None, "expected 'stop' in commands: " + str(commands)
+    assert remove_idx is not None, "expected 'remove' in commands: " + str(commands)
+    assert stop_idx < remove_idx, "stop must precede remove: " + str(commands)
+
+
+def test_crs_listener_absent_not_running_skips_stop(monkeypatch):
+    """state=absent, listener NOT running → srvctl stop is NOT issued; remove proceeds directly."""
+    mod = _load("oracle_crs_listener")
+    lsnr_out = _crsctl_output("listener", "listener")
+    responses = [
+        (0, lsnr_out, ""),                                    # crsctl stat res → found
+        (0, "Listener LISTENER is not running.", ""),         # srvctl status listener → not running
+        (0, "", ""),                                          # srvctl remove listener
+    ]
+    Mod = _make_mod(_listener_params(state="absent"), responses)
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "OracleHomes", FakeOracleHomes, raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    result = exc.value.args[0]
+    assert result["changed"] is True
+    commands = result["commands"]
+    assert not any("stop" in c for c in commands), "stop must NOT appear when listener not running: " + str(commands)
+    assert any("remove" in c for c in commands), "expected 'remove' in commands: " + str(commands)
 
 
 def test_crs_listener_gi_not_detected_fails(monkeypatch):
