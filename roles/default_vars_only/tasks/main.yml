@@ -13,8 +13,16 @@
   changed_when: false
   failed_when: false
 
+- name: Detect hypervisor UUID (Xen-based EC2 starts with 'ec2')
+  ansible.builtin.shell: cat /sys/hypervisor/uuid 2>/dev/null || echo unknown
+  register: dmi_hypervisor_uuid
+  changed_when: false
+  failed_when: false
+
 - name: Set hypervisor facts from DMI
   ansible.builtin.set_fact:
-    is_aws_environment: "{{ 'amazon' in (dmi_sys_vendor.stdout | lower) }}"
+    is_aws_environment: >-
+      {{ 'amazon' in (dmi_sys_vendor.stdout | lower) or
+         (dmi_hypervisor_uuid.stdout | lower)[:3] == 'ec2' }}
     is_vmware_environment: "{{ 'vmware' in (dmi_sys_vendor.stdout | lower) }}"
     is_vbox_environment: "{{ 'virtualbox' in (dmi_product_name.stdout | lower) }}"
