@@ -30,7 +30,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install ansible oracledb pbkdf2
+          pip install ansible -r tests/integration/requirements.txt
           ansible-galaxy collection install community.docker
 
       - name: Build and install collection

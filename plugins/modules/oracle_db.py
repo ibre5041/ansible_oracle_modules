@@ -510,11 +510,16 @@ def remove_db(module, ohomes):
 
     sid = guess_oracle_sid(module, ohomes)
     if ohomes.oracle_gi_managed and ohomes.oracle_crs:
+        # RAC: use db_unique_name or db_name
         if db_unique_name:
             db_to_remove = db_unique_name
         else:
             db_to_remove = db_name
+    elif ohomes.oracle_gi_managed and getattr(ohomes, 'oracle_restart', False):
+        # HAS: dbca expects db_name (SID without instance number suffix)
+        db_to_remove = db_name
     else:
+        # Standalone (no GI): use SID
         db_to_remove = sid
 
     dbca = os.path.join(oracle_home, 'bin', 'dbca')

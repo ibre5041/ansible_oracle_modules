@@ -335,10 +335,11 @@ class oracle_crs_service:
                 wanted_set.add((pname, param))
             elif param:
                 wanted_set.add((pname, param.upper()))
-        for rac_param in ['serverpool', 'preferred', 'available', 'cardinality']:
-            val = self.module.params.get(rac_param)
-            if val:
-                wanted_set.add((rac_param, val))
+        if self.ohomes.oracle_crs:
+            for rac_param in ['serverpool', 'preferred', 'available', 'cardinality']:
+                val = self.module.params.get(rac_param)
+                if val:
+                    wanted_set.add((rac_param, val))
 
         current_set = set()
         # current_set.add(("db", self.curent_resource.get('???', None)))
@@ -365,10 +366,11 @@ class oracle_crs_service:
         current_set.add(("tablefamilyid", self.curent_resource.get('TABLE_FAMILY_ID', None)))
         current_set.add(("drain_timeout", self.curent_resource.get('DRAIN_TIMEOUT', None)))
         current_set.add(("stopoption", self.curent_resource.get('STOP_OPTION', '').upper())) # CRS stores is as lowercase
-        current_set.add(("serverpool", self.curent_resource.get('SERVER_POOL', None)))
-        current_set.add(("cardinality", self.curent_resource.get('CARDINALITY', None)))
-        current_set.add(("preferred", self.curent_resource.get('PREFERRED', None)))
-        current_set.add(("available", self.curent_resource.get('AVAILABLE', None)))
+        if self.ohomes.oracle_crs:
+            current_set.add(("serverpool", self.curent_resource.get('SERVER_POOL', None)))
+            current_set.add(("cardinality", self.curent_resource.get('CARDINALITY', None)))
+            current_set.add(("preferred", self.curent_resource.get('PREFERRED', None)))
+            current_set.add(("available", self.curent_resource.get('AVAILABLE', None)))
 
         apply = False
         changes = wanted_set.difference(current_set)

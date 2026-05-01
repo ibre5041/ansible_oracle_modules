@@ -808,3 +808,93 @@ def test_wallet_present_open_none_does_not_open_or_close(monkeypatch):
     assert result["changed"] is False
     assert not any("SET KEYSTORE OPEN" in d for d in result.get("ddls", []))
     assert not any("SET KEYSTORE CLOSE" in d for d in result.get("ddls", []))
+
+
+# ===========================================================================
+# Tests: tde_key_exists()
+# ===========================================================================
+
+def test_tde_key_exists_returns_true_when_count_positive():
+    """tde_key_exists returns True when V$ENCRYPTION_KEYS has rows."""
+    mod = _load()
+
+    class _KeyConn(BaseFakeConn):
+        def execute_select_to_dict(self, sql, params=None, fetchone=False, fail_on_error=True):
+            if 'V$ENCRYPTION_KEYS' in sql.upper():
+                return {'cnt': 3} if fetchone else [{'cnt': 3}]
+            return {} if fetchone else []
+
+    conn = _KeyConn(None)
+    assert mod.tde_key_exists(conn) is True
+
+
+def test_tde_key_exists_returns_false_when_count_zero():
+    """tde_key_exists returns False when V$ENCRYPTION_KEYS is empty."""
+    mod = _load()
+
+    class _KeyConn(BaseFakeConn):
+        def execute_select_to_dict(self, sql, params=None, fetchone=False, fail_on_error=True):
+            if 'V$ENCRYPTION_KEYS' in sql.upper():
+                return {'cnt': 0} if fetchone else [{'cnt': 0}]
+            return {} if fetchone else []
+
+    conn = _KeyConn(None)
+    assert mod.tde_key_exists(conn) is False
+
+
+def test_tde_key_exists_returns_false_on_exception():
+    """tde_key_exists returns False when the view raises any exception (e.g. ORA-00942)."""
+    mod = _load()
+
+    class _ErrorConn(BaseFakeConn):
+        def execute_select_to_dict(self, sql, params=None, fetchone=False, fail_on_error=True):
+            raise Exception("ORA-00942: table or view does not exist")
+
+    conn = _ErrorConn(None)
+    assert mod.tde_key_exists(conn) is False
+
+
+def test_wallet_status_includes_tde_key_present(monkeypatch):
+    """state=status output must include tde_key_present field."""
+    mod = _load()
+
+    class _TdeWalletConn(_WalletConn):
+        def execute_select_to_dict(self, sql, params=None, fetchone=False, fail_on_error=True):
+            if 'V$ENCRYPTION_KEYS' in sql.upper():
+                return {'cnt': 1} if fetchone else [{'cnt': 1}]
+            return super().execute_select_to_dict(sql, params=params, fetchone=fetchone, fail_on_error=fail_on_error)
+
+    class Mod(BaseFakeModule):
+        params = _wallet_params(state="status")
+
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "oracleConnection", lambda m: _TdeWalletConn(m, 'OPEN', 'PASSWORD'), raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    result = exc.value.args[0]
+    assert "tde_key_present" in result
+    assert result["tde_key_present"] is True
+
+
+def test_wallet_present_includes_tde_key_present(monkeypatch):
+    """state=present output must include tde_key_present field."""
+    mod = _load()
+
+    class _TdeWalletConn(_WalletConn):
+        def execute_select_to_dict(self, sql, params=None, fetchone=False, fail_on_error=True):
+            if 'V$ENCRYPTION_KEYS' in sql.upper():
+                return {'cnt': 0} if fetchone else [{'cnt': 0}]
+            return super().execute_select_to_dict(sql, params=params, fetchone=fetchone, fail_on_error=fail_on_error)
+
+    class Mod(BaseFakeModule):
+        params = _wallet_params(state="present")
+
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "oracleConnection", lambda m: _TdeWalletConn(m, 'OPEN', 'PASSWORD'), raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    result = exc.value.args[0]
+    assert "tde_key_present" in result
+    assert result["tde_key_present"] is False
