@@ -201,8 +201,11 @@ class oracle_crs_service:
         self.commands = []
         self.changed = False
         self.curent_resource = None
-        self.get_crs_config('service')
         self.srvctl = os.path.join(self.ohomes.crs_home, "bin", "srvctl")
+        self.get_crs_config('service')
+        if self.curent_resource:
+            self.get_service_config(module)
+
 
     def run_change_command(self, command):
         self.commands.append(' '.join(command))
@@ -272,6 +275,41 @@ class oracle_crs_service:
         else:
             self.curent_resource = retval.get(self.resource_name.lower(), dict())
 
+
+    def get_service_config(self, module):
+        command = [self.srvctl
+                   , 'config'
+                   , 'service'
+                   , '-d', module.params['db']
+                   , '-s', module.params['name']
+                   ]
+        (rc, stdout, stderr) = self.module.run_command(command)
+        if rc or stderr:
+            self.module.fail_json(msg=f"Failed command: {command}"
+                                  , commands=self.commands
+                                  , changed=self.changed)
+        SRVCTL_ATTRIBUTES = {
+            'Server pool': 'SERVER_POOL',
+            'Cardinality': 'CARDINALITY',            
+            'Preferred instances': 'PREFERRED',
+            'Available instances': 'AVAILABLE',
+        }
+        for line in stdout.splitlines():
+            if line.startswith('Service is enabled'):
+                self.curent_resource['ENABLED'] = True
+            
+            if line.startswith('Service is disabled'):
+                self.curent_resource['ENABLED'] = False
+
+            if ': ' not in line:
+                continue
+            
+            (key, value) = line.split(': ', 1)
+            if key in SRVCTL_ATTRIBUTES.keys():
+                kkey = SRVCTL_ATTRIBUTES[key]
+                self.curent_resource[kkey] = value
+        
+            
     def configure_db(self):
         state = self.module.params["state"]
         resource_name = self.module.params['name'].upper()
@@ -342,6 +380,9 @@ class oracle_crs_service:
             apply = True
         elif self.curent_resource and state in ['present', 'started', 'stopped', 'restarted']:
             srvctl.extend(['modify', 'service', '-s', resource_name, '-d', database_name])
+            # PRKO-3145 : Option '-preferred' requires '-modifyconfig' option to be specified
+            if any(k in ('preferred', 'available') for k, v in changes):
+                srvctl.extend(['-modifyconfig'])
         elif self.curent_resource and state == 'absent':
             srvctl.extend(['remove', 'service', '-s', resource_name, '-d', database_name])
             if self.module.params['force']:

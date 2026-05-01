@@ -67,7 +67,7 @@
 - name: "query current redo log group count and size"
   oracle_sql:
     <<: *con_new
-    sql: "SELECT count(*) AS cnt, max(bytes)/1024/1024 AS size_mb FROM v$log"
+    sql: "SELECT count(*) AS cnt, max(bytes)/1024/1024 AS size_mb, thread# as thread FROM v$log group by thread#"
   register: current_redo
   failed_when: current_redo.failed
 
@@ -94,7 +94,7 @@
 - name: "verify group count increased"
   oracle_sql:
     <<: *con_new
-    sql: "SELECT count(*) AS cnt FROM v$log"
+    sql: "SELECT count(*) AS cnt, max(bytes)/1024/1024 AS size_mb, thread# as thread FROM v$log group by thread#"
   register: new_count
   failed_when: >
     new_count.failed or

@@ -1,0 +1,9 @@
+#
+# ADVM devices
+KERNEL=="asm/*",      GROUP="{{ oracle_asm_disk_group }}", MODE="0770"
+KERNEL=="asm/.*",     GROUP="{{ oracle_asm_disk_group }}", MODE="0770"
+#
+# ACFS devices
+KERNEL=="ofsctl",     GROUP="{{ oracle_asm_disk_group }}", MODE="0664"
+
+

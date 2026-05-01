@@ -20,7 +20,8 @@
     link_name: TEST_DBLINK_PRIVATE
     link_type: private
     state: absent
-  failed_when: false
+  register: _
+  failed_when: _.failed
 
 - name: "cleanup: drop public dblink if exists"
   oracle_dblink:
@@ -28,7 +29,8 @@
     link_name: TEST_DBLINK_PUBLIC
     link_type: public
     state: absent
-  failed_when: false
+  register: _
+  failed_when: _.failed
 
 # ── Private fixed-user dblink ─────────────────────────────────────────────────
 

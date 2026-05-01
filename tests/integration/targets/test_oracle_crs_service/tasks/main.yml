@@ -5,6 +5,9 @@
     - include_tasks: simple.yml
       when: running_on_server_crs
 
+    - include_tasks: relocate.yml
+      when: running_on_server_crs
+      
     - include_tasks: complex.yml  
       when: running_on_server_crs
 

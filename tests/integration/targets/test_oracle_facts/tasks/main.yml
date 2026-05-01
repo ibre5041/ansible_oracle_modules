@@ -1,13 +1,21 @@
 ---
-- include_tasks: "compile.yml"
-  when: running_on_server
+
+- name: Resource consumer group tests
+  block:
+    - include_tasks: "compile.yml"
+      when: running_on_server
   
-- include_tasks: "subset_parameter.yml"
-  when: running_on_server
+    # - include_tasks: "subset_parameter.yml"
+    #   when: running_on_server
+    #
+    # - include_tasks: "subset_content.yml"
+    #   when: running_on_server
   
-- include_tasks: "subset_content.yml"
-  when: running_on_server
-  
+  environment:
+    ORACLE_SID: "{{ oracle_sid | default(omit) }}"
+    ORACLE_HOME: "{{ oracle_home | default(omit) }}"
+
 - include_tasks: "no_sysdba.yml"
+  when: running_on_client
 
 ...

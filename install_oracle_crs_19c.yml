@@ -1,7 +1,5 @@
 ---
 
-# TODO: setcap cap_net_raw+ep  /usr/bin/ping (on Centos8)
-
 - hosts: all
   collections:
     - ibre5041.ansible_oracle_modules    
@@ -9,7 +7,7 @@
   become_user: root
   become_method: sudo
   vars:
-    oracle_db_ver_path: 19.21.0.0
+
   any_errors_fatal: true
   roles:    
   - role: default_vars_only
@@ -19,16 +17,16 @@
     tags: [ base, baseoracle ]
     when: is_vmware_environment
     
-  # - role: base_oracle_vbox
-  #   tags: [ base, baseoracle ]
-  #   when: is_vbox_environment
+  - role: base_oracle_vbox
+    tags: [ base, baseoracle ]
+    when: is_vbox_environment
     
   - role: oracle_crs_19c
-    oracle_gi_media: grid_home_19_21.zip
+    #oracle_gi_media: "{{ oracle_gi_media | default('LINUX.X64_193000_grid_home.zip') }}"
     tags: [ oracle, oraclecrs ]
 
   - role: oracle_db_home
-    oracle_db_media: db_home_19_21.zip
+    #oracle_db_media: "{{ oracle_db_media | default('LINUX.X64_193000_db_home.zip') }}"
     tags: [ oracle, oracledbhome ]
 
   - role: oracle_post_install
@@ -45,7 +43,6 @@
         #system_password:
         #dbsnmp_password:
         #template:
-        cdb: true
         db_options:
           JSERVER: false
           ORACLE_TEXT: false

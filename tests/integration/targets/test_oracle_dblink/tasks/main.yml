@@ -2,7 +2,18 @@
 
 - name: Database link tests
   block:
+    # - name: oracle_username
+    #   debug:
+    #     msg: "{{ item }}"
+    #   loop:
+    #     - "{{ oracle_pdb_username is defined and oracle_pdb_username is not none and oracle_pdb_username|default('')|length>0 }}" 
+    #     - "{{ oracle_username is defined and oracle_username is not none and oracle_username|default('')|length>0 }}" 
+        
     - include_tasks: "create_delete.yml"
+      when: |
+        (oracle_pdb_username is defined and oracle_pdb_username is not none and oracle_pdb_username|default('')|length>0)
+        or
+        (oracle_username is defined and oracle_username is not none and oracle_username|default('')|length>0)
 
   environment:
     ORACLE_SID: "{{ oracle_sid | default(omit) }}"

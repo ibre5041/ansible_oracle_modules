@@ -1,0 +1,58 @@
+---
+
+all:
+  hosts:
+    # NOTE: change "db_server_hostname" to match your server hostname
+    test9f-restart:
+      address: 192.168.8.97
+      ansible_connection: ssh
+      ansible_ssh_user: root
+      ansible_port: 22
+      ansible_ssh_private_key_file: /root/.ssh/id_rsa
+      ansible_ssh_extra_args: ' -o StrictHostKeyChecking=no '
+      ansible_host: test9f-restart      
+      # These variables are used by install roles
+      oracle_release: 26ai
+      oracle_install_type: restart
+      oracle_url_base: http://kicklinux9/oracle/26ai/
+      oracle_db_ver_path: 23.26.0.0
+      oracle_gi_image: V1054596-01.zip
+      oracle_db_image: V1054592-01.zip
+  children:
+    oracle:
+      vars:
+  vars:
+    scsi:
+    - adapter:
+        pciSlotNumber: 16
+    - adapter:
+        pciSlotNumber: 32
+    disks:
+    - disk: rootdg
+      size: 10g
+      bus: 0
+    - disk: appdg
+      size: 60g
+      bus: 0
+    cluster:
+      oracle_cluster_name: restart19
+      disks:
+        - disk:
+            size: 8G
+            bus: 1
+            count: 4
+
+    network:
+    - adapter:
+      pciSlotNumber: 192
+      network: "Public Network"
+    - adapter:
+      pciSlotNumber: 224
+      network: "Barn Network"      
+    ram: 32G
+    cpu: 4
+
+    vmware:
+      vm_folder: VmFolder
+      datastore: KINGSTON
+    template: "RHEL9Template"

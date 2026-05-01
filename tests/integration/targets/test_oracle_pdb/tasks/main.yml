@@ -3,9 +3,11 @@
 - name: "compute pdbseed path from oracle_datadir"
   set_fact:
     pdbseed_path: "{{ oracle_datadir }}/pdbseed"
-
+  when: running_on_cdb and oracle_datadir is defined
+  
 - name: Role tasks with env
   block:
+    
     - include_tasks: "create_delete.yml"
       when: running_on_cdb
   
