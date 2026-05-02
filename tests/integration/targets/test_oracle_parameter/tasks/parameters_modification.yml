@@ -1,20 +1,23 @@
 ---
+
 - name: "define pdb connection parameters"
   set_fact:
     connection_parameters: &pdb_con_param
       hostname: "{{ oracle_hostname }}"
       port: "{{ oracle_port }}"      
-      service_name: "{{ oracle_pdb_service_name | default(oracle_service_name) }}"
+      # service_name: "{{ oracle_pdb_service_name | default(oracle_service_name) }}"
+      service_name: "{{ (running_on_server|bool) | ternary(omit,oracle_pdb_service_name|default(oracle_service_name)) }}"
+      session_container: "{{ (not running_on_server|bool) | ternary(omit,oracle_pdb_service_name|default(oracle_service_name)) }}"
       username: "{{ oracle_pdb_username | default(oracle_username) }}"
       password: "{{ oracle_pdb_password | default(oracle_password) }}"
       dsn: "{{ oracle_dsn }}"
       mode: "{{ mode }}"
       oracle_home: "{{ oracle_home }}"
-
+      
 - name: 'PDB Connection paramters - see or use integration_config.yml.template'
   debug:
     var: connection_parameters
-      
+    
 - name: "define cdb connection parameters"
   set_fact:
     cdb_connection_parameters: &cdb_con_param
@@ -26,7 +29,27 @@
       dsn: "{{ oracle_dsn }}"
       mode: "{{ mode }}"
       oracle_home: "{{ oracle_home }}"
-      
+
+- name: Oracle DB facts - pga_aggregate_target
+  oracle_facts:
+    <<: *cdb_con_param
+    userenv: false
+    database: false
+    instance: false
+    parameter:
+      - pga_aggregate_target
+  register: database_facts
+    
+- name: database_facts
+  debug:
+    var: database_facts
+
+- name: "database facts {{ item }}"
+  set_fact:
+    "{{ item.name }}": "{{ item.value }}"
+  loop:
+    - { "name": "pga_aggregate_target_value", "value": "{{ (database_facts.ansible_facts[oracle_sid].parameter['pga_aggregate_target'].value|int)//1024//1024 }}" }
+
 - name: 'CDB Connection paramters - see or use integration_config.yml.template'
   debug:
     var: cdb_connection_parameters
@@ -83,48 +106,59 @@
   failed_when: _.changed
   when: not running_on_adb
 
-- name: "change pga_aggregate_target"
+- name: "change pga_aggregate_target to {{ (pga_aggregate_target_value|int) - 50 }}M"
   oracle_parameter:
     <<: *pdb_con_param
-    name: "pga_aggregate_target"
-    value: "500M"
+    name: pga_aggregate_target
+    value: "{{ (pga_aggregate_target_value|int) - 50 }}M"
     state: "present"
     scope: both
-  when: not running_on_adb and not (running_on_xe | default(false) | bool)
+  when: not running_on_adb
 
-- name: "change pga_aggregate_target +1(change)"
+- name: "change pga_aggregate_target +1 (change)"
   oracle_parameter:
     <<: *pdb_con_param
     name: "pga_aggregate_target"
-    value: "501M"
+    value: "{{ (pga_aggregate_target_value|int) - 50 + 1}}M"
     state: "present"
     scope: both
   register: _
   failed_when: not _.changed
-  when: not running_on_adb and not (running_on_xe | default(false) | bool)
+  when: not running_on_adb
 
-- name: "change pga_aggregate_target (idempotent)"
+- name: "change pga_aggregate_target 1+(idempotent)"
   oracle_parameter:
     <<: *pdb_con_param
     name: "pga_aggregate_target"
-    value: "300M"
+    value: "{{ (pga_aggregate_target_value|int) - 50 + 1}}M"
     state: "present"
     scope: both
   register: _
   failed_when: _.changed
-  when: not running_on_adb and not (running_on_xe | default(false) | bool)
+  when: not running_on_adb
 
 - name: "change pga_aggregate_target (change in memory)"
   oracle_parameter:
     <<: *pdb_con_param
     name: "pga_aggregate_target"
-    value: "350M"
+    value: "{{(pga_aggregate_target_value|int) - 50}}M"
     state: "present"
     scope: memory
   register: _
   failed_when: not _.changed
-  when: not running_on_adb and not (running_on_xe | default(false) | bool)
+  when: not running_on_adb
 
+- name: "revert back pga_aggregate_target"
+  oracle_parameter:
+    <<: *pdb_con_param
+    name: "pga_aggregate_target"
+    value: "{{(pga_aggregate_target_value|int)}}M"
+    state: "present"
+    scope: both
+  register: _
+  failed_when: _.failed
+  when: not running_on_adb
+  
 - name: "change blank_trimming"
   oracle_parameter:
     <<: *pdb_con_param

@@ -1,7 +1,7 @@
 ---
 
 - name: "define pdb connection parameters"
-  no_log: true
+  #no_log: true
   set_fact:
     connection_parameters: &pdb_con_param
       service_name: "{{ oracle_normal_service_name | default(oracle_pdb_service_name) }}"
@@ -10,7 +10,11 @@
       mode: "{{ oracle_normal_mode | default('normal') }}"
       port: "{{ oracle_port }}"
       host: "{{ oracle_hostname }}"
-      
+
+- name: 'PDB Connection paramters - see or use integration_config.yml.template'
+  debug:
+    var: connection_parameters
+
 - name: "change _disable_directory_link_check (cdb only)"
   oracle_parameter:
     <<: *pdb_con_param
