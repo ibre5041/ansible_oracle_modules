@@ -87,7 +87,16 @@
   oracle_parameter:
     <<: *pdb_con_param
     name: "pga_aggregate_target"
-    value: "300M"
+    value: "500M"
+    state: "present"
+    scope: both
+  when: not running_on_adb and not (running_on_xe | default(false) | bool)
+
+- name: "change pga_aggregate_target +1(change)"
+  oracle_parameter:
+    <<: *pdb_con_param
+    name: "pga_aggregate_target"
+    value: "501M"
     state: "present"
     scope: both
   register: _
