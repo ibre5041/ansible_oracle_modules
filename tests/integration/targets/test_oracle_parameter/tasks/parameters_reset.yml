@@ -3,13 +3,16 @@
 - name: "define pdb connection parameters"
   set_fact:
     connection_parameters: &pdb_con_param
-      service_name: "{{ oracle_pdb_service_name }}"
-      username: "{{ oracle_pdb_username }}"
-      password: "{{ oracle_pdb_password }}"
-      mode: "sysdba"
-      port: "{{ oracle_port }}"
-      host: "{{ oracle_hostname }}"
-      
+      hostname: "{{ oracle_hostname }}"
+      port: "{{ oracle_port }}"      
+      service_name: "{{ (running_on_server|bool) | ternary(omit,oracle_pdb_service_name|default(oracle_service_name)) }}"
+      session_container: "{{ (not running_on_server|bool) | ternary(omit,oracle_pdb_service_name|default(oracle_service_name)) }}"
+      username: "{{ oracle_pdb_username | default(oracle_username) }}"
+      password: "{{ oracle_pdb_password | default(oracle_password) }}"
+      dsn: "{{ oracle_dsn }}"
+      mode: "{{ mode }}"
+      oracle_home: "{{ oracle_home }}"
+
 - name: "define cdb connection parameters"
   set_fact:
     cdb_connection_parameters: &cdb_con_param

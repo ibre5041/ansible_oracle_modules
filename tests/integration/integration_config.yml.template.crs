@@ -5,8 +5,10 @@ oracle_dsn: null
 oracle_service_name: null
 oracle_username: null
 oracle_password: null
-oracle_home: "/oracle/u01/product/19.21.0.0"
-oracle_sid: TEST19C1
+oracle_home: "/oracle/u01/product/23.26.0.0"
+oracle_sid: TEST26C1
+
+oracle_pdb_service_name: TPDB
 
 mode: "sysdba"
 
@@ -20,7 +22,7 @@ running_on_cdb: true
 running_on_pdb: true
 running_on_client: false
 running_on_adb: false
-
+running_on_xe: false
 
 #
 oracle_wallet_location: /home/oracle/wallet

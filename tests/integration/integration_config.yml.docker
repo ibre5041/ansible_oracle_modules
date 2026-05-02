@@ -51,4 +51,4 @@ running_on_pdb:        true    # FREEPDB1 disponible (oracle_pdb_service_name)
 running_on_db_asm:     false   # stockage filesystem (pas ASM)
 running_on_db_fs:      true    # stockage filesystem
 running_on_adb:        false   # pas Oracle ADB
-running_on_xe:         false   # Oracle Free 23ai (TDE et orapki disponibles)
+running_on_xe:         true    # Oracle Free 23ai (TDE et orapki disponibles)
