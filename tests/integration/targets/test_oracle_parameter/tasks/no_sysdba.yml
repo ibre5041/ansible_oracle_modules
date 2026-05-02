@@ -1,7 +1,8 @@
+
 ---
 
 - name: "define pdb connection parameters"
-  no_log: true
+  # no_log: true
   set_fact:
     connection_parameters: &pdb_con_param
       service_name: "{{ oracle_normal_service_name | default(oracle_pdb_service_name) }}"

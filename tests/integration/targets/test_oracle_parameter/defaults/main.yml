@@ -6,9 +6,9 @@ oracle_username: "SYS"
 oracle_password: "password"
 #mode: "sysdba"
 
-#oracle_pdb_service_name: pdb01
-#oracle_pdb_password: admin
-#oracle_pdb_username: admin
+oracle_pdb_service_name: params_pdb
+oracle_pdb_password: admin
+oracle_pdb_username: admin
 
 oracle_cdb_service_name: "{{ oracle_service_name }}"
 oracle_cdb_username: "{{ oracle_username }}"
