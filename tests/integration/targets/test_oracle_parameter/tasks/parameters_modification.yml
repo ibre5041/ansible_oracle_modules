@@ -31,24 +31,21 @@
       oracle_home: "{{ oracle_home }}"
 
 - name: Oracle DB facts - pga_aggregate_target
-  oracle_facts:
+  oracle_sql:
     <<: *cdb_con_param
-    userenv: false
-    database: false
-    instance: false
-    parameter:
-      - pga_aggregate_target
-  register: database_facts
+    sql: |
+      select * from v$system_parameter where NAME='pga_aggregate_target'
+  register: pga_parameter
     
-- name: database_facts
+- name: pga_parameter
   debug:
-    var: database_facts
+    var: pga_parameter.data[0].value
 
 - name: "database facts {{ item }}"
   set_fact:
     "{{ item.name }}": "{{ item.value }}"
   loop:
-    - { "name": "pga_aggregate_target_value", "value": "{{ (database_facts.ansible_facts[oracle_sid].parameter['pga_aggregate_target'].value|int)//1024//1024 }}" }
+    - { "name": "pga_aggregate_target_value", "value": "{{ (pga_parameter.data[0].value|int)//1024//1024 }}" }
 
 - name: 'CDB Connection paramters - see or use integration_config.yml.template'
   debug:
