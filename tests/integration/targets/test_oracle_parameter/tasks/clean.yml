@@ -10,7 +10,7 @@
       password: "{{ oracle_cdb_password | default(oracle_password) }}"
       dsn: "{{ oracle_dsn }}"
       mode: "{{ mode }}"
-      oracle_home: "{{ oracle_home }}"
+      oracle_home: "{{ oracle_home | default(omit) }}"
 
 - name: drop PDB {{ oracle_pdb_service_name }}
   oracle_pdb:
