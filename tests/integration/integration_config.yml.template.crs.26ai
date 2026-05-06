@@ -26,8 +26,3 @@ running_on_xe: false
 
 #
 oracle_wallet_location: /home/oracle/wallet
-
-# ASM path prefix for PDB datafiles: +<DISKGROUP>/<DB_UNIQUE_NAME>
-# Replace +XDATA with your diskgroup (e.g. +DATA, +XDATA, +DGDATA) and
-# TEST26C_1 with your DB unique name (check: SELECT db_unique_name FROM v$database)
-oracle_datadir: "+XDATA/TEST26C_1"
