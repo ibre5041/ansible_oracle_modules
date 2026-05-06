@@ -10,7 +10,7 @@
       mode: "{{ oracle_normal_mode | default('normal') }}"
       port: "{{ oracle_port }}"
       host: "{{ oracle_hostname }}"
-      
+
 - name: "change _disable_directory_link_check (cdb only)"
   oracle_parameter:
     <<: *pdb_con_param

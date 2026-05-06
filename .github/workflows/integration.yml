@@ -32,6 +32,10 @@ jobs:
         run: |
           pip install ansible -r tests/integration/requirements.txt
           ansible-galaxy collection install community.docker
+          which python
+          python --version
+          python -m pip list | grep oracledb
+          python -c "import oracledb; print('oracledb found:', oracledb.version)"
 
       - name: Build and install collection
         run: |
