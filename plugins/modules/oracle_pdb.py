@@ -165,7 +165,7 @@ EXAMPLES = '''
 
 # Check if the pdb exists
 def check_pdb_exists(conn, pdb_name):
-    sql = sql = 'select name, open_mode, restricted from v$pdbs where upper(name) = :pdb_name'
+    sql = sql = 'select name, open_mode, restricted from v$pdbs where upper(name) = upper(:pdb_name)'
     result = conn.execute_select_to_dict(sql, {"pdb_name": pdb_name}, fetchone=True)
 
     if not result:
@@ -265,7 +265,7 @@ def create_pdb(conn, module):
     run_sql.append(createsql)
 
     for sql in run_sql:
-        conn.execute_ddl(sql)
+        conn.execute_ddl(sql, ignore_errors=[65012])
 
     return set({'name': pdb_name.upper(), 'open_mode': 'MOUNTED'}.items())
 

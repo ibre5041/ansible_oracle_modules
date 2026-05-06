@@ -26,3 +26,6 @@ running_on_xe: false
 
 #
 oracle_wallet_location: /home/oracle/wallet
+
+# ASM path prefix for PDB datafiles (e.g. +XDATA/DB_UNIQUE_NAME)
+oracle_datadir: "+XDATA/TEST26C_1"
