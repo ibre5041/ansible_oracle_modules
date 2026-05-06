@@ -186,7 +186,7 @@ def check_pdb_exists(conn, pdb_name):
 
     sql = """
     select LISTAGG(NETWORK_NAME,',') WITHIN GROUP (ORDER BY PDB) as SERVICE_NAME
-    from cdb_services group by PDB having PDB=:pdb_name
+    from cdb_services group by PDB having PDB=upper(:pdb_name)
     """
     prop = conn.execute_select_to_dict(sql, {"pdb_name": pdb_name}, fetchone=True)
     result.update(prop)
