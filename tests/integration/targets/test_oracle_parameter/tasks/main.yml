@@ -5,20 +5,22 @@
     - include_tasks: setup.yml
       when: running_on_pdb and not running_on_xe
 
-    - include_tasks: "parameters_modification.yml"
-      when: running_on_pdb
-  
-    - include_tasks: "parameters_reset.yml"
-      when: running_on_pdb
-  
-    # - include_tasks: "no_sysdba.yml"
-    #   when: running_on_pdb
+    - block:
+        - include_tasks: "parameters_modification.yml"
+          when: running_on_pdb
 
-    - include_tasks: clean.yml
-      when: running_on_pdb and not running_on_xe
+      always:
+        - include_tasks: "parameters_reset.yml"
+          when: running_on_pdb
+
+        # - include_tasks: "no_sysdba.yml"
+        #   when: running_on_pdb
+
+        - include_tasks: clean.yml
+          when: running_on_pdb and not running_on_xe
 
   environment:
     ORACLE_SID: "{{ oracle_sid | default() }}"
     ORACLE_HOME: "{{ oracle_home | default() }}"
-      
+
 ...
