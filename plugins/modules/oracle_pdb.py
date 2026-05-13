@@ -9,81 +9,24 @@ description:
   - Manage pluggable databases in Oracle
 version_added: "3.0.1"
 options:
-  name:
-    description: The name of the pdb
-    required: True
-    default: None
-  oracle_home:
-    description: The ORACLE_HOME to use
-    required: False
-    default: None
-  sourcedb:
-    description: >
-      Source PDB to clone from. Mutually exclusive with plug_file.
-      Use clone_from as a more explicit alias.
-    required: False
-    default: None
-    aliases: ['db', 'container', 'cdb', 'clone_from']
-  snapshot_copy:
-    description: Use SNAPSHOT COPY when cloning from another PDB (requires compatible storage)
-    required: False
-    default: False
-    type: bool
-  plug_file:
-    description: Path to XML descriptor file for plug-in/unplug operations. Mutually exclusive with sourcedb.
-    required: False
-    default: None
-    aliases: ['plug_file_xml']
-  nocopy:
-    description: >
-      Skip copying datafiles when plugging in a PDB from an XML descriptor (NOCOPY clause).
-      Use when the datafiles are already in the correct location and only the XML metadata
-      needs to be imported. Only meaningful when plug_file is set.
-    required: False
-    default: False
-    type: bool
-  state:
-    description: >
-      The intended state of the pdb.
-      present - create PDB if absent (leaves it in MOUNTED state).
-      opened/read_write - create if absent then open read-write.
-      closed - create if absent then leave/put in MOUNTED state.
-      read_only - create if absent then open read-only.
-      absent - drop the PDB including datafiles.
-      unplugged - unplug the PDB to an XML file (plug_file required).
-      status - return current PDB status.
-    default: present
-    choices: ['present', 'absent', 'opened', 'read_write', 'closed', 'read_only', 'status', 'unplugged']
-  pdb_admin_username:
-    description: The username for the pdb admin user
-    required: false
-    default: pdb_admin
-    aliases: ['un']
-  pdb_admin_password:
-    description: The password for the pdb admin user
-    required: false
-    default: pdb_admin
-    aliases: ['pw']
-  datafile_dest:
-    description:  The path where the datafiles will be placed
-    required: false
-    default: None
-    aliases: ['dfd']
-  username:
+  pdb_name:
+    description: The name of the PDB
+    required: true
+    aliases: ['pdb', 'name']
+  user:
     description: The database username to connect to the database
     required: false
-    default: None
-    aliases: ['un']
+    aliases: ['un', 'username']
   password:
     description: The password to connect to the database
     required: false
-    default: None
     aliases: ['pw']
-  service_name:
-    description: The service_name to connect to the database
+  mode:
+    description:
+      - The mode with which to connect to the database
     required: false
-    default: database_name
-    aliases: ['sn']
+    default: normal
+    choices: ['normal', 'sysdba', 'sysdg', 'sysoper', 'sysasm']
   hostname:
     description: The host of the database
     required: false
@@ -93,12 +36,122 @@ options:
     description: The listener port to connect to the database
     required: false
     default: 1521
-  mode:
-    description:
-      - The mode with which to connect to the database
+  service_name:
+    description: The service name to connect to the database
     required: false
-    default: normal
-    choices: ['normal','sysdba','sysdg','sysoper','sysasm']
+    aliases: ['sn']
+  dsn:
+    description: Oracle DSN/TNS alias. When provided, it takes precedence over hostname/port/service_name.
+    required: false
+    aliases: ['datasource_name']
+  oracle_home:
+    description: The ORACLE_HOME to use
+    required: false
+    aliases: ['oh']
+  session_container:
+    description:
+      - Target PDB name for ALTER SESSION SET CONTAINER on connect.
+      - Useful when connecting to CDB root but executing queries in a specific PDB.
+    required: false
+  sourcedb:
+    description: >
+      Source PDB to clone from. Mutually exclusive with plug_file.
+      Use clone_from as a more explicit alias.
+    required: false
+    aliases: ['db', 'container', 'cdb', 'clone_from']
+  snapshot_copy:
+    description: Use SNAPSHOT COPY when cloning from another PDB (requires compatible storage)
+    required: false
+    default: false
+    type: bool
+  plug_file:
+    description: Path to XML descriptor file for plug-in/unplug operations. Mutually exclusive with sourcedb.
+    required: false
+    aliases: ['plug_file_xml']
+  pdb_admin_username:
+    description: The username for the PDB admin user
+    required: false
+    default: pdb_admin
+    aliases: ['pdbadmun']
+  pdb_admin_password:
+    description: The password for the PDB admin user
+    required: false
+    default: pdb_admin
+    aliases: ['pdbadmpw']
+  roles:
+    description:
+      - List of roles granted to the PDB admin user during PDB creation from seed.
+    required: false
+    type: list
+    elements: str
+    default: []
+  save_state:
+    description: Save PDB state across instance restarts.
+    required: false
+    default: true
+    type: bool
+  datafile_dest:
+    description: The path where PDB datafiles will be placed
+    required: false
+    aliases: ['dfd', 'create_file_dest']
+  file_name_convert:
+    description:
+      - Mapping of source file paths to target file paths for CREATE PLUGGABLE DATABASE file_name_convert clause.
+    required: false
+    type: dict
+    aliases: ['fnc']
+  service_name_convert:
+    description:
+      - Mapping of source service names to target service names for service_name_convert clause.
+    required: false
+    type: dict
+    aliases: ['snc']
+  nocopy:
+    description: >
+      Skip copying datafiles when plugging in a PDB from an XML descriptor (NOCOPY clause).
+      Use when the datafiles are already in the correct location and only the XML metadata
+      needs to be imported. Only meaningful when plug_file is set.
+    required: false
+    default: false
+    type: bool
+  default_tablespace_type:
+    description: Set PDB default tablespace type when opening/ensuring state.
+    required: false
+    choices: ['smallfile', 'bigfile']
+  default_tablespace:
+    description: Set PDB default permanent tablespace when opening/ensuring state.
+    required: false
+  default_temp_tablespace:
+    description: Set PDB default temporary tablespace when opening/ensuring state.
+    required: false
+  timezone:
+    description: Set PDB DBTIMEZONE when opening/ensuring state.
+    required: false
+  open:
+    description:
+      - Desired open state when C(state=present).
+      - C(true) opens the PDB read-write, C(false) closes it (MOUNTED), C(null) leaves open state unchanged.
+    required: false
+    type: bool
+  restricted:
+    description:
+      - Open the PDB in restricted mode.
+      - Valid only with C(state=present) and C(open=true).
+    required: false
+    default: false
+    type: bool
+  state:
+    description: >
+      The intended state of the PDB.
+      present - create PDB if absent; optionally use open/restricted to control runtime open mode.
+      read_write - create if absent then open read-write.
+      closed - create if absent then leave/put it in MOUNTED state.
+      read_only - create if absent then open read-only.
+      absent - drop the PDB including datafiles.
+      unplugged - unplug the PDB to an XML file (plug_file required).
+      status - return current PDB status.
+    default: present
+    choices: ['present', 'absent', 'read_write', 'closed', 'read_only', 'status', 'unplugged']
 notes:
     - oracledb needs to be installed
 requirements: [ "oracledb" ]
@@ -123,14 +176,16 @@ EXAMPLES = '''
   oracle_pdb:
     mode: sysdba
     pdb_name: "XEPDB2_CLONE"
-    state: "opened"
+    state: "present"
+    open: true
     clone_from: "XEPDB2"
 
 - name: Clone a PDB with explicit file placement
   oracle_pdb:
     mode: sysdba
     pdb_name: "XEPDB2_CLONE"
-    state: "opened"
+    state: "present"
+    open: true
     clone_from: "XEPDB2"
     file_name_convert:
       "/opt/oracle/oradata/XE/xepdb2": "/opt/oracle/oradata/XE/xepdb2_clone"
@@ -288,6 +343,8 @@ def remove_pdb(conn, module, current_state):
 def ensure_pdb_state(conn, module, current_state):
     pdb_name = module.params['pdb_name']
     state = module.params['state']
+    open_pdb = module.params.get('open')
+    restricted = module.params.get('restricted')
     default_tablespace_type = module.params['default_tablespace_type']
     default_tablespace = module.params['default_tablespace']
     default_temp_tablespace = module.params['default_temp_tablespace']
@@ -299,24 +356,48 @@ def ensure_pdb_state(conn, module, current_state):
     wanted_state = {}
     ensure_sql = 'alter pluggable database %s ' % pdb_name
     current_open_mode = dict(current_state).get('open_mode', 'MOUNTED')
-    if state in ('opened', 'read_write'):
-        wanted_state.update({'open_mode': 'READ WRITE'})
-        if current_open_mode == 'MOUNTED':
-            ensure_sql += 'open read write'
-        else:
-            ensure_sql += 'open read write force'
+    desired_open_mode = None
+    desired_restricted = None
+
+    if state == 'present':
+        if open_pdb is True:
+            desired_open_mode = 'READ WRITE'
+            desired_restricted = 'YES' if restricted else 'NO'
+        elif open_pdb is False:
+            desired_open_mode = 'MOUNTED'
+            desired_restricted = 'NO'
+    elif state == 'read_write':
+        desired_open_mode = 'READ WRITE'
+        desired_restricted = 'NO'
     elif state == 'closed':
+        desired_open_mode = 'MOUNTED'
+        desired_restricted = 'NO'
+    elif state == 'read_only':
+        desired_open_mode = 'READ ONLY'
+        desired_restricted = 'NO'
+
+    if desired_open_mode == 'READ WRITE':
+        wanted_state.update({'open_mode': 'READ WRITE'})
+        wanted_state.update({'restricted': desired_restricted})
+        if desired_restricted == 'YES':
+            if current_open_mode == 'MOUNTED':
+                ensure_sql += 'open restricted'
+            else:
+                ensure_sql += 'open restricted force'
+        else:
+            if current_open_mode == 'MOUNTED':
+                ensure_sql += 'open read write'
+            else:
+                ensure_sql += 'open read write force'
+    elif desired_open_mode == 'MOUNTED':
         wanted_state.update({'open_mode': 'MOUNTED'})
         ensure_sql += 'close immediate'
-    elif state == 'read_only':
+    elif desired_open_mode == 'READ ONLY':
         wanted_state.update({'open_mode': 'READ ONLY'})
         if current_open_mode == 'MOUNTED':
             ensure_sql += 'open read only'
         else:
             ensure_sql += 'open read only force'
-    # elif state == 'restricted':
-    #     wanted_state = [('read write', 'yes')]
-    #     ensure_sql += 'open restricted force'
 
     if default_tablespace_type:
         wanted_state.update({'DEFAULT_TBS_TYPE': default_tablespace_type.upper()})
@@ -335,7 +416,8 @@ def ensure_pdb_state(conn, module, current_state):
     about_to_open = (wanted_state.get('open_mode') in ('READ WRITE', 'READ ONLY')
                      or dict(current_state).get('open_mode') == 'READ WRITE')
 
-    if 'open_mode' in dict(changes):
+    change_keys = dict(changes)
+    if desired_open_mode is not None and ('open_mode' in change_keys or 'restricted' in change_keys):
         change_db_sql.append(ensure_sql)
 
     if 'DEFAULT_TBS_TYPE' in dict(changes) and about_to_open:
@@ -417,8 +499,10 @@ def main():
             pdb_admin_username     = dict(required=False, default='pdb_admin', aliases=['pdbadmun']),
             pdb_admin_password     = dict(required=False, no_log=True, default='pdb_admin', aliases=['pdbadmpw']),
             roles                  = dict(type='list', elements='str', default=[]),
+            open                   = dict(required=False, type='bool', default=None),
+            restricted             = dict(type='bool', default=False),
             state                  = dict(default="present",
-                                         choices=["present", "absent", "opened", "closed",
+                                         choices=["present", "absent", "closed",
                                                   "read_only", "read_write", "status", "unplugged"]),
             save_state             = dict(default=True, type='bool'),
             datafile_dest          = dict(required=False, aliases=['dfd', 'create_file_dest']),
@@ -440,21 +524,29 @@ def main():
 
     pdb_name = module.params["pdb_name"]
     state = module.params["state"]
+    open_pdb = module.params.get('open')
+    restricted = module.params.get('restricted')
 
     if module.params['nocopy'] and not module.params.get('plug_file'):
         module.fail_json(msg="nocopy=True requires plug_file to be set", changed=False)
+
+    if restricted and open_pdb is not True:
+        module.fail_json(msg="restricted=True requires open=True", changed=False)
+
+    if state in ['absent', 'status', 'unplugged'] and (open_pdb is not None or restricted):
+        module.fail_json(msg="open/restricted can only be used with state=present", changed=False)
+
+    if state in ['closed', 'read_only', 'read_write'] and (open_pdb is not None or restricted):
+        module.fail_json(msg="open/restricted cannot be combined with state=%s" % state, changed=False)
 
     oc = oracleConnection(module)
     pdb = check_pdb_exists(oc, pdb_name)
     if state == 'present':
         if not pdb:
-            create_pdb(oc, module)
-            msg = 'Pluggable database %s successfully created' % pdb_name
-            module.exit_json(msg=msg, changed=oc.changed, ddls=oc.ddls)
-        else:
-            module.exit_json(msg='Pluggable database %s already exists' % pdb_name, changed=False, ddls=oc.ddls)
+            pdb = create_pdb(oc, module)
+        ensure_pdb_state(oc, module, pdb)
 
-    elif state in ['closed', 'opened', 'read_write', 'restricted', 'read_only']:
+    elif state in ['closed', 'read_write', 'read_only']:
         if not pdb:
             pdb = create_pdb(oc, module)
             ensure_pdb_state(oc, module, pdb)
