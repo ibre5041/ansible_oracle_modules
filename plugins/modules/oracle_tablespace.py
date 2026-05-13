@@ -194,19 +194,19 @@ def create_tablespace(conn, module):
             if bigfile:
                 sql = f'create bigfile undo tablespace {tablespace} datafile size {size}'
             else:
-                sql = f'create undo tablespace {tablespace} datafile {datafile_list}'
+                sql = f'create smallfile undo tablespace {tablespace} datafile {datafile_list}'
 
         elif content == 'temp':
             if bigfile:
                 sql = f'create bigfile temporary tablespace {tablespace} tempfile size {size}'
             else:
-                sql = f'create temporary tablespace tablespace tempfile {datafile_list}'
+                sql = f'create smallfile temporary tablespace {tablespace} tempfile {datafile_list}'
 
         else:
             if bigfile:
                 sql = f'create bigfile tablespace {tablespace} datafile size {size}'
             else:
-                sql = f'create tablespace {tablespace} datafile  {datafile_list}'
+                sql = f'create smallfile tablespace {tablespace} datafile {datafile_list}'
 
         conn.execute_ddl(sql)
         return
@@ -231,19 +231,19 @@ def create_tablespace(conn, module):
             if bigfile:
                 sql = f'create bigfile undo tablespace {tablespace} datafile {datafile_list}'
             else:
-                sql = f'create undo tablespace {tablespace} datafile {datafile_list}'
+                sql = f'create smallfile undo tablespace {tablespace} datafile {datafile_list}'
 
         elif content == 'temp':
             if bigfile:
                 sql = f'create bigfile temporary tablespace {tablespace} tempfile {datafile_list}'
             else:
-                sql = f'create temporary tablespace {tablespace} tempfile {datafile_list}'
+                sql = f'create smallfile temporary tablespace {tablespace} tempfile {datafile_list}'
 
         else:
             if bigfile:
                 sql = f'create bigfile tablespace {tablespace} datafile {datafile_list}'
             else:
-                sql = f'create tablespace {tablespace} datafile {datafile_list}'
+                sql = f'create smallfile tablespace {tablespace} datafile {datafile_list}'
 
         conn.execute_ddl(sql)
         return

@@ -1,0 +1,6 @@
+---
+dg_configuration_name: "test_dg_config"
+dg_primary_database: "PROD"
+dg_standby_database: "STDBY"
+dg_primary_connect_identifier: "prod-host:1521/PROD"
+dg_standby_connect_identifier: "stdby-host:1521/STDBY"

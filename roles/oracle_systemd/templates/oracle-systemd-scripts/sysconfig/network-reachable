@@ -1,0 +1,6 @@
+#TEST_HOST=www.google.com
+TEST_HOST={{ ansible_default_ipv4.gateway }}
+
+# Number of times to repeat the ping
+# Interval between pings is 1 second
+#REPEAT=30

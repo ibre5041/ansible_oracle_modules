@@ -1,6 +1,6 @@
 ---
 cdb_service_name: "{{ oracle_service_name }}"
-pdb_service_name: "XEPDB1"
+pdb_service_name: "{{ oracle_pdb_service_name }}"
 sys_password: "password"
 app_user: "app_user"
 app_password: "app_user_password"

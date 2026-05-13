@@ -1,0 +1,6 @@
+---
+keystore_password: "TestWalletPass123"
+keystore_new_password: "TestWalletPass456"
+secret_value: "my_test_secret_value"
+secret_client: "TEST_APP"
+backup_tag: "test_backup"

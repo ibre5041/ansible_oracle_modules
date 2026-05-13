@@ -23,5 +23,10 @@
       - db_unique_name
       - instance_name
       - service_names
-    
+  register: _
+
+- name: facts
+  debug:
+    var: _
+  
 ...

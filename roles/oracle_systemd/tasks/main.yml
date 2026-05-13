@@ -1,0 +1,75 @@
+---
+# tasks file for oracle_systemd
+
+# - debug:
+#     var: ansible_default_ipv4.gateway
+
+# - debug:
+#     var: oracle_systemd_packages
+
+# - debug:
+#     var: oracle_systemd_libexec_source
+
+# - debug:
+#     var: oracle_systemd_python_lib_dest
+
+- name: systemd-python
+  yum:
+    name: "{{ oracle_systemd_packages }}"
+
+- name: /usr/libexec/oracle_systemd-service
+  copy:
+    src: "oracle-systemd-scripts/libexec/{{ oracle_systemd_libexec_source }}"
+    dest: /usr/libexec/oracle-systemd-service
+    mode: '0755'
+  
+# This only one file has template in it
+- name: /etc/sysconfig/network-reachable
+  template:
+    src: oracle-systemd-scripts/sysconfig/network-reachable
+    dest: /etc/sysconfig/network-reachable
+
+- name: "copy oracle-systemd files"
+  copy:
+    src:  "{{ item.file_name }}"
+    dest: "{{ item.dest }}"
+    mode: "{{ item.mode | default('0644') }}"
+    directory_mode: "{{ item.mode | default('no') }}"
+  # debug:
+  #   msg: "{{ item.file_name }} => {{ item.dest }}"
+  with_items:
+    - file_name: oracle-systemd-scripts/systemd/network-reachable.service
+      dest: /etc/systemd/system/network-reachable.service      
+    - file_name: oracle-systemd-scripts/systemd/oracle.service
+      dest: /etc/systemd/system/oracle.service
+
+    # installed via template
+    #- file_name: oracle-systemd-scripts/sysconfig/network-reachable
+    #  dest: /etc/system/network-reachable
+    - file_name: oracle-systemd-scripts/sysconfig/oracle
+      dest: /etc/sysconfig/oracle
+
+    - file_name: oracle-systemd-scripts/libexec/network-reachable
+      dest: /usr/libexec/network-reachable
+      mode: '0755'
+    # - file_name: libexec/oracle-systemd-service.py3
+    #   dest: /usr/libexec/oracle-systemd-service
+    #   mode: '0755'
+
+    - file_name: oracle-systemd-scripts/site-packages/dotora
+      dest: "{{ oracle_systemd_python_lib_dest }}/dotora"
+      directory_mode: yes
+      mode: 'g+rX,o+rX'
+
+- name: systemd daemon-reload
+  systemd: 
+    name=network-reachable
+    daemon_reload=yes
+    enabled=yes
+    state=started
+
+- name: systemd daemon-reload
+  systemd: 
+    name=oracle
+    enabled=yes
+    daemon_reload=yes

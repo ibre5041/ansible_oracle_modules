@@ -1,0 +1,29 @@
+---
+- name: "define connection parameters"
+  set_fact:
+    con_param: &con_param
+      hostname: "{{ oracle_hostname }}"
+      port: "{{ oracle_port }}"
+      service_name: "{{ oracle_service_name }}"
+      username: "{{ oracle_username }}"
+      password: "{{ oracle_password }}"
+      dsn: "{{ oracle_dsn }}"
+      oracle_home: "{{ oracle_home }}"
+      mode: "{{ mode }}"
+
+- name: "get TDE status"
+  oracle_tde:
+    <<: *con_param
+    state: status
+  register: tde_status
+  failed_when: tde_status.failed
+
+- name: "verify status fields are present"
+  assert:
+    that:
+      - tde_status.wallet_status is defined
+      - tde_status.master_key is defined
+      - tde_status.encrypted_tablespaces is defined
+      - tde_status.changed == false
+
+...

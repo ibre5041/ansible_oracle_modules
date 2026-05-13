@@ -1,0 +1,9 @@
+{
+    "ANSIBLE_MODULE_ARGS": {
+        "mode": "sysdba",
+	"state": "present",
+	"open": true,
+	"keystore_password": "MyKeystorePass123",
+	"keystore_location": "/home/oracle/wallet"
+    }
+}

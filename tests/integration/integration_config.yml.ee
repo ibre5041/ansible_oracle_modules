@@ -1,0 +1,55 @@
+# Oracle Enterprise Edition — Docker integration config
+# Usage: make test-docker-ee
+#        (ou manuellement : make integration-config-ee && make test ROLE=xxx)
+#
+# Image: container-registry.oracle.com/database/enterprise:latest
+# Démarrer avec: docker compose up -d
+# Le conteneur est prêt quand le healthcheck passe (~90s)
+# Requires: docker login container-registry.oracle.com (Oracle SSO credentials)
+
+# ── Mode A1 : SYSDBA direct sur CDB ──────────────────────────────────────────
+# Utilisé par : test_oracle_pdb (CREATE/DROP PLUGGABLE DATABASE)
+oracle_hostname:     localhost
+oracle_port:         1521
+oracle_service_name: ORCLCDB   # service CDB
+oracle_sid:          ORCLCDB
+oracle_dsn:
+oracle_username:     SYS
+oracle_password:     Oracle_4U
+oracle_home:         /opt/oracle/product/latest/dbhome_1
+mode:                sysdba
+
+# ── Mode A2 : SYSDBA direct sur PDB ──────────────────────────────────────────
+# Utilisé par : test_oracle_user, test_oracle_role, test_oracle_grant,
+#               test_oracle_tablespace, test_oracle_parameter, etc.
+oracle_pdb_service_name: ORCLPDB1
+oracle_pdb_username:     SYS
+oracle_pdb_password:     Oracle_4U
+
+# ── Mode B : SYSDBA sur CDB + session_container ──────────────────────────────
+# Connexion à ORCLCDB (CDB) puis ALTER SESSION SET CONTAINER = ORCLPDB1
+# Utilisé par : test_oracle_ping (bloc Mode B)
+oracle_session_container: ORCLPDB1
+
+# ── Mode C : connexion normale username/password (sans SYSDBA) ───────────────
+# Utilisé par : test_oracle_ping (bloc Mode C), test_oracle_facts (no_sysdba.yml)
+oracle_normal_service_name: ORCLPDB1
+oracle_normal_username:     SYSTEM
+oracle_normal_password:     Oracle_4U
+oracle_normal_mode:         normal
+
+# ── Chemins et noms dérivés ────────────────────────────────────────────────────
+oracle_datadir: /opt/oracle/oradata/ORCLCDB
+oracle_pdb_name: ORCLPDB1
+oracle_wallet_location: /opt/oracle/admin/ORCLCDB/wallet
+
+# ── Flags d'environnement ─────────────────────────────────────────────────────
+running_on_client:     true    # connexion TCP distante
+running_on_server:     false   # pas d'accès OS Oracle
+running_on_server_crs: false   # pas de Grid Infrastructure
+running_on_cdb:        true    # CDB multitenant
+running_on_pdb:        true    # ORCLPDB1 disponible (oracle_pdb_service_name)
+running_on_db_asm:     false   # stockage filesystem (pas ASM)
+running_on_db_fs:      true    # stockage filesystem
+running_on_adb:        false   # pas Oracle ADB
+running_on_xe:         false   # Oracle Enterprise Edition

@@ -1,2 +1,4 @@
 ---
-# defaults file for oracle.asm.disks
+# defaults file for oracle_asm_disk_vbox
+
+oracle_asm_disk_group: "{{ oracle_install_space[oracle_release]['oracle_asm_disk_group'] }}"

@@ -1,0 +1,25 @@
+---
+- name: "define connection parameters"
+  set_fact:
+    con_param: &con_param
+      hostname: "{{ oracle_hostname }}"
+      port: "{{ oracle_port }}"
+      service_name: "{{ oracle_pdb_service_name }}"
+      username: "{{ oracle_pdb_username | default(oracle_username) }}"
+      password: "{{ oracle_pdb_password | default(oracle_password) }}"
+      dsn: "{{ oracle_dsn }}"
+      oracle_home: "{{ oracle_home }}"
+      mode: "{{ mode }}"
+
+- name: "rekey tablespace {{ test_tablespace }} with AES128"
+  oracle_tde:
+    <<: *con_param
+    state: present
+    tablespace_state: rekeyed
+    tablespace: "{{ test_tablespace }}"
+    algorithm: AES256
+    online: true
+  register: _
+  failed_when: not _.changed
+
+...

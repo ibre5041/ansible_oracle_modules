@@ -1,0 +1,22 @@
+---
+# vars file for oracle.systemd
+
+# on RHEL7 we must use Python2 (package python3-systemd is not present here)
+oracle_systemd_packages: "{{ ['fping'] \
+                         + (['systemd-python']  if ansible_distribution_major_version == '7' else [] ) \
+                         + (['python3-systemd'] if ansible_distribution_major_version >= '8' else [] ) }}"
+
+oracle_systemd_libexec_source: "{{ {'7': 'oracle-systemd-service.py2' \
+                                  , '8': 'oracle-systemd-service.py3' \
+                                  , '9': 'oracle-systemd-service.py3' \
+                                  , '10': 'oracle-systemd-service.py3'} \
+                                  [ansible_distribution_major_version] }}"
+
+oracle_systemd_python_lib_dest: "{{ {'7': '/usr/lib/python2.7/site-packages/' \
+                                  ,  '8': '/usr/lib/python3.6/site-packages/' \
+                                  ,  '9': '/usr/lib/python3.9/site-packages/' \
+                                  ,  '10': '/usr/lib/python3.9/site-packages/'} \
+                                  [ansible_distribution_major_version] }}"
+
+
+

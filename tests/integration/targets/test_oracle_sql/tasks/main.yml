@@ -4,11 +4,14 @@
   block:
     - include_tasks: "select.yml"
     - include_tasks: "ddl.yml"
+      when: not (running_on_cdb | default(false)) or (oracle_pdb_service_name is defined and oracle_pdb_service_name | length > 0)
     - include_tasks: "plsql_block.yml"
     - include_tasks: "sql_file.yml"
     - include_tasks: "special_cases.yml"
     - include_tasks: "check_mode.yml"
     - include_tasks: "dbms_output.yml"
+    - include_tasks: "cdb.yml"
+      when: running_on_cdb | default(false)
 
   environment:
     ORACLE_SID: "{{ oracle_sid | default() }}"

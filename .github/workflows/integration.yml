@@ -9,7 +9,7 @@ jobs:
 
     services:
       oracle:
-        image: gvenzl/oracle-xe:21-slim
+        image: gvenzl/oracle-free:23-full
         env:
           ORACLE_PASSWORD: Oracle_4U
         ports:
@@ -19,7 +19,7 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 50
-          --health-start-period 90s
+          --health-start-period 300s
 
     steps:
       - uses: actions/checkout@v4
@@ -29,13 +29,25 @@ jobs:
           python-version: "3.11"
 
       - name: Install dependencies
-        run: pip install ansible oracledb
+        run: |
+          pip install ansible -r tests/integration/requirements.txt
+          ansible-galaxy collection install community.docker
+          which python
+          python --version
+          python -m pip list | grep oracledb
+          python -c "import oracledb; print('oracledb found:', oracledb.version)" || echo "oracledb not importable"
 
       - name: Build and install collection
         run: |
           make build
           VERSION=$(grep ^version: galaxy.yml | cut -d" " -f2)
           ansible-galaxy collection install --force ibre5041-ansible_oracle_modules-${VERSION}.tar.gz
+
+      - name: Prepare Oracle container directories
+        run: |
+          CONTAINER_ID=$(docker ps -q --filter "ancestor=gvenzl/oracle-free:23-full")
+          docker exec "$CONTAINER_ID" mkdir -p /opt/oracle/admin/FREE/wallet
+          docker exec "$CONTAINER_ID" chown oracle:oinstall /opt/oracle/admin/FREE/wallet
 
       - name: Configure integration config (Docker)
         run: |
@@ -56,8 +68,27 @@ jobs:
               test_oracle_user \
               test_oracle_tablespace \
               test_oracle_parameter \
+              test_oracle_grant \
               test_oracle_pdb \
-              test_oracle_facts; do
+              test_oracle_facts \
+              test_oracle_wallet \
+              test_oracle_tde \
+              test_oracle_orapki \
+              test_oracle_dataguard \
+              test_oracle_dblink \
+              test_oracle_jobclass \
+              test_oracle_jobschedule \
+              test_oracle_jobwindow \
+              test_oracle_job \
+              test_oracle_audit \
+              test_oracle_flashback \
+              test_oracle_quota \
+              test_oracle_privs \
+              test_oracle_acl \
+              test_oracle_stats_prefs \
+              test_oracle_rsrc_consgroup \
+              test_oracle_rsrc_plan \
+              test_oracle_services; do
             echo ""
             echo "════════════════════════════════════════"
             echo "  Running: $ROLE"

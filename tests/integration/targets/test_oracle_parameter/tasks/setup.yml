@@ -16,7 +16,7 @@
   oracle_pdb:
     <<: *cdb_con_param
     pdb_name: "{{ oracle_pdb_service_name }}"
-    state: absent
+    state: "absent"
 
 - name: create PDB {{ oracle_pdb_service_name }}
   oracle_pdb:

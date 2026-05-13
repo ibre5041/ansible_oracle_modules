@@ -594,7 +594,9 @@ def _pdb_params(**overrides):
     base = {
         **BASE_CONN_PARAMS,
         "pdb_name": "TESTPDB",
-        "state": "opened",
+        "state": "present",
+        "open": None,
+        "restricted": False,
         "sourcedb": None,
         "snapshot_copy": False,
         "plug_file": None,
@@ -605,7 +607,8 @@ def _pdb_params(**overrides):
         "datafile_dest": None,
         "file_name_convert": None,
         "service_name_convert": None,
-        "default_tablespace_type": "smallfile",
+        "nocopy": False,
+        "default_tablespace_type": None,
         "default_tablespace": None,
         "default_temp_tablespace": None,
         "timezone": None,
@@ -654,6 +657,38 @@ def test_pdb_creates_new(monkeypatch):
     payload = exc.value.args[0]
     assert payload["changed"] is True
     assert any("create pluggable database" in d.lower() for d in payload["ddls"])
+
+
+def test_pdb_creates_with_nocopy(monkeypatch):
+    """plug_file + nocopy=True → DDL contains NOCOPY clause."""
+    mod = _load("oracle_pdb")
+
+    class Mod(BaseFakeModule):
+        params = _pdb_params(state="present", plug_file="/tmp/test.xml", nocopy=True, sourcedb=None)
+
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "oracleConnection", lambda m: _PdbConn(m, None), raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    payload = exc.value.args[0]
+    assert payload["changed"] is True
+    assert any("NOCOPY" in d for d in payload["ddls"])
+
+
+def test_pdb_nocopy_without_plug_file_fails(monkeypatch):
+    """nocopy=True with no plug_file → fail_json with descriptive message."""
+    mod = _load("oracle_pdb")
+
+    class Mod(BaseFakeModule):
+        params = _pdb_params(state="present", nocopy=True, plug_file=None, sourcedb=None)
+
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "oracleConnection", lambda m: _PdbConn(m, None), raising=False)
+
+    with pytest.raises(FailJson) as exc:
+        mod.main()
+    assert "plug_file" in exc.value.args[0]["msg"]
 
 
 def test_pdb_absent_removes_existing(monkeypatch):
@@ -832,7 +867,7 @@ def test_tablespace_creates_with_datafile(monkeypatch):
         mod.main()
     payload = exc.value.args[0]
     assert payload["changed"] is True
-    assert any("create tablespace" in d.lower() for d in payload["ddls"])
+    assert any("create smallfile tablespace" in d.lower() for d in payload["ddls"])
 
 
 def test_tablespace_drops_existing(monkeypatch):
@@ -1737,12 +1772,12 @@ def test_pdb_remove_when_read_write(monkeypatch):
     assert any("drop" in d.lower() for d in ddls)
 
 
-def test_pdb_state_opened_existing_already_open(monkeypatch):
-    """state=opened, pdb already exists and is READ WRITE → no open DDL issued."""
+def test_pdb_state_present_open_existing_already_open(monkeypatch):
+    """state=present + open=True, already READ WRITE → no open DDL issued."""
     mod = _load("oracle_pdb")
 
     class Mod(BaseFakeModule):
-        params = _pdb_params(state="opened")
+        params = _pdb_params(state="present", open=True)
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
     monkeypatch.setattr(mod, "oracleConnection", lambda m: _PdbConn(m, "READ WRITE"), raising=False)
@@ -1785,11 +1820,11 @@ def test_pdb_state_read_only_from_new(monkeypatch):
 
 
 def test_pdb_state_with_default_tablespace(monkeypatch):
-    """state=opened with default_tablespace → ensure_pdb_state adds tablespace DDL."""
+    """state=present + open=True with default_tablespace → ensure_pdb_state adds tablespace DDL."""
     mod = _load("oracle_pdb")
 
     class Mod(BaseFakeModule):
-        params = _pdb_params(state="opened", default_tablespace="USERS")
+        params = _pdb_params(state="present", open=True, default_tablespace="USERS")
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
     monkeypatch.setattr(mod, "oracleConnection", lambda m: _PdbConn(m, "READ WRITE"), raising=False)
@@ -1801,11 +1836,11 @@ def test_pdb_state_with_default_tablespace(monkeypatch):
 
 
 def test_pdb_state_with_default_temp_tablespace(monkeypatch):
-    """state=opened with default_temp_tablespace → DDL for temp tablespace."""
+    """state=present + open=True with default_temp_tablespace → DDL for temp tablespace."""
     mod = _load("oracle_pdb")
 
     class Mod(BaseFakeModule):
-        params = _pdb_params(state="opened", default_temp_tablespace="TEMP2")
+        params = _pdb_params(state="present", open=True, default_temp_tablespace="TEMP2")
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
     monkeypatch.setattr(mod, "oracleConnection", lambda m: _PdbConn(m, "READ WRITE"), raising=False)
@@ -1817,11 +1852,11 @@ def test_pdb_state_with_default_temp_tablespace(monkeypatch):
 
 
 def test_pdb_state_with_timezone(monkeypatch):
-    """state=opened with timezone → DDL for time_zone."""
+    """state=present + open=True with timezone → DDL for time_zone."""
     mod = _load("oracle_pdb")
 
     class Mod(BaseFakeModule):
-        params = _pdb_params(state="opened", timezone="+02:00")
+        params = _pdb_params(state="present", open=True, timezone="+02:00")
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
     monkeypatch.setattr(mod, "oracleConnection", lambda m: _PdbConn(m, "READ WRITE"), raising=False)
@@ -1842,17 +1877,60 @@ def test_pdb_state_no_changes_after_create(monkeypatch):
             super().__init__(m, None)
 
     class Mod(BaseFakeModule):
-        params = _pdb_params(state="opened")
+        params = _pdb_params(state="present", open=True)
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
     monkeypatch.setattr(mod, "oracleConnection", lambda m: _Conn(m), raising=False)
 
-    # state=opened, pdb newly created with open_mode=MOUNTED
+    # state=present + open=true, pdb newly created with open_mode=MOUNTED
     # wanted_state={'open_mode': 'READ WRITE'}, current={'open_mode': 'MOUNTED'}
     # → changes has open_mode → DDL added → exits changed=True
     with pytest.raises(ExitJson) as exc:
         mod.main()
     assert exc.value.args[0]["changed"] is True
+
+
+def test_pdb_restricted_requires_open_true(monkeypatch):
+    mod = _load("oracle_pdb")
+
+    class Mod(BaseFakeModule):
+        params = _pdb_params(state="present", open=None, restricted=True)
+
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "oracleConnection", lambda m: _PdbConn(m, "MOUNTED"), raising=False)
+
+    with pytest.raises(FailJson) as exc:
+        mod.main()
+    assert "requires open=True" in exc.value.args[0]["msg"]
+
+
+def test_pdb_open_not_allowed_with_absent(monkeypatch):
+    mod = _load("oracle_pdb")
+
+    class Mod(BaseFakeModule):
+        params = _pdb_params(state="absent", open=True)
+
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "oracleConnection", lambda m: _PdbConn(m, "MOUNTED"), raising=False)
+
+    with pytest.raises(FailJson) as exc:
+        mod.main()
+    assert "only be used with state=present" in exc.value.args[0]["msg"]
+
+
+def test_pdb_present_open_restricted_executes_open_restricted(monkeypatch):
+    mod = _load("oracle_pdb")
+
+    class Mod(BaseFakeModule):
+        params = _pdb_params(state="present", open=True, restricted=True)
+
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "oracleConnection", lambda m: _PdbConn(m, "MOUNTED"), raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    ddls = exc.value.args[0]["ddls"]
+    assert any("open restricted" in d.lower() for d in ddls)
 
 
 def test_pdb_status_mounted(monkeypatch):

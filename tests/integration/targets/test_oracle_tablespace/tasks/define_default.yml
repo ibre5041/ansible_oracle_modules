@@ -46,7 +46,7 @@
   oracle_tablespace:
     <<: *con_param
     tablespace: "users"
-    datafiles: "/opt/oracle/oradata/XE/XEPDB1/users01.dbf"
+    datafiles: "{{ oracle_datadir }}/{{ oracle_pdb_name }}/users01.dbf"
     size: "5M"
     autoextend: yes
     nextsize: "1280K"
@@ -81,7 +81,7 @@
   oracle_tablespace:
     <<: *con_param
     tablespace: "temp"
-    datafiles: "/opt/oracle/oradata/XE/XEPDB1/temp01.dbf"
+    datafiles: "{{ oracle_datadir }}/{{ oracle_pdb_name }}/temp01.dbf"
     content: "temp"
     default: yes
     size: "5M"

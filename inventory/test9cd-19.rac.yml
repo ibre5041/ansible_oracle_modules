@@ -1,0 +1,65 @@
+---
+
+all:
+  hosts:
+    test9c-rac:
+      address: 192.168.8.89
+      oracle_crs_node_vip: test9c-rac-vip
+    test9d-rac:
+      address: 192.168.8.90
+      oracle_crs_node_vip: test9d-rac-vip
+  children:
+    oracle:
+      hosts:
+        test9c-rac:
+        test9d-rac:
+      vars:
+        oracle_release: 19c
+        oracle_install_type: rac
+        oracle_url_base: http://kicklinux9/oracle/19c/
+        oracle_db_ver_path: 19.26.0.0
+        oracle_gi_media: grid_home_19_26.zip
+        oracle_db_media: db_home_19_26.zip
+
+  vars:  
+    scsi:
+    - adapter:
+        pciSlotNumber: 16
+    - adapter:
+        pciSlotNumber: 32
+    disks:
+    - disk: rootdg
+      size: 10g
+      bus: 0
+    - disk: appdg
+      size: 100g
+      bus: 0
+    network:
+    - adapter:
+      pciSlotNumber: 192
+      network: "Public Network"
+    - adapter:
+      pciSlotNumber: 224
+      network: "Barn Network"      
+    ram: 32G
+    cpu: 4
+
+    vmware:
+      vm_folder: VmFolder
+      datastore: KINGSTON
+
+    cluster:
+      oracle_cluster_name: test19c
+      disks:
+        - disk:
+            size: 8G
+            bus: 1
+            count: 4
+      addresses:
+        test9c-rac-vip: 192.168.8.94
+        test9d-rac-vip: 192.168.8.95
+        test9cd-scan: [192.168.8.91, 192.168.8.92, 192.168.8.93]
+
+    oracle_crs_scan: test9cd-scan
+    oracle_password: Xb6a5ed2ff29f98d
+    template: "RHEL9Template"

@@ -136,6 +136,23 @@ options:
       - "-stopoption <stop_options>     Options to stop service (e.g. TRANSACTIONAL or IMMEDIATE)"
     choices: ['TRANSACTIONAL', 'IMMEDIATE']
     required: false
+  preferred:
+    description:
+      - "-preferred <node_list> Comma-separated list of preferred nodes for administrator-managed RAC services"
+    required: false
+  available:
+    description:
+      - "-available <node_list> Comma-separated list of available nodes for administrator-managed RAC services"
+    required: false
+  serverpool:
+    description:
+      - "-serverpool <pool_name> Server pool name for policy-managed RAC services"
+    required: false
+  cardinality:
+    description:
+      - "-cardinality (UNIFORM | SINGLETON) Cardinality for policy-managed RAC services"
+    choices: ['UNIFORM', 'SINGLETON']
+    required: false
 notes:
   - Should be executed with privileges of Oracle CRS installation owner
 author: Ivan Brezina
@@ -184,8 +201,11 @@ class oracle_crs_service:
         self.commands = []
         self.changed = False
         self.curent_resource = None
-        self.get_crs_config('service')
         self.srvctl = os.path.join(self.ohomes.crs_home, "bin", "srvctl")
+        self.get_crs_config('service')
+        if self.curent_resource:
+            self.get_service_config(module)
+
 
     def run_change_command(self, command):
         self.commands.append(' '.join(command))
@@ -255,6 +275,41 @@ class oracle_crs_service:
         else:
             self.curent_resource = retval.get(self.resource_name.lower(), dict())
 
+
+    def get_service_config(self, module):
+        command = [self.srvctl
+                   , 'config'
+                   , 'service'
+                   , '-d', module.params['db']
+                   , '-s', module.params['name']
+                   ]
+        (rc, stdout, stderr) = self.module.run_command(command)
+        if rc or stderr:
+            self.module.fail_json(msg=f"Failed command: {command}"
+                                  , commands=self.commands
+                                  , changed=self.changed)
+        SRVCTL_ATTRIBUTES = {
+            'Server pool': 'SERVER_POOL',
+            'Cardinality': 'CARDINALITY',            
+            'Preferred instances': 'PREFERRED',
+            'Available instances': 'AVAILABLE',
+        }
+        for line in stdout.splitlines():
+            if line.startswith('Service is enabled'):
+                self.curent_resource['ENABLED'] = True
+            
+            if line.startswith('Service is disabled'):
+                self.curent_resource['ENABLED'] = False
+
+            if ': ' not in line:
+                continue
+            
+            (key, value) = line.split(': ', 1)
+            if key in SRVCTL_ATTRIBUTES.keys():
+                kkey = SRVCTL_ATTRIBUTES[key]
+                self.curent_resource[kkey] = value
+        
+            
     def configure_db(self):
         state = self.module.params["state"]
         resource_name = self.module.params['name'].upper()
@@ -280,6 +335,11 @@ class oracle_crs_service:
                 wanted_set.add((pname, param))
             elif param:
                 wanted_set.add((pname, param.upper()))
+        if self.ohomes.oracle_crs:
+            for rac_param in ['serverpool', 'preferred', 'available', 'cardinality']:
+                val = self.module.params.get(rac_param)
+                if val:
+                    wanted_set.add((rac_param, val))
 
         current_set = set()
         # current_set.add(("db", self.curent_resource.get('???', None)))
@@ -306,6 +366,11 @@ class oracle_crs_service:
         current_set.add(("tablefamilyid", self.curent_resource.get('TABLE_FAMILY_ID', None)))
         current_set.add(("drain_timeout", self.curent_resource.get('DRAIN_TIMEOUT', None)))
         current_set.add(("stopoption", self.curent_resource.get('STOP_OPTION', '').upper())) # CRS stores is as lowercase
+        if self.ohomes.oracle_crs:
+            current_set.add(("serverpool", self.curent_resource.get('SERVER_POOL', None)))
+            current_set.add(("cardinality", self.curent_resource.get('CARDINALITY', None)))
+            current_set.add(("preferred", self.curent_resource.get('PREFERRED', None)))
+            current_set.add(("available", self.curent_resource.get('AVAILABLE', None)))
 
         apply = False
         changes = wanted_set.difference(current_set)
@@ -315,6 +380,9 @@ class oracle_crs_service:
             apply = True
         elif self.curent_resource and state in ['present', 'started', 'stopped', 'restarted']:
             srvctl.extend(['modify', 'service', '-s', resource_name, '-d', database_name])
+            # PRKO-3145 : Option '-preferred' requires '-modifyconfig' option to be specified
+            if any(k in ('preferred', 'available') for k, v in changes):
+                srvctl.extend(['-modifyconfig'])
         elif self.curent_resource and state == 'absent':
             srvctl.extend(['remove', 'service', '-s', resource_name, '-d', database_name])
             if self.module.params['force']:
@@ -436,6 +504,11 @@ def main():
         drain_timeout=dict(required=False),
         # <stop_options> Options to stop service (e.g. TRANSACTIONAL or IMMEDIATE)
         stopoption=dict(required=False, choices=['TRANSACTIONAL', 'IMMEDIATE']),
+        # RAC placement options (required for srvctl add service on RAC)
+        preferred=dict(required=False),
+        available=dict(required=False),
+        serverpool=dict(required=False),
+        cardinality=dict(required=False, choices=['UNIFORM', 'SINGLETON']),
     )
     # global is Python keyword, use this hack to use 'global' as ansible module parameter
     argument_spec.update({'global': dict(required=False, type='bool')})

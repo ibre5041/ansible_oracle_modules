@@ -1,0 +1,10 @@
+---
+- hosts: oracle
+  gather_facts: false
+  vars_files:
+    - defaults/main.yml
+  environment:
+    ORACLE_SID: "{{ oracle_sid | default('') }}"
+    ORACLE_HOME: "{{ oracle_home | default('') }}"
+  tasks:
+    - include_tasks: tasks/main.yml

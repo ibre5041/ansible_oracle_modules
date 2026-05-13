@@ -1,9 +1,41 @@
 ---
 
+- name: Oracle DB facts
+  oracle_facts:
+    mode: sysdba
+    userenv: false
+    database: true
+    instance: false
+    redo: summary
+    standby: summary
+    parameter:
+      - audit_file_dest
+      - db_name
+      - db_unique_name
+      - instance_name
+      - service_names
+  register: database_facts
+
+- name: database_facts
+  debug:
+    var: database_facts
+  
+- name: "database facts {{ item }}"
+  set_fact:
+    "{{ item.name }}": "{{ item.value }}"
+  loop:
+    - { "name": "db_unique_name", "value": "{{ database_facts.ansible_facts[oracle_sid].parameter['db_unique_name'].value }}" }
+    - { "name": "db_name", "value": "{{ database_facts.ansible_facts[oracle_sid].parameter['db_name'].value }}" }    
+    - { "name": "instance_names", "value": "{{ database_facts.ansible_facts[oracle_sid].rac | map(attribute='instance_name') | list }}" }
+
+- name: instance_names
+  debug:
+    var: instance_names
+
 - name: First remove the service
   oracle_crs_service:
-    name: TMP12102_PRIMARY
-    db: TMP12102
+    name: "{{ db_name }}_PRIMARY"
+    db: "{{ db_unique_name }}"
     state: absent
     force: true
   register: _
@@ -13,9 +45,10 @@
   
 - name: Register database service (check mode)
   oracle_crs_service:
-    name: TMP12102_PRIMARY
-    db: TMP12102_PRIMARY    
+    name: "{{ db_name }}_PRIMARY"
+    db: "{{ db_unique_name }}"
     state: present
+    preferred: "{{ instance_names | join(',') }}"
   check_mode: yes    
   register: _
   failed_when: not 'add service' in _.commands[0] or not _.changed or _.failed
@@ -23,11 +56,12 @@
 - name: Register database service (check mode)
   debug: var=_
 
-- name: Alter database attributes (DG Standby)
+- name: Alter service attributes (DG Standby)
   oracle_crs_service:
-    name: TMP12102_PRIMARY
-    db: TMP12102
+    name: "{{ db_name }}_PRIMARY"
+    db: "{{ db_unique_name }}"
     state: present
+    preferred: "{{ instance_names | join(',') }}"
     role: PHYSICAL_STANDBY
     policy: MANUAL
     failovertype: TRANSACTION
@@ -40,14 +74,15 @@
     stopoption: IMMEDIATE
   register: _
 
-- name: Alter database attributes (DG Standby)
+- name: Alter service attributes (DG Standby)
   debug: var=_
 
-- name: Alter database attributes (DG Standby) (Again no change)
+- name: Alter service attributes (DG Standby) (Again no change)
   oracle_crs_service:
-    name: TMP12102_PRIMARY
-    db: TMP12102
+    name: "{{ db_name }}_PRIMARY"
+    db: "{{ db_unique_name }}"
     state: present
+    preferred: "{{ instance_names | join(',') }}"
     role: PHYSICAL_STANDBY
     policy: MANUAL
     failovertype: TRANSACTION
@@ -60,8 +95,8 @@
     stopoption: IMMEDIATE
   register: _
   failed_when: _.changed or _.failed
-  
-- name: Alter database attributes (DG Standby)
+
+- name: Alter service attributes (DG Standby)
   debug: var=_
 
 ...

@@ -1,4 +1,5 @@
 ---
+
 - name: "define connection parameters"
   set_fact:
     connection_parameters: &con_param
@@ -13,4 +14,5 @@
     gather_subset: "min"
   register: _
   failed_when: not _.failed
+
 ...

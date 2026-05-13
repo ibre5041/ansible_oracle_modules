@@ -1,6 +1,6 @@
 services:
   oracle:
-    image: gvenzl/oracle-xe:21-slim
+    image: gvenzl/oracle-free:23-full
     environment:
       ORACLE_PASSWORD: Oracle_4U
     ports:
@@ -9,9 +9,9 @@ services:
       - oracle-data:/opt/oracle/oradata
     healthcheck:
       test: ["CMD", "healthcheck.sh"]
-      interval: 10s
-      timeout: 5s
-      retries: 50
+      interval: 30s
+      timeout: 10s
+      retries: 30
       start_period: 90s
 
 volumes:

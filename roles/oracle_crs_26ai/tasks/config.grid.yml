@@ -1,15 +1,15 @@
 
 - name: "Execute Config Tools gridSetup.sh (part II)"
   block:
-    - name: install grid.rsp
+    - name: install {{ oracle_gi_response_file }}
       template:
-        src: grid.no.comments.rsp
-        dest: "{{ oracle_install_dir_temp }}/grid.rsp"
+        src:  "{{ oracle_gi_response_file }}"
+        dest: "{{ oracle_install_dir_temp }}"
         mode: '0640'
         owner: "{{ oracle_os_user }}"
 
-    - name: Grid Setup ASM
-      shell: "./gridSetup.sh -executeConfigTools -responseFile {{ oracle_install_dir_temp }}/grid.rsp -silent"
+    - name: "Config Grid ASM (Part II)"
+      shell: "./gridSetup.sh -executeConfigTools -responseFile {{ oracle_install_dir_temp }}/{{ oracle_gi_response_file }} -silent"
       args:
         chdir: "{{ oracle_home }}"
       environment:

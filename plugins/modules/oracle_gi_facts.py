@@ -254,7 +254,7 @@ def main():
     else:
         for i in ['releaseversion', 'releasepatch', 'softwareversion', 'softwarepatch']:
             version = exec_program([ohomes.crsctl, 'query', 'has', i])
-            m = re.search('\[([0-9\.]+)\]$', version)
+            m = re.search(r'\[([0-9.]+)\]$', version)
             if m:
                 facts.update({i: m.group(1)})
                 facts.update({"version": m.group(1)})  # for backward compatibility
