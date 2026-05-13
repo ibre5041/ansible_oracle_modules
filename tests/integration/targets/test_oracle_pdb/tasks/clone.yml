@@ -18,7 +18,8 @@
   oracle_pdb:
     <<: *con_param
     pdb_name: "TESTPDB2"
-    state: "opened"
+    state: "present"
+    open: true
     pdb_admin_username: foo
     pdb_admin_password: bar
     file_name_convert: "{{ {pdbseed_path: oracle_datadir + '/TESTPDB2'} }}"
@@ -33,7 +34,8 @@
   oracle_pdb:
     <<: *con_param
     pdb_name: "TESTSNAP1"
-    state: "opened"
+    state: "present"
+    open: true
     clone_from: "TESTPDB2"
     file_name_convert: "{{ {oracle_datadir + '/TESTPDB2': oracle_datadir + '/TESTSNAP1'} }}"
 

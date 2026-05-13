@@ -40,7 +40,8 @@
   oracle_pdb:
     <<: *con_param
     pdb_name: "TESTPDB2"
-    state: "opened"
+    state: "present"
+    open: true
   register: _
   failed_when: _.failed or not _.changed
 
@@ -48,7 +49,8 @@
   oracle_pdb:
     <<: *con_param
     pdb_name: "TESTPDB2"
-    state: "opened"
+    state: "present"
+    open: true
   register: _
   failed_when: _.failed or _.changed
 
