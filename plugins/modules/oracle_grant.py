@@ -423,6 +423,12 @@ def main():
     session_container = module.params["session_container"]
     state = module.params["state"]
 
+    if container_scope and container_scope.upper() == 'ALL' and (session_container or container):
+        module.fail_json(
+            msg="container_scope=ALL is mutually exclusive with session_container and container. "
+                "Connect directly to CDB root without switching containers."
+        )
+
     oc = oracleConnection(module)
 
     # Keep backward compatibility: container previously selected the session.

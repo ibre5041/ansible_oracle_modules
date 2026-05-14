@@ -656,6 +656,44 @@ def test_grant_container_scope_all_not_cdb_root_fails(monkeypatch):
     assert "cdb root" in exc.value.args[0]["msg"].lower()
 
 
+def test_grant_container_scope_all_with_session_container_fails(monkeypatch):
+    """container_scope='all' + session_container set → fail_json before any connection."""
+    mod = _load("oracle_grant")
+
+    class Mod(BaseFakeModule):
+        params = _grant_params(
+            grants=["CREATE SESSION"],
+            container_scope="all",
+            session_container="MYPDB",
+        )
+
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "oracleConnection", _GrantConn, raising=False)
+
+    with pytest.raises(FailJson) as exc:
+        mod.main()
+    assert "mutually exclusive" in exc.value.args[0]["msg"].lower()
+
+
+def test_grant_container_scope_all_with_container_fails(monkeypatch):
+    """container_scope='all' + container set → fail_json before any connection."""
+    mod = _load("oracle_grant")
+
+    class Mod(BaseFakeModule):
+        params = _grant_params(
+            grants=["CREATE SESSION"],
+            container_scope="all",
+            container="MYPDB",
+        )
+
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "oracleConnection", _GrantConn, raising=False)
+
+    with pytest.raises(FailJson) as exc:
+        mod.main()
+    assert "mutually exclusive" in exc.value.args[0]["msg"].lower()
+
+
 # ===========================================================================
 # oracle_pdb
 # ===========================================================================
