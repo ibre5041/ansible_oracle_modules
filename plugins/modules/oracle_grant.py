@@ -425,6 +425,11 @@ def main():
 
     oc = oracleConnection(module)
 
+    # Keep backward compatibility: container previously selected the session.
+    effective_container = session_container or container
+    if effective_container:
+        oc.set_container(effective_container)
+
     if container_scope and container_scope.upper() == 'ALL':
         if not _is_cdb_root(oc):
             module.fail_json(
@@ -432,11 +437,6 @@ def main():
                     "(cdb='YES' and con_id=1). "
                     "Current session is not at CDB root."
             )
-
-    # Keep backward compatibility: container previously selected the session.
-    effective_container = session_container or container
-    if effective_container:
-        oc.set_container(effective_container)
 
     if state == 'present':
         ensure_grant(module, oc, grantee, grants, object_privs, directory_privs, grant_mode, container_scope)
