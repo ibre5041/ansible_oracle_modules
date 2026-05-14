@@ -264,6 +264,7 @@ def _grant_params(**overrides):
         "directory_privs": [],
         "grant_mode": "append",
         "container": None,
+        "container_scope": None,
         "state": "present",
     }
     base.update(overrides)
@@ -546,20 +547,20 @@ def test_grant_with_dba_no_unlimited_tablespace_revoke(monkeypatch):
 
 
 def test_grant_exact_mode_with_container(monkeypatch):
-    """grant_mode=exact + container → grant SQL includes 'container=CURRENT' clause."""
+    """grant_mode=exact + container_scope=current → grant SQL includes 'container=CURRENT' clause."""
     mod = _load("oracle_grant")
 
     class Mod(BaseFakeModule):
         params = _grant_params(
             grants=["CONNECT", "RESOURCE"],
             grant_mode="exact",
-            container="current",
+            container=None,
+            container_scope="current",
             session_container=None,
         )
 
     class _Conn(_GrantConn):
         def __init__(self, m):
-            # user currently has only CONNECT; RESOURCE needs to be added
             super().__init__(m, current_roles=["connect"])
 
         def execute_select(self, sql, params=None, fetchone=False):
@@ -582,8 +583,77 @@ def test_grant_exact_mode_with_container(monkeypatch):
         mod.main()
     payload = exc.value.args[0]
     assert payload["changed"] is True
-    # The grant statement for RESOURCE should carry the container clause
     assert any("container=current" in d.lower() for d in payload["ddls"])
+
+
+def test_grant_container_scope_all_from_cdb_root(monkeypatch):
+    """container_scope='all' at CDB root → grant SQL has 'container=ALL', no set_container call."""
+    mod = _load("oracle_grant")
+
+    class Mod(BaseFakeModule):
+        params = _grant_params(
+            grants=["CREATE SESSION"],
+            container=None,
+            container_scope="all",
+            session_container=None,
+        )
+
+    class _Conn(_GrantConn):
+        def __init__(self, m):
+            super().__init__(m)
+            self._set_container_calls = []
+
+        def execute_select_to_dict(self, sql, params=None, fetchone=False, fail_on_error=True):
+            if "v$database" in sql.lower():
+                return {"cdb": "YES", "con_id": "1"} if fetchone else [{"cdb": "YES", "con_id": "1"}]
+            return {} if fetchone else []
+
+        def set_container(self, pdb_name):
+            self._set_container_calls.append(pdb_name)
+
+    conn_instance = None
+
+    def _make_conn(m):
+        nonlocal conn_instance
+        conn_instance = _Conn(m)
+        return conn_instance
+
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "oracleConnection", _make_conn, raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+
+    payload = exc.value.args[0]
+    assert payload["changed"] is True
+    assert any("container=all" in d.lower() for d in payload["ddls"])
+    assert conn_instance._set_container_calls == []
+
+
+def test_grant_container_scope_all_not_cdb_root_fails(monkeypatch):
+    """container_scope='all' when not at CDB root (con_id != 1) → fail_json."""
+    mod = _load("oracle_grant")
+
+    class Mod(BaseFakeModule):
+        params = _grant_params(
+            grants=["CREATE SESSION"],
+            container=None,
+            container_scope="all",
+            session_container=None,
+        )
+
+    class _Conn(_GrantConn):
+        def execute_select_to_dict(self, sql, params=None, fetchone=False, fail_on_error=True):
+            if "v$database" in sql.lower():
+                return {"cdb": "YES", "con_id": "3"} if fetchone else [{"cdb": "YES", "con_id": "3"}]
+            return {} if fetchone else []
+
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "oracleConnection", _Conn, raising=False)
+
+    with pytest.raises(FailJson) as exc:
+        mod.main()
+    assert "cdb root" in exc.value.args[0]["msg"].lower()
 
 
 # ===========================================================================
