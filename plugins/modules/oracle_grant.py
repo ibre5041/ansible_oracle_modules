@@ -36,9 +36,29 @@ options:
       - "append: Grant/privileges are just appended, nothing is removed"
     default: append
     choices: ['exact','append']
+  container:
+    description:
+      - Controls the CONTAINER= clause appended to GRANT/REVOKE statements.
+      - "'current': appends CONTAINER=CURRENT in a CDB environment (scopes the grant to the current container).
+        On a non-CDB database the clause is silently omitted, so the same playbook works against both."
+      - "'all': appends CONTAINER=ALL, making privileges apply to all PDBs. Requires the
+        session to be connected to CDB root (cdb='YES' and con_id=1); the module fails otherwise.
+        Mutually exclusive with session_container."
+      - "Leave unset (default) to issue grants without any CONTAINER= clause."
+      - "Note: this parameter previously accepted a free-string PDB name and switched the session.
+        That role now belongs exclusively to session_container; passing a PDB name here is rejected."
+    required: false
+    default: null
+    choices: ['current', 'all']
+  session_container:
+    description:
+      - Name of a PDB to switch to via ALTER SESSION SET CONTAINER before issuing grants.
+      - Mutually exclusive with container=all.
+    required: false
+    default: null
   state:
     description:
-      - The intended state of the priv (present=added to the user, absent=removed from the user). 
+      - The intended state of the priv (present=added to the user, absent=removed from the user).
       -  REMOVEALL will remove ALL role/sys privileges
     default: present
     choices: ['present','absent','REMOVEALL']
@@ -232,8 +252,38 @@ def get_obj_privs(conn, schema, wanted_privs_list, grant_mode):
     return total_sql_obj
 
 
+def _cdb_state(conn):
+    """Return (is_cdb, is_cdb_root) from a single v$database query.
+
+    is_cdb       -- True iff cdb='YES'.
+    is_cdb_root  -- True iff is_cdb and current con_id=1.
+    """
+    sql = "SELECT cdb, sys_context('USERENV', 'CON_ID') AS con_id FROM v$database"
+    row = conn.execute_select_to_dict(sql, fetchone=True)
+    if not row:
+        return False, False
+    is_cdb = row.get('cdb', '').upper() == 'YES'
+    is_cdb_root = is_cdb and str(row.get('con_id', '0')) == '1'
+    return is_cdb, is_cdb_root
+
+
+def _container_clause(container, is_cdb):
+    """Return the CONTAINER= SQL suffix for a grant/revoke statement.
+
+    container='all' assumes the caller already validated CDB root.
+    container='current' on a non-CDB database returns '' (clause silently stripped).
+    """
+    if not container:
+        return ''
+    if container.upper() == 'ALL':
+        return ' container=ALL'
+    if not is_cdb:
+        return ''
+    return ' container=CURRENT'
+
+
 # Add grant to the schema/role
-def ensure_grant(module, conn, schema, wanted_grant_list, object_privs, directory_privs, grant_mode, container):
+def ensure_grant(module, conn, schema, wanted_grant_list, object_privs, directory_privs, grant_mode, container_clause):
     add_sql = ''
     remove_sql = ''
 
@@ -273,16 +323,14 @@ def ensure_grant(module, conn, schema, wanted_grant_list, object_privs, director
 
     if grant_mode.lower() == 'exact' and any(grant_to_remove):
         grant_to_remove = ','.join(grant_to_remove)
-        remove_sql += 'revoke %s from %s' % (grant_to_remove, schema)
-        if container:
-            add_sql += ' container=CURRENT'
+        remove_sql = 'revoke %s from %s' % (grant_to_remove, schema)
+        remove_sql += container_clause
         total_sql.append(remove_sql)
 
     if any(grant_to_add):
         grant_to_add = ','.join(grant_to_add)
-        add_sql += 'grant %s to %s' % (grant_to_add, schema)
-        if container:
-            add_sql += ' container=CURRENT'
+        add_sql = 'grant %s to %s' % (grant_to_add, schema)
+        add_sql += container_clause
         total_sql.append(add_sql)
 
     if total_sql:
@@ -295,7 +343,7 @@ def ensure_grant(module, conn, schema, wanted_grant_list, object_privs, director
 
 
 # Remove grant to the schema
-def remove_grant(module, conn, grantee, grants, object_privs, directory_privs, container):
+def remove_grant(module, conn, grantee, grants, object_privs, directory_privs, container_clause):
     sql = ''
 
     # This list will hold all grant/privs the user currently has
@@ -303,9 +351,7 @@ def remove_grant(module, conn, grantee, grants, object_privs, directory_privs, c
     total_sql = []
 
     for grant in grants:
-        sql = 'revoke %s from %s' % (grant, grantee)
-        if container:
-            sql += ' container=CURRENT'
+        sql = 'revoke %s from %s' % (grant, grantee) + container_clause
         total_sql.append(sql)
 
     for object_priv in object_privs:
@@ -380,7 +426,7 @@ def main():
             object_privs  = dict(default=None, type="list", aliases=['objprivs', 'objects_privileges']),
             directory_privs = dict(default=None, type="list", aliases=['dirprivs', 'directory_privileges']),
             grant_mode    = dict(default="append", choices=["append", "exact"], aliases=['privs_mode']),
-            container     = dict(default=None),
+            container     = dict(default=None, choices=['current', 'all']),
             state         = dict(default="present", choices=["present", "absent", "REMOVEALL"])
         ),
         required_together=[['username', 'password']],
@@ -398,19 +444,35 @@ def main():
     session_container = module.params["session_container"]
     state = module.params["state"]
 
+    if container and container.upper() == 'ALL' and session_container:
+        module.fail_json(
+            msg="container=ALL is mutually exclusive with session_container. "
+                "Connect directly to CDB root without switching containers."
+        )
+
     oc = oracleConnection(module)
 
-    # Keep backward compatibility: container previously selected the session.
-    effective_container = session_container or container
-    if effective_container:
-        oc.set_container(effective_container)
+    if session_container:
+        oc.set_container(session_container)
+
+    # Only query CDB state when container is set; otherwise no clause to emit.
+    container_clause = ''
+    if container:
+        is_cdb, is_cdb_root = _cdb_state(oc)
+        if container.upper() == 'ALL' and not is_cdb_root:
+            module.fail_json(
+                msg="container=ALL requires connection to CDB root "
+                    "(cdb='YES' and con_id=1). "
+                    "Current session is not at CDB root."
+            )
+        container_clause = _container_clause(container, is_cdb)
 
     if state == 'present':
-        ensure_grant(module, oc, grantee, grants, object_privs, directory_privs, grant_mode, container)
+        ensure_grant(module, oc, grantee, grants, object_privs, directory_privs, grant_mode, container_clause)
     if state == 'REMOVEALL':
-        ensure_grant(module, oc, grantee, [], [], [], grant_mode='exact', container=container)
+        ensure_grant(module, oc, grantee, [], [], [], grant_mode='exact', container_clause=container_clause)
     elif state in ['absent']:
-        remove_grant(module, oc, grantee, grants, object_privs, directory_privs, container)
+        remove_grant(module, oc, grantee, grants, object_privs, directory_privs, container_clause)
 
     module.fail_json(msg='Unknown object', changed=False)
 

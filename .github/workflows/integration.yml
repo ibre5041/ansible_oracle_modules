@@ -35,7 +35,7 @@ jobs:
           which python
           python --version
           python -m pip list | grep oracledb
-          python -c "import oracledb; print('oracledb found:', oracledb.version)" || echo "oracledb not importable"
+          python -c "import oracledb; print('oracledb found:', oracledb.version)"
 
       - name: Build and install collection
         run: |
