@@ -252,18 +252,19 @@ def get_obj_privs(conn, schema, wanted_privs_list, grant_mode):
     return total_sql_obj
 
 
-def _is_cdb_root(conn):
-    """Return True iff connected to CDB root (cdb='YES' and con_id=1)."""
+def _cdb_state(conn):
+    """Return (is_cdb, is_cdb_root) from a single v$database query.
+
+    is_cdb       -- True iff cdb='YES'.
+    is_cdb_root  -- True iff is_cdb and current con_id=1.
+    """
     sql = "SELECT cdb, sys_context('USERENV', 'CON_ID') AS con_id FROM v$database"
     row = conn.execute_select_to_dict(sql, fetchone=True)
-    return bool(row) and row.get('cdb', '').upper() == 'YES' and str(row.get('con_id', '0')) == '1'
-
-
-def _is_cdb(conn):
-    """Return True iff database is a CDB (cdb='YES'), regardless of con_id."""
-    sql = "SELECT cdb FROM v$database"
-    row = conn.execute_select_to_dict(sql, fetchone=True)
-    return bool(row) and row.get('cdb', '').upper() == 'YES'
+    if not row:
+        return False, False
+    is_cdb = row.get('cdb', '').upper() == 'YES'
+    is_cdb_root = is_cdb and str(row.get('con_id', '0')) == '1'
+    return is_cdb, is_cdb_root
 
 
 def _container_clause(container, is_cdb):
@@ -454,14 +455,17 @@ def main():
     if session_container:
         oc.set_container(session_container)
 
-    if container and container.upper() == 'ALL' and not _is_cdb_root(oc):
-        module.fail_json(
-            msg="container=ALL requires connection to CDB root "
-                "(cdb='YES' and con_id=1). "
-                "Current session is not at CDB root."
-        )
-
-    container_clause = _container_clause(container, _is_cdb(oc))
+    # Only query CDB state when container is set; otherwise no clause to emit.
+    container_clause = ''
+    if container:
+        is_cdb, is_cdb_root = _cdb_state(oc)
+        if container.upper() == 'ALL' and not is_cdb_root:
+            module.fail_json(
+                msg="container=ALL requires connection to CDB root "
+                    "(cdb='YES' and con_id=1). "
+                    "Current session is not at CDB root."
+            )
+        container_clause = _container_clause(container, is_cdb)
 
     if state == 'present':
         ensure_grant(module, oc, grantee, grants, object_privs, directory_privs, grant_mode, container_clause)
