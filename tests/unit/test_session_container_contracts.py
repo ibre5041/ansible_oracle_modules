@@ -43,9 +43,12 @@ def test_sql_keeps_backward_compatibility_with_pdb_name():
     assert "(not session_container) and pdb_name" in content
 
 
-def test_grant_keeps_backward_compatibility_with_container():
+def test_grant_container_param_is_sql_clause_choice():
+    """oracle_grant.container is the SQL CONTAINER= clause selector (current|all),
+    not a session-switch param. Session switching belongs to session_container."""
     content = module_path("plugins", "modules", "oracle_grant.py").read_text(encoding="utf-8", errors="ignore")
-    assert "effective_container = session_container or container" in content
+    assert "container     = dict(default=None, choices=['current', 'all'])" in content
+    assert "effective_container" not in content
 
 
 def test_oracle_user_container_semantics_are_preserved():
