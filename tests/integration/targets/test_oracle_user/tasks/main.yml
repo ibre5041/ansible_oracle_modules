@@ -14,5 +14,6 @@
   environment:
     ORACLE_SID: "{{ oracle_sid | default() }}"
     ORACLE_HOME: "{{ oracle_home | default() }}"
+    NLS_LANG: 'AMERICAN_AMERICA.AL32UTF8'
 
 ...
