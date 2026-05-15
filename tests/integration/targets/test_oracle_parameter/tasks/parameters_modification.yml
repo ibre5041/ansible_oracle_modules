@@ -32,20 +32,23 @@
 
 - name: Oracle DB facts - pga_aggregate_target
   oracle_sql:
-    <<: *cdb_con_param
+    <<: *pdb_con_param
     sql: |
       select * from v$system_parameter where NAME='pga_aggregate_target'
   register: pga_parameter
+  when: not running_on_adb
     
 - name: pga_parameter
   debug:
     var: pga_parameter.data[0].value
+  when: not running_on_adb
 
 - name: "database facts {{ item }}"
   set_fact:
     "{{ item.name }}": "{{ item.value }}"
   loop:
     - { "name": "pga_aggregate_target_value", "value": "{{ (pga_parameter.data[0].value|int)//1024//1024 }}" }
+  when: not running_on_adb
 
 - name: 'CDB Connection paramters - see or use integration_config.yml.template'
   debug:

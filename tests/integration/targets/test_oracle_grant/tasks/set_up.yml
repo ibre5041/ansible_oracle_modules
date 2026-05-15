@@ -102,7 +102,7 @@
       - "create session"
       - "sysdba"
     grant_mode: "append"
-    container: "{{ pdb_name }}"
+    session_container: "{{ pdb_name }}"
     state: present
 
 - name: create u_foo user

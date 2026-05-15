@@ -3,6 +3,7 @@
   set_fact:
     connection_parameters: &con_param
       mode: "sysdba"
+      oracle_home: "{{ oracle_home | default(omit) }}"
 
 - name: 'Connection paramters - see or use integration_config.yml.template'
   debug:

@@ -160,11 +160,15 @@ def main():
     if (not session_container) and pdb_name and module.params["hostname"] in LOCAL_HOSTS:
         conn.set_container(pdb_name)
 
-    # Single SELECT or DML, ALTER, DROP, ... statement
+    # Single SELECT, PL/SQL block, DML, ALTER, DROP, ... statement
     if sql:
         if re.match(r'^\s*(select|with)\s+', sql, re.IGNORECASE):
             result = conn.execute_select_to_dict(sql.rstrip().rstrip(';'))
             module.exit_json(msg='Select statement executed.', changed=False, data=result)
+        elif re.match(r'^\s*(begin|declare)\b', sql, re.IGNORECASE):
+            # PL/SQL anonymous block: END; requires its semicolon — do not strip it.
+            lines = conn.execute_statement(sql.strip())
+            module.exit_json(msg='PL/SQL block executed.', changed=conn.changed, ddls=conn.ddls, output_lines=lines)
         else:
             conn.execute_ddl(sql.rstrip().rstrip(';'))
             module.exit_json(msg='SQL statement processed.', changed=conn.changed, ddls=conn.ddls)
