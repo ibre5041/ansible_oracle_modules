@@ -159,6 +159,58 @@ def test_script_file_branch(monkeypatch, tmp_path):
         raise AssertionError("module should exit_json")
 
 
+def _sql_params(sql):
+    return {
+        "user": "u",
+        "password": "p",
+        "mode": "normal",
+        "hostname": "db.example",
+        "port": 1521,
+        "service_name": "svc",
+        "dsn": None,
+        "oracle_home": None,
+        "pdb_name": None,
+        "sql": sql,
+        "script": None,
+    }
+
+
+def test_sql_plsql_begin_block_uses_execute_statement(monkeypatch):
+    """sql param with BEGIN...END; → execute_statement (no rstrip of trailing ;)."""
+    mod = _load()
+    FakeAnsibleModule.params = _sql_params("begin\n  null;\nend;")
+    monkeypatch.setattr(mod, "AnsibleModule", FakeAnsibleModule)
+    monkeypatch.setattr(mod, "oracleConnection", FakeConn, raising=False)
+
+    try:
+        mod.main()
+    except ExitJson as exc:
+        payload = exc.args[0]
+        assert payload["changed"] is True
+        # execute_statement receives the block with END; intact (no ; stripped)
+        assert FakeConn.last.ddls == ["begin\n  null;\nend;"]
+    else:
+        raise AssertionError("module should exit_json")
+
+
+def test_sql_plsql_declare_block_uses_execute_statement(monkeypatch):
+    """sql param with DECLARE...BEGIN...END; → execute_statement."""
+    mod = _load()
+    FakeAnsibleModule.params = _sql_params("declare\n  v number;\nbegin\n  v := 1;\nend;")
+    monkeypatch.setattr(mod, "AnsibleModule", FakeAnsibleModule)
+    monkeypatch.setattr(mod, "oracleConnection", FakeConn, raising=False)
+
+    try:
+        mod.main()
+    except ExitJson as exc:
+        payload = exc.args[0]
+        assert payload["changed"] is True
+        assert FakeConn.last.ddls[0].startswith("declare")
+        assert FakeConn.last.ddls[0].endswith("end;")
+    else:
+        raise AssertionError("module should exit_json")
+
+
 def test_script_file_ioerror(monkeypatch):
     mod = _load()
     FakeAnsibleModule.params = {
