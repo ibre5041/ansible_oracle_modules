@@ -278,7 +278,7 @@ def main():
         argument_spec = dict(
             hostname      = dict(default='localhost'),
             port          = dict(default=1521, type='int'),
-            service_name  = dict(required=True),
+            service_name  = dict(required=False),
             oracle_home   = dict(required=False, aliases=['oh']),
             dsn           = dict(required=False, aliases=['datasource_name']),
             user          = dict(required=False),
