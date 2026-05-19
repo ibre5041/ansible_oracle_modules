@@ -2,38 +2,52 @@
 - name: define connection parameters
   set_fact:
     connection_parameters: &con_param
-      hostname: "{{ oracle_hostname }}"      
-      port: "{{ oracle_port }}"      
-      service_name: "{{ oracle_pdb_service_name | default(oracle_service_name) }}"
+      hostname: "{{ oracle_hostname }}"
+      port: "{{ oracle_port }}"
+      service_name: "{{ (running_on_server|bool) | ternary(omit,oracle_pdb_service_name|default(oracle_service_name)) }}"
+      session_container: "{{ (not running_on_server|bool) | ternary(omit,oracle_pdb_service_name|default(oracle_service_name)) }}"
       username: "{{ oracle_pdb_username | default(oracle_username) }}"
       password: "{{ oracle_pdb_password | default(oracle_password) }}"
-      dsn: "{{ oracle_dsn }}"
-      oracle_home: "{{ oracle_home }}"
+      dsn: "{{ oracle_dsn | default() }}"
       mode: "{{ mode }}"
+      oracle_home: "{{ oracle_home | default() }}"
       
     app_connection_parameters: &app_con_param
       hostname: "{{ oracle_hostname }}"      
-      port: "{{ oracle_port }}"      
-      service_name: "{{ oracle_pdb_service_name | default(oracle_service_name) }}"      
+      port: "{{ oracle_port }}"
+      service_name: "{{ (running_on_server|bool) | ternary(omit,oracle_pdb_service_name|default(oracle_service_name)) }}"
+      session_container: "{{ (not running_on_server|bool) | ternary(omit,oracle_pdb_service_name|default(oracle_service_name)) }}"
       username: "foo"
       password: "Xlfsjflkdjgkrehjg1"
+      dsn: "{{ oracle_dsn | default() }}"      
       mode: "normal"
-      dsn: "{{ oracle_dsn }}"
-      oracle_home: "{{ oracle_home }}"
+      oracle_home: "{{ oracle_home | default() }}"
 
+- debug: var=app_connection_parameters      
+      
 - name: prepare test
   oracle_sql:
     <<: *con_param
     sql: "drop user foo cascade"
   failed_when: false
-    
+
+- name: List tablespaces
+  oracle_sql:
+    <<: *con_param
+    sql: "select TABLESPACE_NAME, STATUS, CONTENTS from dba_tablespaces where status='ONLINE' and CONTENTS='PERMANENT' and TABLESPACE_NAME not in('SYSTEM','SYSAUX')"
+  register: tablespaces
+
+- name: "Tablespace: {{ tablespaces.data[0].tablespace_name }}"
+  set_fact:
+    users_tablespace: "{{ tablespaces.data[0].tablespace_name }}"
+  
 - name: prepare test
   oracle_sql:
     <<: *con_param
     script: |      
       create user foo identified by "Xlfsjflkdjgkrehjg1";
       grant create session to foo;
-      alter user foo quota unlimited on users;
+      alter user foo quota unlimited on {{ users_tablespace }};
       create table foo.t_foo (f1 varchar2(10), f2 varchar2(10));
 
 - name: insert statement

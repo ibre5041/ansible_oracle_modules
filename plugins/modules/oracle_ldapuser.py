@@ -22,7 +22,8 @@ options:
     service_name:
         description:
             - The database service name to connect to
-        required: true
+            - Optional. Omit (with no user/password and mode=sysdba) to use local BEQ / OS auth via ORACLE_SID
+        required: false
     user:
         description:
             - The Oracle user name to connect to the database, must have DBA privilege
@@ -47,6 +48,10 @@ options:
             - Oracle Data Source Name (connect string or TNS alias), overrides hostname/port/service_name
         required: false
         aliases: ['datasource_name']
+    session_container:
+        description:
+            - Switch session into this PDB via ALTER SESSION SET CONTAINER after connecting (use when connecting to a CDB)
+        required: false
     user_default_tablespace:
         description:
             - Default tablespace for syncronised users
@@ -229,7 +234,7 @@ def main():
         argument_spec = dict(
             hostname      = dict(default='localhost'),
             port          = dict(default=1521, type='int'),
-            service_name  = dict(required=True),
+            service_name  = dict(required=False),
             user          = dict(required=False),
             password      = dict(required=False, no_log=True),
             mode          = dict(default='normal', choices=["normal", "sysdba", "sysdg", "sysoper", "sysasm"]),
