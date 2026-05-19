@@ -24,7 +24,8 @@ options:
     service_name:
         description:
             - The database service name to connect to
-        required: true
+            - Optional. Omit (with no user/password and mode=sysdba) to use local BEQ / OS auth via ORACLE_SID
+        required: false
     user:
         description:
             - The Oracle user name to connect to the database, must have DBA privilege
@@ -49,6 +50,10 @@ options:
             - Oracle Data Source Name (connect string or TNS alias), overrides hostname/port/service_name
         required: false
         aliases: ['datasource_name']
+    session_container:
+        description:
+            - Switch session into this PDB via ALTER SESSION SET CONTAINER after connecting (use when connecting to a CDB)
+        required: false
     state:
         description:
             - If present, then consumer group is created, if absent, then consumer group is removed
