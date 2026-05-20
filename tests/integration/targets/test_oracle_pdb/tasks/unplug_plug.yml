@@ -34,14 +34,19 @@
     <<: *con_cdb
     pdb_name: TESTPDB2
     state: absent
-  failed_when: false
+  failed_when: "false"
 
 - name: "cleanup: drop TESTPDB3 if it exists"
   oracle_pdb:
     <<: *con_cdb
     pdb_name: TESTPDB3
     state: absent
-  failed_when: false
+  failed_when: "false"
+
+- name: Delete a file /tmp/testpdb2_unplug.xml
+  ansible.builtin.file:
+    path: /tmp/testpdb2_unplug.xml
+    state: absent
 
 # ── Step 1: Create TESTPDB2 from seed ────────────────────────────────────────
 
@@ -53,7 +58,7 @@
     open: true
     pdb_admin_username: pdbadmin
     pdb_admin_password: Oracle_4U_Pdb1
-    file_name_convert: "{{ {pdbseed_path: oracle_datadir + '/TESTPDB2'} }}"
+    file_name_convert: "{{ (running_on_db_asm|bool) | ternary(omit, {pdbseed_path: oracle_datadir ~ '/TESTPDB2'}) }}"
   register: _
   failed_when: _.failed or _.changed == false
 
@@ -93,7 +98,7 @@
     state: present
     open: true
     plug_file: "/tmp/testpdb2_unplug.xml"
-    file_name_convert: "{{ {oracle_datadir + '/TESTPDB2': oracle_datadir + '/TESTPDB3'} }}"
+    file_name_convert: "{{ (running_on_db_asm|bool) | ternary(omit, {oracle_datadir ~ '/TESTPDB2': oracle_datadir ~ '/TESTPDB3'}) }}"
   register: _
   failed_when: _.failed or _.changed == false
 

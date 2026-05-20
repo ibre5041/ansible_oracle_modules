@@ -10,11 +10,11 @@
       password: "{{ oracle_password }}"
       mode: "sysdba"
 
-- name: 'Connection paramters - see or use integration_config.yml.template'
+- name: 'Connection parameters - see or use integration_config.yml.template'
   debug:
     var: connection_parameters
 
-- name: create a PDB from seed, XML and clone
+- name: create a PDB TESTPDB2 from seed {{ oracle_pdb_name }}, XML and clone
   oracle_pdb:
     <<: *con_param
     pdb_name: "TESTPDB2"
@@ -24,7 +24,10 @@
     pdb_admin_password: "bar"
     clone_from: "{{ oracle_pdb_name }}"
     plug_file: "/tmp/testpdb2.xml"
-    file_name_convert: "{{ {pdbseed_path: '/tmp/testpdb2/dbf01'} }}"
+    file_name_convert: "{{ (running_on_db_asm|bool) | ternary(omit, {pdbseed_path: '/tmp/testpdb2/dbf01'}) }}"
   register: _
   failed_when: not _.failed
+
+- debug: var=_
+
 ...

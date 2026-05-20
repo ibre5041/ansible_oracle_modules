@@ -1,6 +1,6 @@
 ---
 
-- name: "define connection parameters"
+- name: "define pdb connection parameters"
   set_fact:
     connection_parameters: &con_param
       hostname: "{{ oracle_hostname }}"
@@ -9,9 +9,13 @@
       session_container: "{{ (not running_on_server|bool) | ternary(omit,oracle_pdb_service_name|default(oracle_service_name)) }}"
       username: "{{ oracle_pdb_username | default(oracle_username) }}"
       password: "{{ oracle_pdb_password | default(oracle_password) }}"
-      dsn: "{{ oracle_dsn | default() }}"
+      dsn: "{{ oracle_dsn }}"
       mode: "{{ mode }}"
-      oracle_home: "{{ oracle_home | default() }}"
+      oracle_home: "{{ oracle_home }}"
+
+- name: 'PDB Connection parameters - see or use integration_config.yml.template'
+  debug:
+    var: connection_parameters
 
 - name: select from dual
   oracle_sql:

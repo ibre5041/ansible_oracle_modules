@@ -3,16 +3,30 @@
 - name: "define connection parameters"
   set_fact:
     connection_parameters: &con_param
-      hostname: "{{ oracle_cdb_hostname }}"      
+      hostname: "{{ oracle_hostname }}"
       port: "{{ oracle_port }}"
-      username: pdbadmin
-      password: pdbpass
+      service_name: "{{ (running_on_server|bool) | ternary(omit,oracle_pdb_service_name|default(oracle_service_name)) }}"
+      session_container: "{{ (not running_on_server|bool) | ternary(omit,oracle_pdb_service_name|default(oracle_service_name)) }}"
+      username: "{{ oracle_pdb_username | default(oracle_username) }}"
+      password: "{{ oracle_pdb_password | default(oracle_password) }}"
+      dsn: "{{ oracle_dsn }}"
       mode: "{{ mode }}"
-      service_name: "pdb37"
+      oracle_home: "{{ oracle_home }}"
 
-- name: 'Connection paramters - see or use integration_config.yml.template'
+- name: 'Connection parameters - see or use integration_config.yml.template'
   debug:
     var: connection_parameters
+
+- name: create u_foo user
+  oracle_user:
+    <<: *con_param
+    schema_name: "u_foo"
+    schema_password: "bar"
+
+- name: create r_foo role
+  oracle_role:
+    <<: *con_param
+    role: "r_foo"
 
 - name: grant create session to inexistent user
   oracle_grant:

@@ -10,7 +10,7 @@
       password: "{{ oracle_password }}"
       mode: "sysdba"
 
-- name: 'Connection paramters - see or use integration_config.yml.template'
+- name: 'Connection parameters - see or use integration_config.yml.template'
   debug:
     var: connection_parameters
 
@@ -22,7 +22,7 @@
     open: true
     pdb_admin_username: foo
     pdb_admin_password: bar
-    file_name_convert: "{{ {pdbseed_path: oracle_datadir + '/TESTPDB2'} }}"
+    file_name_convert: "{{ (running_on_db_asm|bool) | ternary(omit, {pdbseed_path: oracle_datadir ~ '/TESTPDB2'}) }}"
 
 - name: open PDB source in read only
   oracle_pdb:
@@ -37,7 +37,7 @@
     state: "present"
     open: true
     clone_from: "TESTPDB2"
-    file_name_convert: "{{ {oracle_datadir + '/TESTPDB2': oracle_datadir + '/TESTSNAP1'} }}"
+    file_name_convert: "{{ (running_on_db_asm|bool) | ternary(omit, {oracle_datadir ~ '/TESTPDB2': oracle_datadir ~ '/TESTSNAP1'}) }}"
 
 - name: drop clone PDB
   oracle_pdb:

@@ -12,7 +12,7 @@
       mode: "{{ mode }}"
       oracle_home: "{{ oracle_home }}"
 
-- name: 'Connection paramters - see or use integration_config.yml.template'
+- name: 'Connection parameters - see or use integration_config.yml.template'
   debug:
     var: connection_parameters
       

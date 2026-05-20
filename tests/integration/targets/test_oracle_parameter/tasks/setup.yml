@@ -22,4 +22,5 @@
   oracle_pdb:
     <<: *cdb_con_param
     pdb_name: "{{ oracle_pdb_service_name }}"      
-    state: opened
+    state: present
+    open: true
