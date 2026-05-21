@@ -430,9 +430,6 @@ def run_dgmgrl(module, commands, output_format='text'):
     script = ';\n'.join(script_lines) + ';\n'
 
     rc, stdout, stderr = module.run_command(cmd, data=script)
-    if dgmgrl_password:
-        stdout = stdout.replace(dgmgrl_password, '[REDACTED]')
-        stderr = stderr.replace(dgmgrl_password, '[REDACTED]')
 
     return rc, stdout, stderr
 

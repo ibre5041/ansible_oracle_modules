@@ -171,31 +171,6 @@ def check_user_exists(conn, schema):
     return set(r.items())
 
 
-def _redact_user_password(sql, schema_password=None, schema_password_hash=None):
-    if schema_password_hash:
-        sql = sql.replace(
-            "identified by values '%s'" % schema_password_hash,
-            "identified by values '********'"
-        )
-        return sql.replace(
-            'identified by "%s"' % schema_password_hash,
-            'identified by "********"'
-        )
-    if schema_password:
-        return sql.replace(
-            'identified by "%s"' % schema_password,
-            'identified by "********"'
-        )
-    return sql
-
-
-def _redact_user_changes(changes):
-    return set(
-        (key, '********') if key in ('password', 'password_hash') else (key, value)
-        for key, value in changes
-    )
-
-
 # Create the user/schema
 def create_user(conn, module):
     schema = module.params["schema"]
@@ -249,10 +224,7 @@ def create_user(conn, module):
     if module.params['expired']:
         sql += ' password expire'
 
-    conn.execute_ddl(
-        sql,
-        ddls_entry=_redact_user_password(sql, schema_password, schema_password_hash)
-    )
+    conn.execute_ddl(sql)
 
     if container_data:
         alter_sql = 'alter user %s set container_data=%s container=current' % (schema, container)
@@ -434,10 +406,7 @@ def modify_user(conn, module, user):
         sql += ' profile "%s" ' % profile
 
     if changes:
-        conn.execute_ddl(
-            sql,
-            ddls_entry=_redact_user_password(sql, schema_password, schema_password_hash)
-        )
+        conn.execute_ddl(sql)
 
     if container_data:
         alter_sql = 'alter user %s set container_data=%s container=current' % (schema, container)
@@ -447,11 +416,7 @@ def modify_user(conn, module, user):
     if not changes and not container_data:
         module.exit_json(msg='The schema (%s) is in the intended state' % schema, changed=conn.changed, ddls=conn.ddls)
 
-    module.exit_json(
-        msg='Successfully altered the user (%s) / %s' % (schema, str(_redact_user_changes(changes))),
-        changed=conn.changed,
-        ddls=conn.ddls
-    )
+    module.exit_json(msg='Successfully altered the user (%s) / %s' % (schema, str(changes)), changed=conn.changed, ddls=conn.ddls)
 
 
 # Drop the user
