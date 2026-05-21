@@ -362,8 +362,8 @@ class oracleConnection:
                 self.module.warn("SQL: --{}".format(trace))
             if not self.module.check_mode:
                 with self.conn.cursor() as cursor:
-                    cursor.execute(request, params)
                     self.ddls.append(trace)
+                    cursor.execute(request, params)
             else:
                 self.ddls.append('--' + trace)
             if not no_change: # In case of alter session, do not set changed to True
