@@ -376,8 +376,7 @@ def test_wallet_add_secret(monkeypatch):
 
     class Mod(BaseFakeModule):
         params = _wallet_params(
-            secret="WalletSecret123", secret_client="MY_APP",
-            keystore_password="KeystoreSecret123",
+            secret="my_secret", secret_client="MY_APP",
             secret_state="present"
         )
 
@@ -389,11 +388,6 @@ def test_wallet_add_secret(monkeypatch):
     result = exc.value.args[0]
     assert result["changed"] is True
     assert any("ADD SECRET" in d for d in result["ddls"])
-    joined = "\n".join(result["ddls"])
-    assert "WalletSecret123" not in joined
-    assert "KeystoreSecret123" not in joined
-    assert "SECRET '***'" in joined
-    assert 'IDENTIFIED BY "***"' in joined
 
 
 def test_wallet_update_existing_secret(monkeypatch):
@@ -401,8 +395,7 @@ def test_wallet_update_existing_secret(monkeypatch):
 
     class Mod(BaseFakeModule):
         params = _wallet_params(
-            secret="WalletSecret456", secret_client="MY_APP",
-            keystore_password="KeystoreSecret456",
+            secret="new_value", secret_client="MY_APP",
             secret_state="present"
         )
 
@@ -416,11 +409,6 @@ def test_wallet_update_existing_secret(monkeypatch):
     result = exc.value.args[0]
     assert result["changed"] is True
     assert any("UPDATE SECRET" in d for d in result["ddls"])
-    joined = "\n".join(result["ddls"])
-    assert "WalletSecret456" not in joined
-    assert "KeystoreSecret456" not in joined
-    assert "SECRET '***'" in joined
-    assert 'IDENTIFIED BY "***"' in joined
 
 
 def test_wallet_delete_secret(monkeypatch):

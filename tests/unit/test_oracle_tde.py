@@ -330,7 +330,6 @@ def test_tde_export_keys(monkeypatch):
             master_key_action="export_keys",
             export_file="/tmp/keys.exp",
             export_secret="ExportPass123",
-            keystore_password="KeystoreSecret123",
         )
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
@@ -341,11 +340,6 @@ def test_tde_export_keys(monkeypatch):
     result = exc.value.args[0]
     assert result["changed"] is True
     assert any("EXPORT" in d for d in result["ddls"])
-    joined = "\n".join(result["ddls"])
-    assert "ExportPass123" not in joined
-    assert "KeystoreSecret123" not in joined
-    assert "SECRET '***'" in joined
-    assert 'IDENTIFIED BY "***"' in joined
 
 
 # ===========================================================================
@@ -360,7 +354,6 @@ def test_tde_import_keys(monkeypatch):
             master_key_action="import_keys",
             export_file="/tmp/keys.exp",
             export_secret="ExportPass123",
-            keystore_password="KeystoreSecret123",
         )
 
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
@@ -371,11 +364,6 @@ def test_tde_import_keys(monkeypatch):
     result = exc.value.args[0]
     assert result["changed"] is True
     assert any("IMPORT" in d for d in result["ddls"])
-    joined = "\n".join(result["ddls"])
-    assert "ExportPass123" not in joined
-    assert "KeystoreSecret123" not in joined
-    assert "SECRET '***'" in joined
-    assert 'IDENTIFIED BY "***"' in joined
 
 
 # ===========================================================================

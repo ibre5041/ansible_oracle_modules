@@ -278,10 +278,7 @@ def main():
         lconn.set_option(ldap.OPT_REFERRALS, 0)
         lconn.simple_bind_s(module.params['ldap_binddn'], module.params['ldap_bindpassword'])
     except ldap.LDAPError as e:
-        msg = str(e)
-        if module.params['ldap_bindpassword']:
-            msg = msg.replace(module.params['ldap_bindpassword'], '[REDACTED]')
-        module.fail_json(msg="LDAP connection error: %s" % msg)
+        module.fail_json(msg="LDAP connection error: %s" % e)
     lparam = {
         'basedn': module.params['ldap_user_basedn'],
         'subtree': module.params['ldap_user_subtree'],
