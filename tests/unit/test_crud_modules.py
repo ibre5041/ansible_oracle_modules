@@ -1537,6 +1537,29 @@ def test_user_modify_redacts_schema_password_hash_from_ddls(monkeypatch):
     assert "identified by values '********'" in rendered.lower()
 
 
+def test_user_modify_redacts_fallback_password_hash_from_ddls(monkeypatch):
+    mod = _load("oracle_user")
+
+    class Mod(BaseFakeModule):
+        params = _user_params(
+            schema_password=None,
+            schema_password_hash="S:FAKEHASH1234ABCDEF",
+            authentication_type=None,
+            expired=False,
+        )
+
+    row = {**_default_user_row(), "account_status": "EXPIRED"}
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "oracleConnection", lambda m: _UserConn(m, row), raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+
+    rendered = repr(exc.value.args[0])
+    assert "S:FAKEHASH1234ABCDEF" not in rendered
+    assert 'identified by "********"' in rendered.lower()
+
+
 def test_user_modify_to_global_auth(monkeypatch):
     """Modify existing user to global authentication."""
     mod = _load("oracle_user")

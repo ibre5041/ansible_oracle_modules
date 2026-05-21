@@ -173,9 +173,13 @@ def check_user_exists(conn, schema):
 
 def _redact_user_password(sql, schema_password=None, schema_password_hash=None):
     if schema_password_hash:
-        return sql.replace(
+        sql = sql.replace(
             "identified by values '%s'" % schema_password_hash,
             "identified by values '********'"
+        )
+        return sql.replace(
+            'identified by "%s"' % schema_password_hash,
+            'identified by "********"'
         )
     if schema_password:
         return sql.replace(
