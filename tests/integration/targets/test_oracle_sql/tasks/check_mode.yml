@@ -91,6 +91,8 @@
 - name: check select still works in check_mode
   oracle_sql:
     <<: *app_con_param
+    username: foo
+    password: Xlfsjflkdjgkrehjg1
     sql: "select f1, f2 from foo.t_foo order by f1"
   check_mode: yes
   register: _

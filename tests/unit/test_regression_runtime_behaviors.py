@@ -99,3 +99,15 @@ def test_oracle_sql_app_connections_do_not_inherit_sysdba_mode():
         )[0]
         assert "mode: normal" in app_block
         assert 'mode: "{{ mode }}"' not in app_block
+
+
+def test_oracle_sql_check_mode_app_select_has_credentials():
+    content = module_path(
+        "tests", "integration", "targets", "test_oracle_sql", "tasks", "check_mode.yml"
+    ).read_text(encoding="utf-8")
+    task_block = content.split("- name: check select still works in check_mode", 1)[1].split(
+        "- name: clean test", 1
+    )[0]
+    assert "<<: *app_con_param" in task_block
+    assert "username: foo" in task_block
+    assert "password: Xlfsjflkdjgkrehjg1" in task_block
