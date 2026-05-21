@@ -799,6 +799,23 @@ def test_pdb_creates_new(monkeypatch):
     assert any("create pluggable database" in d.lower() for d in payload["ddls"])
 
 
+def test_pdb_create_redacts_admin_password_from_ddls(monkeypatch):
+    mod = _load("oracle_pdb")
+
+    class Mod(BaseFakeModule):
+        params = _pdb_params(pdb_admin_password="PdbAdminSecret123")
+
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "oracleConnection", lambda m: _PdbConn(m, None), raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+
+    rendered = repr(exc.value.args[0])
+    assert "PdbAdminSecret123" not in rendered
+    assert 'identified by "********"' in rendered.lower()
+
+
 def test_pdb_creates_with_nocopy(monkeypatch):
     """plug_file + nocopy=True → DDL contains NOCOPY clause."""
     mod = _load("oracle_pdb")
@@ -1169,6 +1186,44 @@ def test_user_creates_with_hash(monkeypatch):
     assert any("identified by values" in d.lower() for d in ddls)
 
 
+def test_user_create_redacts_schema_password_from_ddls(monkeypatch):
+    mod = _load("oracle_user")
+
+    class Mod(BaseFakeModule):
+        params = _user_params(schema_password="UserSecret123")
+
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "oracleConnection", lambda m: _UserConn(m, None), raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+
+    rendered = repr(exc.value.args[0])
+    assert "UserSecret123" not in rendered
+    assert 'identified by "********"' in rendered.lower()
+
+
+def test_user_create_redacts_schema_password_hash_from_ddls(monkeypatch):
+    mod = _load("oracle_user")
+
+    class Mod(BaseFakeModule):
+        params = _user_params(
+            schema_password=None,
+            schema_password_hash="S:SECRETUSERHASH",
+            authentication_type=None,
+        )
+
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "oracleConnection", lambda m: _UserConn(m, None), raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+
+    rendered = repr(exc.value.args[0])
+    assert "S:SECRETUSERHASH" not in rendered
+    assert "identified by values '********'" in rendered.lower()
+
+
 def test_user_creates_global(monkeypatch):
     """Create user with global authentication."""
     mod = _load("oracle_user")
@@ -1262,6 +1317,24 @@ def test_user_modify_change_password(monkeypatch):
     payload = exc.value.args[0]
     assert payload["changed"] is True
     assert any("identified by" in d.lower() for d in payload["ddls"])
+
+
+def test_user_modify_redacts_schema_password_from_ddls(monkeypatch):
+    mod = _load("oracle_user")
+
+    class Mod(BaseFakeModule):
+        params = _user_params(schema_password="ModifiedSecret123", authentication_type=None)
+
+    row = _default_user_row()
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "oracleConnection", lambda m: _UserConn(m, row), raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+
+    rendered = repr(exc.value.args[0])
+    assert "ModifiedSecret123" not in rendered
+    assert 'identified by "********"' in rendered.lower()
 
 
 def test_user_modify_change_tablespace(monkeypatch):
@@ -1440,6 +1513,51 @@ def test_user_modify_with_different_hash(monkeypatch):
     payload = exc.value.args[0]
     assert payload["changed"] is True
     assert any("identified by values" in d.lower() for d in payload["ddls"])
+
+
+def test_user_modify_redacts_schema_password_hash_from_ddls(monkeypatch):
+    mod = _load("oracle_user")
+
+    class Mod(BaseFakeModule):
+        params = _user_params(
+            schema_password=None,
+            schema_password_hash="S:SECRETMODHASH",
+            authentication_type=None,
+        )
+
+    row = _default_user_row()
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "oracleConnection", lambda m: _UserConn(m, row), raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+
+    rendered = repr(exc.value.args[0])
+    assert "S:SECRETMODHASH" not in rendered
+    assert "identified by values '********'" in rendered.lower()
+
+
+def test_user_modify_redacts_fallback_password_hash_from_ddls(monkeypatch):
+    mod = _load("oracle_user")
+
+    class Mod(BaseFakeModule):
+        params = _user_params(
+            schema_password=None,
+            schema_password_hash="S:FAKEHASH1234ABCDEF",
+            authentication_type=None,
+            expired=False,
+        )
+
+    row = {**_default_user_row(), "account_status": "EXPIRED"}
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "oracleConnection", lambda m: _UserConn(m, row), raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+
+    rendered = repr(exc.value.args[0])
+    assert "S:FAKEHASH1234ABCDEF" not in rendered
+    assert 'identified by "********"' in rendered.lower()
 
 
 def test_user_modify_to_global_auth(monkeypatch):

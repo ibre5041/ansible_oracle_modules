@@ -319,8 +319,16 @@ def create_pdb(conn, module):
 
     run_sql.append(createsql)
 
+    ddls_entry = createsql
+    if pdb_admin_username and not plug_file and not sourcedb:
+        escaped_password = pdb_admin_password.replace('"', '""')
+        ddls_entry = createsql.replace(
+            'identified by "%s"' % escaped_password,
+            'identified by "********"'
+        )
+
     for sql in run_sql:
-        conn.execute_ddl(sql, ignore_errors=[65012])
+        conn.execute_ddl(sql, ignore_errors=[65012], ddls_entry=ddls_entry)
 
     return set({'name': pdb_name.upper(), 'open_mode': 'MOUNTED'}.items())
 

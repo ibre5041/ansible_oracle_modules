@@ -128,6 +128,37 @@ def test_dg_broker_status_not_configured(monkeypatch):
     assert result["configuration"]["status"] == "NOT_CONFIGURED"
 
 
+def test_dg_broker_failure_redacts_dgmgrl_password(monkeypatch):
+    """Broker failures must not expose dgmgrl_password from DGMGRL output."""
+    mod = _load()
+    secret = "dg-secret"
+
+    class Mod(_DgBrokerModule):
+        params = _dg_params(
+            oracle_home="/fake/oracle",
+            dgmgrl_user="sys",
+            dgmgrl_password=secret,
+            dgmgrl_connect_identifier="prod_dg",
+        )
+        _dgmgrl_responses = {
+            'SHOW CONFIGURATION': (
+                2,
+                "DGMGRL> CONNECT sys/dg-secret@prod_dg\nfailed",
+                "invalid password dg-secret",
+            ),
+        }
+
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "os", _FakeOs("/fake/oracle"))
+
+    with pytest.raises(FailJson) as exc:
+        mod.main()
+
+    rendered = repr(exc.value.args[0])
+    assert secret not in rendered
+    assert "[REDACTED]" in rendered
+
+
 # ===========================================================================
 # Tests: Broker mode - create configuration
 # ===========================================================================

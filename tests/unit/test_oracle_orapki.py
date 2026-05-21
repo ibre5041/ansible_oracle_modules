@@ -322,6 +322,31 @@ def test_orapki_missing_binary_fails(monkeypatch):
     assert "orapki not found" in exc.value.args[0]["msg"]
 
 
+def test_orapki_wallet_create_failure_redacts_password(monkeypatch):
+    mod = _load()
+
+    class Mod(_OrapkiModule):
+        params = _orapki_params(wallet_password="WalletSecret123")
+        _orapki_responses = {
+            'wallet create': (
+                1,
+                'stdout leaked WalletSecret123',
+                'stderr leaked WalletSecret123',
+            ),
+        }
+        _commands_run = []
+
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "os", _make_fake_os(orapki_exists=True, wallet_exists=False))
+
+    with pytest.raises(FailJson) as exc:
+        mod.main()
+
+    result = repr(exc.value.args[0])
+    assert "WalletSecret123" not in result
+    assert "********" in result
+
+
 # ===========================================================================
 # Tests: Certificate management
 # ===========================================================================
@@ -562,6 +587,40 @@ def test_orapki_create_credential(monkeypatch):
     assert cmd[cmd.index('-pwd') + 1] == 'TestPass123'
 
 
+def test_orapki_create_credential_failure_redacts_passwords(monkeypatch):
+    mod = _load()
+
+    class Mod(_OrapkiModule):
+        params = _orapki_params(
+            wallet_password="WalletSecret123",
+            credential_state="present",
+            credential_alias="primary_db",
+            credential_db="PROD",
+            credential_user="sys",
+            credential_password="CredentialSecret456",
+        )
+        _orapki_responses = {
+            'list_credentials': (0, LIST_CREDENTIALS_EMPTY, ''),
+            'create_credential': (
+                1,
+                'stdout leaked WalletSecret123 CredentialSecret456',
+                'stderr leaked WalletSecret123 CredentialSecret456',
+            ),
+        }
+        _commands_run = []
+
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "os", _make_fake_os(orapki_exists=True))
+
+    with pytest.raises(FailJson) as exc:
+        mod.main()
+
+    result = repr(exc.value.args[0])
+    assert "WalletSecret123" not in result
+    assert "CredentialSecret456" not in result
+    assert "********" in result
+
+
 def test_orapki_modify_credential(monkeypatch):
     mod = _load()
 
@@ -674,6 +733,39 @@ def test_orapki_create_entry(monkeypatch):
         mod.main()
     result = exc.value.args[0]
     assert result["changed"] is True
+
+
+def test_orapki_create_entry_failure_redacts_secret(monkeypatch):
+    mod = _load()
+
+    class Mod(_OrapkiModule):
+        params = _orapki_params(
+            wallet_password="WalletSecret123",
+            credential_state="present",
+            credential_type="entry",
+            credential_alias="api_key",
+            credential_secret="EntrySecret789",
+        )
+        _orapki_responses = {
+            'list_entries': (0, '', ''),
+            'create_entry': (
+                1,
+                'stdout leaked WalletSecret123 EntrySecret789',
+                'stderr leaked WalletSecret123 EntrySecret789',
+            ),
+        }
+        _commands_run = []
+
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "os", _make_fake_os(orapki_exists=True))
+
+    with pytest.raises(FailJson) as exc:
+        mod.main()
+
+    result = repr(exc.value.args[0])
+    assert "WalletSecret123" not in result
+    assert "EntrySecret789" not in result
+    assert "********" in result
 
 
 def test_orapki_modify_entry(monkeypatch):

@@ -251,6 +251,13 @@ EXAMPLES = '''
 import os, re, time
 
 
+def _redact_secrets(value, secrets):
+    text = str(value)
+    for secret in sorted({str(s) for s in secrets if s}, key=len, reverse=True):
+        text = text.replace(secret, '[REDACTED]')
+    return text
+
+
 def get_version(module, oracle_home):
     command = os.path.join(oracle_home, 'bin', 'sqlplus')
     (rc, stdout, stderr) = module.run_command([command, '-V'])
@@ -488,18 +495,23 @@ def create_db(module, ohomes):
         # Convert dict to list of k:v pairs and then join it.
         command += ' -initParams ' + ",".join(["{}={}".format(_[0], str(_[1])) for _ in paramslist.items()])
 
-    msg = "command: %s" % command
+    secrets = [sys_password, system_password, dbsnmp_password]
+    redacted_command = _redact_secrets(command, secrets)
+
+    msg = "command: %s" % redacted_command
     module.warn(msg)
     env = {'ORACLE_HOME': oracle_home, 'PATH': '%s/bin/:/bin:/sbin:/usr/bin:/usr/sbin' % oracle_home}
     (rc, stdout, stderr) = module.run_command(command, environ_update=env)
     # module.warn('dcdba: %s ' % stdout)
     # module.warn('dcdba: %s ' % stderr)
     # module.warn('dcdba: %s ' % rc)
+    stdout_safe = _redact_secrets(stdout, secrets)
+    stderr_safe = _redact_secrets(stderr, secrets)
     if rc != 0:
-        msg = 'Error - STDOUT: %s, STDERR: %s, COMMAND: %s' % (stdout, stderr, command)
-        module.fail_json(msg=msg, changed=True, stdout=stdout, stderr=stderr)
+        msg = 'Error - STDOUT: %s, STDERR: %s, COMMAND: %s' % (stdout_safe, stderr_safe, redacted_command)
+        module.fail_json(msg=msg, changed=True, stdout=stdout_safe, stderr=stderr_safe)
     else:
-        return 'STDOUT: %s, STDERR: %s COMMAND: %s' % (stdout, stderr, command)
+        return 'STDOUT: %s, STDERR: %s COMMAND: %s' % (stdout_safe, stderr_safe, redacted_command)
 
 
 def remove_db(module, ohomes):
@@ -525,16 +537,17 @@ def remove_db(module, ohomes):
     dbca = os.path.join(oracle_home, 'bin', 'dbca')
     command = [dbca, '-deleteDatabase', '-silent', '-sourceDB', db_to_remove, '-sysDBAUserName', 'sys', '-sysDBAPassword', sys_password]
     (rc, stdout, stderr) = module.run_command(command)
+    stdout_safe = _redact_secrets(stdout, [sys_password])
+    stderr_safe = _redact_secrets(stderr, [sys_password])
     if 0 < rc <= 6:
-        module.warn(stdout)
-        module.warn(stdout)
+        module.warn(stdout_safe)
+        module.warn(stdout_safe)
     if rc <= 6:
-        msg = 'STDOUT: %s,  COMMAND: %s' % (stdout, command)
         msg = 'Successfully removed database %s' % db_name
-        module.exit_json(msg=msg, changed=True, stdout=stdout, stderr=stderr)
+        module.exit_json(msg=msg, changed=True, stdout=stdout_safe, stderr=stderr_safe)
     else:
-        msg = 'Removal of database %s failed: %s' % (db_name, stdout)
-        module.fail_json(msg=msg, changed=True, stdout=stdout, stderr=stderr)
+        msg = 'Removal of database %s failed: %s' % (db_name, stdout_safe)
+        module.fail_json(msg=msg, changed=True, stdout=stdout_safe, stderr=stderr_safe)
 
 
 def guess_oracle_sid(module, ohomes, fail=True):
