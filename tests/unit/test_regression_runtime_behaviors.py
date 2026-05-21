@@ -1,4 +1,5 @@
 from conftest import module_path, load_module_from_path
+import yaml
 
 
 class _FailJson(Exception):
@@ -86,3 +87,15 @@ def test_oracle_facts_userenv_is_not_nested_under_sid():
 def test_oracle_user_does_not_pass_module_to_execute_ddl():
     content = module_path("plugins", "modules", "oracle_user.py").read_text(encoding="utf-8", errors="ignore")
     assert "conn.execute_ddl(module, alter_sql)" not in content
+
+
+def test_oracle_sql_app_connections_do_not_inherit_sysdba_mode():
+    task_files = ("ddl.yml", "check_mode.yml")
+    for filename in task_files:
+        tasks = yaml.safe_load(
+            module_path("tests", "integration", "targets", "test_oracle_sql", "tasks", filename).read_text(
+                encoding="utf-8"
+            )
+        )
+        set_fact = next(task["set_fact"] for task in tasks if "app_connection_parameters" in task.get("set_fact", {}))
+        assert set_fact["app_connection_parameters"]["mode"] == "normal"

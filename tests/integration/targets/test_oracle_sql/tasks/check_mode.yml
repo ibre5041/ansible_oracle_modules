@@ -19,7 +19,7 @@
       service_name: "{{ (running_on_server|bool) | ternary(omit,oracle_pdb_service_name|default(oracle_service_name)) }}"
       session_container: "{{ (not running_on_server|bool) | ternary(omit,oracle_pdb_service_name|default(oracle_service_name)) }}"
       dsn: "{{ oracle_dsn }}"
-      mode: "{{ mode }}"
+      mode: normal
       oracle_home: "{{ oracle_home }}"
 
 - name: 'PDB Connection parameters - see or use integration_config.yml.template'
