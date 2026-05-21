@@ -1,0 +1,21 @@
+{
+    "ANSIBLE_MODULE_ARGS": {
+	"dsn": null,
+	"hostname": "",
+	"keystore_location": "/home/oracle/wallet",
+	"mode": "sysdba",
+	"oracle_home": "/oracle/u01/product/19.26.0.0",
+	"password": null,
+	"port": 1521,
+	"service_name": null,
+	"username": null,
+	"state": "present",
+    "keystore_password": "TestWalletPass123",
+	"_ansible_check_mode": false,
+	"_ansible_no_log": false,
+	"_ansible_debug": false,
+	"_ansible_diff": false,
+	"_ansible_verbosity": 0,
+	"_ansible_module_name": "oracle_wallet"
+    }
+}
