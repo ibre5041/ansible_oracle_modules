@@ -303,6 +303,40 @@ def test_role_create_with_password(monkeypatch):
     assert any("identified by" in d.lower() for d in payload["ddls"])
 
 
+def test_role_create_with_password_redacts_auth_conf_from_ddls(monkeypatch):
+    mod = _load_role()
+
+    class Mod(BaseFakeModule):
+        params = _role_params(auth="password", auth_conf="RoleSecret123")
+
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "oracleConnection", lambda m: _RoleFakeConn(m, existing_auth=None), raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+
+    rendered = repr(exc.value.args[0])
+    assert "RoleSecret123" not in rendered
+    assert "identified by ********" in rendered.lower()
+
+
+def test_role_modify_with_password_redacts_auth_conf_from_ddls(monkeypatch):
+    mod = _load_role()
+
+    class Mod(BaseFakeModule):
+        params = _role_params(auth="password", auth_conf="RoleSecret456")
+
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "oracleConnection", lambda m: _RoleFakeConn(m, existing_auth="NONE"), raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+
+    rendered = repr(exc.value.args[0])
+    assert "RoleSecret456" not in rendered
+    assert "identified by ********" in rendered.lower()
+
+
 def test_role_create_global(monkeypatch):
     mod = _load_role()
 

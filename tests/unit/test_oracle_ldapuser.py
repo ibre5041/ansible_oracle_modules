@@ -165,6 +165,40 @@ def test_main_ldap_not_exists_fails(monkeypatch):
     assert "ldap" in exc.value.args[0]["msg"]
 
 
+def test_main_ldap_connection_error_redacts_bind_password(monkeypatch):
+    """main(): LDAP bind errors must not expose ldap_bindpassword."""
+    mod = _load()
+    secret = "ldap-secret"
+    monkeypatch.setattr(mod, "oracledb_exists", True, raising=False)
+    monkeypatch.setattr(mod, "ldap_module_exists", True, raising=False)
+
+    class FailingLdap:
+        OPT_REFERRALS = 0
+        LDAPError = Exception
+
+        class _Conn:
+            def set_option(self, option, value):
+                pass
+
+            def simple_bind_s(self, dn, password):
+                raise Exception("bind failed for password ldap-secret")
+
+        @classmethod
+        def initialize(cls, url):
+            return cls._Conn()
+
+    monkeypatch.setattr(mod, "ldap", FailingLdap, raising=False)
+    Mod = _make_ldap_mod(_ldap_params(ldap_bindpassword=secret))
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+
+    with pytest.raises(FailJson) as exc:
+        mod.main()
+
+    rendered = repr(exc.value.args[0])
+    assert secret not in rendered
+    assert "[REDACTED]" in rendered
+
+
 # ---------------------------------------------------------------------------
 # query_ldap_users tests (lines 203-221)
 # ---------------------------------------------------------------------------

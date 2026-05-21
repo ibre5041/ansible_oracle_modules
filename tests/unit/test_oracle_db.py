@@ -887,6 +887,75 @@ def test_create_db_crs_override_dbconfig_type(monkeypatch):
     assert m.params.get("dbconfig_type") == "RAC"
 
 
+def test_create_db_failure_redacts_passwords(monkeypatch):
+    """create_db: DBCA failure must not expose passwords in fail_json or warnings."""
+    mod = _load()
+    secrets = {
+        "sys_password": "sys-secret",
+        "system_password": "system-secret",
+        "dbsnmp_password": "dbsnmp-secret",
+    }
+    Mod = _make_db_mod(_db_params(state="present", **secrets), responses=[
+        (0, "SQL*Plus: Release 19.0.0.0.0 - Production", ""),
+        (7, "Error contains sys-secret", "stderr contains system-secret and dbsnmp-secret"),
+    ])
+    m = Mod()
+    ohomes = _NoGiNoDb()
+
+    with pytest.raises(FailJson) as exc:
+        mod.create_db(m, ohomes)
+
+    rendered = repr(exc.value.args[0]) + repr(m._warnings)
+    for secret in secrets.values():
+        assert secret not in rendered
+    assert "[REDACTED]" in rendered
+
+
+def test_create_db_success_redacts_passwords(monkeypatch):
+    """create_db: DBCA success return value and warnings must not expose passwords."""
+    mod = _load()
+    secrets = {
+        "sys_password": "sys-secret",
+        "system_password": "system-secret",
+        "dbsnmp_password": "dbsnmp-secret",
+    }
+    Mod = _make_db_mod(_db_params(state="present", **secrets), responses=[
+        (0, "SQL*Plus: Release 19.0.0.0.0 - Production", ""),
+        (0, "Database creation successful", ""),
+    ])
+    m = Mod()
+    ohomes = _NoGiNoDb()
+
+    result = mod.create_db(m, ohomes)
+
+    rendered = result + repr(m._warnings)
+    for secret in secrets.values():
+        assert secret not in rendered
+    assert "[REDACTED]" in rendered
+
+
+def test_remove_db_failure_redacts_password(monkeypatch):
+    """remove_db: DBCA failure must not expose sys_password in fail_json."""
+    mod = _load()
+    secret = "sys-delete-secret"
+    os.environ["ORACLE_SID"] = "TESTDB"
+    try:
+        Mod = _make_db_mod(_db_params(state="absent", sys_password=secret), responses=[
+            (99, "stdout contains sys-delete-secret", "stderr contains sys-delete-secret"),
+        ])
+        m = Mod()
+        ohomes = _GiNoDb()
+
+        with pytest.raises(FailJson) as exc:
+            mod.remove_db(m, ohomes)
+
+        rendered = repr(exc.value.args[0]) + repr(m._warnings)
+        assert secret not in rendered
+        assert "[REDACTED]" in rendered
+    finally:
+        os.environ.pop("ORACLE_SID", None)
+
+
 # ---------------------------------------------------------------------------
 # Additional ensure_db_state coverage (lines 648-649, 655-656, 662-663, 687)
 # ---------------------------------------------------------------------------

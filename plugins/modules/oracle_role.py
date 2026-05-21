@@ -49,6 +49,12 @@ def check_role_exists(conn, role):
     return set(r.items())
 
 
+def _redact_role_password(sql, auth, auth_conf):
+    if auth == 'password' and auth_conf:
+        return sql.replace(' identified by %s' % auth_conf, ' identified by ********')
+    return sql
+
+
 # Create the role
 def create_role(conn, module):
     role = module.params["role"]
@@ -74,7 +80,7 @@ def create_role(conn, module):
     elif auth == 'global':
         sql += ' identified globally'
 
-    conn.execute_ddl(sql)
+    conn.execute_ddl(sql, ddls_entry=_redact_role_password(sql, auth, auth_conf))
     msg = 'The role (%s) has been created successfully, authentication: "%s"' % (role, auth)
     module.exit_json(msg=msg , changed=conn.changed, ddls=conn.ddls)
 
@@ -107,7 +113,7 @@ def modify_role(conn, module, current_set):
     elif auth == 'global':
         sql += ' identified globally'
 
-    conn.execute_ddl(sql)
+    conn.execute_ddl(sql, ddls_entry=_redact_role_password(sql, auth, auth_conf))
     msg = 'The role (%s) has been changed successfully, authentication: %s, previous: %s' % (role, auth, current_auth)
     module.exit_json(msg=msg, changed=conn.changed, ddls=conn.ddls)
 
@@ -138,7 +144,7 @@ def main():
             role          = dict(required=True, type='str'),
             state         = dict(default="present", choices=["present", "absent"]),
             auth          = dict(default='none', choices=["none", "password", "external", "global", "application"], aliases=['identified_method']),
-            auth_conf     = dict(default=None, aliases=['identified_value'])
+            auth_conf     = dict(default=None, no_log=True, aliases=['identified_value'])
         ),
         required_together=[['user', 'password']],
         supports_check_mode=True
