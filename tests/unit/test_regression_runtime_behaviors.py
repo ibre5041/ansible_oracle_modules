@@ -1,5 +1,4 @@
 from conftest import module_path, load_module_from_path
-import yaml
 
 
 class _FailJson(Exception):
@@ -92,10 +91,11 @@ def test_oracle_user_does_not_pass_module_to_execute_ddl():
 def test_oracle_sql_app_connections_do_not_inherit_sysdba_mode():
     task_files = ("ddl.yml", "check_mode.yml")
     for filename in task_files:
-        tasks = yaml.safe_load(
-            module_path("tests", "integration", "targets", "test_oracle_sql", "tasks", filename).read_text(
-                encoding="utf-8"
-            )
+        content = module_path("tests", "integration", "targets", "test_oracle_sql", "tasks", filename).read_text(
+            encoding="utf-8"
         )
-        set_fact = next(task["set_fact"] for task in tasks if "app_connection_parameters" in task.get("set_fact", {}))
-        assert set_fact["app_connection_parameters"]["mode"] == "normal"
+        app_block = content.split("app_connection_parameters: &app_con_param", 1)[1].split(
+            "- name: 'PDB Connection parameters", 1
+        )[0]
+        assert "mode: normal" in app_block
+        assert 'mode: "{{ mode }}"' not in app_block
