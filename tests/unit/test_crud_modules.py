@@ -799,6 +799,23 @@ def test_pdb_creates_new(monkeypatch):
     assert any("create pluggable database" in d.lower() for d in payload["ddls"])
 
 
+def test_pdb_create_redacts_admin_password_from_ddls(monkeypatch):
+    mod = _load("oracle_pdb")
+
+    class Mod(BaseFakeModule):
+        params = _pdb_params(pdb_admin_password='Pdb"AdminSecret123')
+
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "oracleConnection", lambda m: _PdbConn(m, None), raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+
+    rendered = repr(exc.value.args[0])
+    assert 'Pdb""AdminSecret123' not in rendered
+    assert 'identified by "********"' in rendered.lower()
+
+
 def test_pdb_creates_with_nocopy(monkeypatch):
     """plug_file + nocopy=True → DDL contains NOCOPY clause."""
     mod = _load("oracle_pdb")

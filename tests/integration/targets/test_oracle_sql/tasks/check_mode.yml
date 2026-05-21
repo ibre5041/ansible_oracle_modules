@@ -19,7 +19,7 @@
       service_name: "{{ (running_on_server|bool) | ternary(omit,oracle_pdb_service_name|default(oracle_service_name)) }}"
       session_container: "{{ (not running_on_server|bool) | ternary(omit,oracle_pdb_service_name|default(oracle_service_name)) }}"
       dsn: "{{ oracle_dsn }}"
-      mode: "{{ mode }}"
+      mode: normal
       oracle_home: "{{ oracle_home }}"
 
 - name: 'PDB Connection parameters - see or use integration_config.yml.template'
@@ -91,6 +91,8 @@
 - name: check select still works in check_mode
   oracle_sql:
     <<: *app_con_param
+    username: foo
+    password: Xlfsjflkdjgkrehjg1
     sql: "select f1, f2 from foo.t_foo order by f1"
   check_mode: yes
   register: _

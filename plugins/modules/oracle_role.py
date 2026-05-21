@@ -138,7 +138,7 @@ def main():
             role          = dict(required=True, type='str'),
             state         = dict(default="present", choices=["present", "absent"]),
             auth          = dict(default='none', choices=["none", "password", "external", "global", "application"], aliases=['identified_method']),
-            auth_conf     = dict(default=None, aliases=['identified_value'])
+            auth_conf     = dict(default=None, no_log=True, aliases=['identified_value'])
         ),
         required_together=[['user', 'password']],
         supports_check_mode=True
