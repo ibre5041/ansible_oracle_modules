@@ -131,6 +131,13 @@ def notify(state):
         return False
 
 
+def child_process_env(base_env=None):
+    '''Build an environment for helper processes that must not notify systemd.'''
+    child_env = (base_env or os.environ).copy()
+    child_env.pop('NOTIFY_SOCKET', None)
+    return child_env
+
+
 def start_oracle_services():
     '''Method for starting all Oracle-services'''
     log.info('Starting Oracle Services')
@@ -225,7 +232,7 @@ def cgroups_checks():
         except subprocess.CalledProcessError:
             log.debug('No running process TNSLSNR found')
 
-        attach_pids_to_systemd_unit(sorted(set(oracle_pids)))
+        attach_pids_to_systemd_unit(get_pids_outside_own_cgroup(sorted(set(oracle_pids))))
 
         # sleep for a defined amount of time
         time.sleep(CGROUP_CHECK_INTERVAL)
@@ -289,14 +296,86 @@ def attach_pids_to_systemd_unit(pids):
     ] + pids
 
     try:
-        subprocess.check_call(command, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
-    except (FileNotFoundError, subprocess.CalledProcessError) as err:
+        result = subprocess.run(command,
+                                env=child_process_env(),
+                                stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE,
+                                check=True)
+        if result.stdout:
+            log.debug('busctl stdout: %s', result.stdout.decode('utf-8', errors='replace').strip())
+    except FileNotFoundError as err:
         log.warning('Failed to attach processes with systemd D-Bus, falling back to cgroup.procs: %s', err)
         try:
             cgroup_proc_list_file = get_cgroup_procs_file(r'/proc/{}/cgroup'.format(os.getpid()))
             sync_pid_cgroups(cgroup_proc_list_file, pids)
         except OSError as fallback_err:
             log.warning('Failed to attach processes with cgroup.procs fallback: %s', fallback_err)
+    except subprocess.CalledProcessError as err:
+        stdout = err.stdout.decode('utf-8', errors='replace').strip() if err.stdout else ''
+        stderr = err.stderr.decode('utf-8', errors='replace').strip() if err.stderr else ''
+        if stdout:
+            log.warning('busctl stdout: %s', stdout)
+        if stderr:
+            log.warning('busctl stderr: %s', stderr)
+        log.warning('Failed to attach processes with systemd D-Bus, falling back to cgroup.procs: %s', err)
+        try:
+            cgroup_proc_list_file = get_cgroup_procs_file(r'/proc/{}/cgroup'.format(os.getpid()))
+            sync_pid_cgroups(cgroup_proc_list_file, pids)
+        except OSError as fallback_err:
+            log.warning('Failed to attach processes with cgroup.procs fallback: %s', fallback_err)
+
+
+def get_pids_outside_own_cgroup(pids):
+    '''Return PIDs that are not currently in this service cgroup.'''
+    if not pids:
+        return []
+
+    try:
+        own_cgroup_path = get_process_cgroup_path(os.getpid())
+    except OSError as err:
+        log.warning('Cannot determine own cgroup, attaching all discovered processes: %s', err)
+        return pids
+
+    missing_pids = []
+    for pid in pids:
+        try:
+            pid_cgroup_path = get_process_cgroup_path(pid)
+        except FileNotFoundError:
+            log.debug('Process disappeared before cgroup check: %s', pid)
+            continue
+        except OSError as err:
+            log.warning('Cannot determine cgroup for PID %s, including it in attach list: %s', pid, err)
+            missing_pids.append(pid)
+            continue
+
+        if pid_cgroup_path != own_cgroup_path and not pid_cgroup_path.startswith(own_cgroup_path + '/'):
+            missing_pids.append(pid)
+
+    if missing_pids:
+        log.debug('Processes outside %s: %s', SYSTEMD_UNIT, repr(missing_pids))
+    return missing_pids
+
+
+def get_process_cgroup_path(pid):
+    '''Return the systemd-relevant cgroup path for a PID.'''
+    cgroup_file = r'/proc/{}/cgroup'.format(pid)
+    cgroup_path = None
+
+    with open(cgroup_file, mode='r', encoding='utf-8') as proc_fh:
+        for line in proc_fh.readlines():
+            parts = line.strip().split(':', 2)
+            if len(parts) != 3:
+                continue
+            # cgroup v2 format: 0::/system.slice/oracle.service
+            if parts[0] == '0':
+                return parts[2]
+            # cgroup v1 systemd controller format: 1:name=systemd:/system.slice/oracle.service
+            if parts[1] == 'name=systemd':
+                cgroup_path = parts[2]
+
+    if cgroup_path is None:
+        raise FileNotFoundError('systemd cgroup entry not found in {}'.format(cgroup_file))
+    return cgroup_path
 
 
 def get_cgroup_procs_file(cgroup_file):
@@ -435,7 +514,7 @@ def parse_listener():
                 try:
                     try:
                         # In case when OH is read-only, listener.ora is placed elsewhere `orabasehome`/network/admin
-                        sqlplus_env = os.environ.copy()
+                        sqlplus_env = child_process_env()
                         sqlplus_env['PATH'] = sqlplus_env['PATH'] + ':{}/bin'.format(oracle_home)
                         sqlplus_env['ORACLE_HOME'] = oracle_home
                         orabasehome = subprocess.check_output('{}/bin/orabasehome'.format(oracle_home), env=sqlplus_env).decode('utf-8').strip()
@@ -500,7 +579,7 @@ def run_sqlplus(query, oratab_sid, oratab_item):
     oracle_home = oratab_item['oracle_home']
 
     # Copy the OS ENV and set the Oracle-ENV-variabels in that ENV
-    sqlplus_env = os.environ.copy()
+    sqlplus_env = child_process_env()
     sqlplus_env['PATH'] = sqlplus_env['PATH'] + ':{}/bin'.format(oracle_home)
     sqlplus_env['ORACLE_SID'] = oratab_sid
     sqlplus_env['ORACLE_HOME'] = oracle_home
@@ -548,7 +627,7 @@ def lsnrctl(command, tnslsnr_oracle_home, tnslsnr_name):
 
     log.info('%s TNSLSNR in %s', listener_action_msg[command], tnslsnr_oracle_home)
     # Copy the OS ENV and set the Oracle-ENV-variabels in that ENV
-    tnslsnr_env = os.environ.copy()
+    tnslsnr_env = child_process_env()
     tnslsnr_env['PATH'] = tnslsnr_env['PATH'] + ':{}/bin'.format(tnslsnr_oracle_home)
     tnslsnr_env['ORACLE_HOME'] = tnslsnr_oracle_home
     try:
