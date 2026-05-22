@@ -42,7 +42,7 @@ JOURNAL_SOCKET = r'/run/systemd/journal/socket'
 
 
 class JournalHandler(logging.Handler):
-    '''Small journald handler that does not require python-systemd.'''
+    """Small journald handler that does not require python-systemd."""
 
     priority_map = {
         logging.DEBUG: 7,
@@ -110,10 +110,8 @@ SYSTEMD_UNIT = os.environ.get('ORACLE_SYSTEMD_UNIT', 'oracle.service')
 
 
 # Define functions
-
-
 def notify(state):
-    '''Send an sd_notify message without requiring python-systemd.'''
+    """Send a sd_notify message without requiring python-systemd."""
     notify_socket = os.environ.get('NOTIFY_SOCKET')
     if not notify_socket:
         return False
@@ -132,14 +130,14 @@ def notify(state):
 
 
 def child_process_env(base_env=None):
-    '''Build an environment for helper processes that must not notify systemd.'''
+    """Build an environment for helper processes that must not notify systemd."""
     child_env = (base_env or os.environ).copy()
     child_env.pop('NOTIFY_SOCKET', None)
     return child_env
 
 
 def start_oracle_services():
-    '''Method for starting all Oracle-services'''
+    """Method for starting all Oracle-services"""
     log.info('Starting Oracle Services')
 
     log.info('Starting Listener...')
@@ -166,11 +164,11 @@ def start_oracle_services():
         startproc.join()
 
     notify('STATUS=Started all databases')
-    log.info('Succesfully started all Oracle Services')
+    log.info('Successfully started all Oracle Services')
 
 
 def stop_oracle_services():
-    '''Method for stopping all Oracle-services'''
+    """Method for stopping all Oracle-services"""
     log.info('Stopping all databases...')
     notify('STATUS=Stopping all databases...')
 
@@ -203,12 +201,12 @@ def stop_oracle_services():
 
 
 def cgroups_checks():
-    '''Attach Oracle-processes to the systemd unit.
+    """Attach Oracle-processes to the systemd unit.
 
     This registers restarted databases with systemd so that databases can
     properly be stopped instead of being terminated by systemd.
     No arguments required
-    '''
+    """
     log.info('Running cgroups_checks...')
 
     while oracle_ns.running:
@@ -241,28 +239,28 @@ def cgroups_checks():
 
 
 def handler_stop_signals(_signum, _frame):
-    '''We received a SIGTERM, so set the running-boolean to False to stop some loops'''
+    """We received a SIGTERM, so set the running-boolean to False to stop some loops"""
     log.info('Received TERM-signal')
     oracle_ns.running = False
 
 
 def handler_stop_oracle(_signum, _frame):
-    '''We received a SIGUSR2, so set the running-boolean to False to stop some loops
+    """We received a SIGUSR2, so set the running-boolean to False to stop some loops
     Addionaly stop the Oracle-databases and the Listener
-    '''
+    """
     log.info('Received STOP-signal')
     stop_oracle_services()
     oracle_ns.running = False
 
 
 def handler_reloadoratab(_signum, _frame):
-    '''We received a SIGHUP, so reload the oratab'''
+    """We received a SIGHUP, so reload the oratab"""
     log.info('Received SIGHUP-signal')
     parseoratab()
 
 
 def sync_pid_cgroups(cgroup_proc_list_file, cgroup_diff_list):
-    '''Fallback for older systemd releases without AttachProcessesToUnit.'''
+    """Fallback for older systemd releases without AttachProcessesToUnit."""
     try:
         # add all those pids to the cgroup by adding them one by one to the cgroups-proc-file
         for non_cgroup_proc in cgroup_diff_list:
@@ -277,7 +275,7 @@ def sync_pid_cgroups(cgroup_proc_list_file, cgroup_diff_list):
 
 
 def attach_pids_to_systemd_unit(pids):
-    '''Attach PIDs to this unit using systemd's D-Bus API.'''
+    """Attach PIDs to this unit using systemd's D-Bus API."""
     if not pids:
         return
 
@@ -326,7 +324,7 @@ def attach_pids_to_systemd_unit(pids):
 
 
 def get_pids_outside_own_cgroup(pids):
-    '''Return PIDs that are not currently in this service cgroup.'''
+    """Return PIDs that are not currently in this service cgroup."""
     if not pids:
         return []
 
@@ -357,7 +355,7 @@ def get_pids_outside_own_cgroup(pids):
 
 
 def get_process_cgroup_path(pid):
-    '''Return the systemd-relevant cgroup path for a PID.'''
+    """Return the systemd-relevant cgroup path for a PID."""
     cgroup_file = r'/proc/{}/cgroup'.format(pid)
     cgroup_path = None
 
@@ -379,11 +377,11 @@ def get_process_cgroup_path(pid):
 
 
 def get_cgroup_procs_file(cgroup_file):
-    '''Get the cgroup.procs file for this service.
+    """Get the cgroup.procs file for this service.
 
     Argument is the cgroup file from the (current) process
     Returns the cgroup.procs path.
-    '''
+    """
 
     try:
         cgroup_path = None
@@ -413,9 +411,9 @@ def get_cgroup_procs_file(cgroup_file):
 
 
 def get_cgroup_procs(cgroup_proc_list_file):
-    '''Get the processes in the cgroup
+    """Get the processes in the cgroup
     Argument is the cgroup process file of the cgroup
-    Returns a list of processes in the cgroup'''
+    Returns a list of processes in the cgroup"""
     try:
         cgroup_proc_list = []
         with open(cgroup_proc_list_file, mode='r', encoding='utf-8') as proc_fh:
@@ -433,10 +431,10 @@ def get_cgroup_procs(cgroup_proc_list_file):
 
 
 def setugid(user):
-    '''Change process user and group ID
+    """Change process user and group ID
 
     Argument is a numeric user id or a user name
-    '''
+    """
     try:
         passwd = getpwuid(int(user))
     except ValueError:
@@ -459,11 +457,11 @@ def setugid(user):
 
 
 def parseoratab():
-    '''Function to parse the contents of the oratab
+    """Function to parse the contents of the oratab
     Default in /etc/oratab
 
     No arguments
-    '''
+    """
     # Check if oratab exists
     log.info('Parsing oratab: %s', ORATAB_LOCATION)
 
@@ -620,9 +618,7 @@ def run_sqlplus(query, oratab_sid, oratab_item):
 
 
 def lsnrctl(command, tnslsnr_oracle_home, tnslsnr_name):
-    '''run the command lsnrctl with given argument
-    Needs ENV-variable LISTENER_ORACLE_HOME to start the Listener
-    '''
+    """run the command lsnrctl with given argument. Needs ENV-variable LISTENER_ORACLE_HOME to start the Listener"""
     listener_action_msg = {"start": "Starting", "stop": "Stopping"}
 
     log.info('%s TNSLSNR in %s', listener_action_msg[command], tnslsnr_oracle_home)
@@ -658,7 +654,7 @@ def lsnrctl(command, tnslsnr_oracle_home, tnslsnr_name):
 
 
 def start_db(oratab_sid, oratab_item):
-    '''Start the correct database in the correct mode by running a SQL-command'''
+    """Start the correct database in the correct mode by running a SQL-command"""
     # Try to set the correct user
     setugid(SERVICE_USER)
 
@@ -687,7 +683,7 @@ exit
 
 
 def stop_db(oratab_sid, oratab_item):
-    '''Stop the correct database by running a SQL-command'''
+    """Stop the correct database by running a SQL-command"""
     # Try to set the correct user
     setugid(SERVICE_USER)
 
@@ -709,7 +705,7 @@ exit
 
 
 def lsnrctl_start(tns_orahome, tns_name):
-    '''Stop the Listener by running lsnrctl with the supplied argument as the correct user'''
+    """Stop the Listener by running lsnrctl with the supplied argument as the correct user"""
 
     # Try to set the correct user
     setugid(SERVICE_USER)
@@ -718,7 +714,7 @@ def lsnrctl_start(tns_orahome, tns_name):
 
 
 def lsnrctl_stop(tns_orahome, tns_name):
-    '''Start the Listener by running lsnrctl with the supplied argument as the correct user'''
+    """Start the Listener by running lsnrctl with the supplied argument as the correct user"""
     # Try to set the correct user
     setugid(SERVICE_USER)
 
@@ -726,7 +722,7 @@ def lsnrctl_stop(tns_orahome, tns_name):
 
 
 def main():
-    '''Main function to be called'''
+    """Main function to be called"""
     # catch some signals to handle systemd-stop-commands or just stop the daemon if accidentally killed
     signal.signal(signal.SIGTERM, handler_stop_signals)
     signal.signal(signal.SIGUSR2, handler_stop_oracle)
@@ -739,7 +735,7 @@ def main():
     # Then, start the databases found in oratab in the correct ORACLE_HOME
     start_oracle_services()
 
-    # Spawn the cgroups-check-process to reregsiter databases that are manually restarted, outside the systemd-process
+    # Spawn the cgroups-check-process to re-register databases that are manually restarted, outside the systemd-process
     cgchecks = multiprocessing.Process(target=cgroups_checks, name='cgroups-checker')
 
     cgchecks.start()
