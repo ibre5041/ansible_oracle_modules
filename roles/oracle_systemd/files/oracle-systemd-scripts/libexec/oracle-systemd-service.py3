@@ -21,11 +21,10 @@ import os
 import sys
 import logging
 import multiprocessing
-from errno import ENOENT
+import socket
+import struct
 from pwd import getpwuid
 from pwd import getpwnam
-from systemd import journal
-from systemd.daemon import notify
 
 # Declarations
 manager = multiprocessing.Manager()
@@ -39,10 +38,64 @@ oracle_ns.tnslsnr_oracle_home = None
 oracle_ns.listener_name = 'LISTENER'
 
 ORATAB_LOCATION = r'/etc/oratab'
+JOURNAL_SOCKET = r'/run/systemd/journal/socket'
+
+
+class JournalHandler(logging.Handler):
+    '''Small journald handler that does not require python-systemd.'''
+
+    priority_map = {
+        logging.DEBUG: 7,
+        logging.INFO: 6,
+        logging.WARNING: 4,
+        logging.ERROR: 3,
+        logging.CRITICAL: 2,
+    }
+
+    def __init__(self, identifier):
+        super().__init__()
+        self.identifier = identifier
+        self.exception_formatter = logging.Formatter()
+
+    def emit(self, record):
+        try:
+            message = record.getMessage()
+            if record.exc_info:
+                message = '{}\n{}'.format(message, self.exception_formatter.formatException(record.exc_info))
+
+            fields = {
+                'MESSAGE': message,
+                'PRIORITY': str(self.priority_map.get(record.levelno, 5)),
+                'SYSLOG_IDENTIFIER': self.identifier,
+                'LOGGER': record.name,
+                'CODE_FILE': record.pathname,
+                'CODE_LINE': str(record.lineno),
+                'CODE_FUNC': record.funcName,
+            }
+            payload = bytearray()
+            for key, value in fields.items():
+                payload.extend(self._journal_field(key, value))
+
+            with socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM) as sock:
+                sock.connect(JOURNAL_SOCKET)
+                sock.sendall(payload)
+        except OSError:
+            sys.stderr.write('{}: {}\n'.format(record.levelname, record.getMessage()))
+        except Exception:
+            self.handleError(record)
+
+    @staticmethod
+    def _journal_field(key, value):
+        key_bytes = key.encode('ascii')
+        value_bytes = str(value).encode('utf-8', errors='replace')
+        if b'\n' not in value_bytes:
+            return key_bytes + b'=' + value_bytes + b'\n'
+        return key_bytes + b'\n' + struct.pack('<Q', len(value_bytes)) + value_bytes + b'\n'
+
 
 # Setup logging
 log = logging.getLogger(__name__)
-log.addHandler(journal.JournalHandler(SYSLOG_IDENTIFIER=os.path.basename(__file__)))
+log.addHandler(JournalHandler(os.path.basename(__file__)))
 log.setLevel(logging.INFO)
 #log.setLevel(logging.DEBUG)
 
@@ -52,8 +105,30 @@ SERVICE_USER = os.environ.get('ORACLE_DATABASE_USER', 'oracle')
 # Interval for the cgroup-check-process
 CGROUP_CHECK_INTERVAL = int(os.environ.get('CGROUP_CHECK_INTERVAL', 120))
 
+# Unit where manually restarted Oracle processes should be attached.
+SYSTEMD_UNIT = os.environ.get('ORACLE_SYSTEMD_UNIT', 'oracle.service')
+
 
 # Define functions
+
+
+def notify(state):
+    '''Send an sd_notify message without requiring python-systemd.'''
+    notify_socket = os.environ.get('NOTIFY_SOCKET')
+    if not notify_socket:
+        return False
+
+    if notify_socket[0] == '@':
+        notify_socket = '\0' + notify_socket[1:]
+
+    try:
+        with socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM) as sock:
+            sock.connect(notify_socket)
+            sock.sendall(state.encode('utf-8'))
+        return True
+    except OSError as err:
+        log.debug('Unable to notify systemd: %s', err)
+        return False
 
 
 def start_oracle_services():
@@ -121,65 +196,36 @@ def stop_oracle_services():
 
 
 def cgroups_checks():
-    '''Check if all Oracle-processes are inside the correct CGroup
-    This is to register restarted databases with the processes to systemd so that databases
-    can properly be stopped instead of being terminated by systemd
+    '''Attach Oracle-processes to the systemd unit.
+
+    This registers restarted databases with systemd so that databases can
+    properly be stopped instead of being terminated by systemd.
     No arguments required
     '''
     log.info('Running cgroups_checks...')
-    # declare some variables
-    cgroup_file = r'/proc/{}/cgroup'.format(os.getpid())
-    cgroup_name = get_cgroup_name(cgroup_file)
-
-    log.debug('cgroups_checks running in cgroup %s', cgroup_name)
 
     while oracle_ns.running:
-        # Declare some variables
-        cgroup_proc_list_file = r'/sys/fs/cgroup/systemd{}/cgroup.procs'.format(cgroup_name)
-        oracle_home_procs = []
-        tnslsnr_proc = []
-        cgroup_diff_list = []
-
         log.debug('Used ORACLE_HOME\'s')
         log.debug('\n'.join(map(str, oracle_ns.oracle_home_list)))
-
-        cgroup_proc_list = get_cgroup_procs(cgroup_proc_list_file)
-
-        log.debug('Number of procs in cgroup: %i', len(cgroup_proc_list))
+        oracle_pids = []
 
         # loop through the original ORACLE_HOME-list to check all running database-processes
         for oracle_home in oracle_ns.oracle_home_list:
             try:
                 # get the pidlist of the running database-processes of this specific ORACLE_HOME
-                oracle_home_procs = subprocess.check_output(
+                oracle_pids.extend(subprocess.check_output(
                     ['pidof', '{}/bin/oracle'.format(oracle_home)]).decode('utf-8').split()
-
-                # Determine if there are differences between the cgroup-list and the ORACLE_HOME-pidlist
-                cgroup_diff_list.extend(set(oracle_home_procs).difference(set(cgroup_proc_list)))
+                )
             except subprocess.CalledProcessError:
                 log.debug('No running processes in ORACLE_HOME %s', oracle_home)
 
-        if len(cgroup_diff_list) > 0:
-            # if there are missing pids in the cgroup (differences are not 0)
-            log.debug('ORACLE_HOME-processes not found in cgroup: %s', repr(cgroup_diff_list))
-            log.debug('Sync cgroups ORACLE_HOME')
-            sync_pid_cgroups(cgroup_proc_list_file, cgroup_diff_list)
-
-        # clear the list and redo this for the tnslnsr-process
-        cgroup_diff_list = []
-
         try:
-            tnslsnr_proc = subprocess.check_output(['pidof', 'tnslsnr']).decode('utf-8').split()
-            log.debug('TNSLSNR-processes found: %s', repr(tnslsnr_proc))
-            cgroup_diff_list.extend(set(tnslsnr_proc).difference(set(cgroup_proc_list)))
+            oracle_pids.extend(subprocess.check_output(['pidof', 'tnslsnr']).decode('utf-8').split())
+            log.debug('TNSLSNR-processes found')
         except subprocess.CalledProcessError:
             log.debug('No running process TNSLSNR found')
 
-        if len(cgroup_diff_list) > 0:
-            # if there are missing pids in the cgroup (differences are not 0)
-            log.debug('TNSLSNR-process not found in cgroup: %s', repr(cgroup_diff_list))
-            log.debug('Sync cgroups TNSLSNR')
-            sync_pid_cgroups(cgroup_proc_list_file, cgroup_diff_list)
+        attach_pids_to_systemd_unit(sorted(set(oracle_pids)))
 
         # sleep for a defined amount of time
         time.sleep(CGROUP_CHECK_INTERVAL)
@@ -209,39 +255,81 @@ def handler_reloadoratab(_signum, _frame):
 
 
 def sync_pid_cgroups(cgroup_proc_list_file, cgroup_diff_list):
-    '''Let's sync the pids to the cgroup'''
+    '''Fallback for older systemd releases without AttachProcessesToUnit.'''
     try:
         # add all those pids to the cgroup by adding them one by one to the cgroups-proc-file
         for non_cgroup_proc in cgroup_diff_list:
             with open(cgroup_proc_list_file, mode='a', encoding='utf-8') as cgroup_proc_fh:
                 log.debug('Adding proc to cgroup: %s', non_cgroup_proc)
-                cgroup_proc_fh.write(non_cgroup_proc)
+                cgroup_proc_fh.write('{}\n'.format(non_cgroup_proc))
     except PermissionError:
-        log.error('Permission denied reading file %s', ORATAB_LOCATION)
+        log.error('Permission denied writing file %s', cgroup_proc_list_file)
     except FileNotFoundError:
-        log.error('File not found %s', ORATAB_LOCATION)
+        log.error('File not found %s', cgroup_proc_list_file)
         raise
 
 
-def get_cgroup_name(cgroup_file):
-    '''Get the name of the cgroup from the cgroup file
-    Argument is the cgroup file from the (current) process
-    Returns the name of the cgroup'''
+def attach_pids_to_systemd_unit(pids):
+    '''Attach PIDs to this unit using systemd's D-Bus API.'''
+    if not pids:
+        return
+
+    log.debug('Attaching processes to %s: %s', SYSTEMD_UNIT, repr(pids))
+    command = [
+        'busctl',
+        'call',
+        'org.freedesktop.systemd1',
+        '/org/freedesktop/systemd1',
+        'org.freedesktop.systemd1.Manager',
+        'AttachProcessesToUnit',
+        'ssau',
+        SYSTEMD_UNIT,
+        '',
+        str(len(pids)),
+    ] + pids
 
     try:
-        cgroup_name = None
+        subprocess.check_call(command, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
+    except (FileNotFoundError, subprocess.CalledProcessError) as err:
+        log.warning('Failed to attach processes with systemd D-Bus, falling back to cgroup.procs: %s', err)
+        try:
+            cgroup_proc_list_file = get_cgroup_procs_file(r'/proc/{}/cgroup'.format(os.getpid()))
+            sync_pid_cgroups(cgroup_proc_list_file, pids)
+        except OSError as fallback_err:
+            log.warning('Failed to attach processes with cgroup.procs fallback: %s', fallback_err)
+
+
+def get_cgroup_procs_file(cgroup_file):
+    '''Get the cgroup.procs file for this service.
+
+    Argument is the cgroup file from the (current) process
+    Returns the cgroup.procs path.
+    '''
+
+    try:
+        cgroup_path = None
         with open(cgroup_file, mode='r', encoding='utf-8') as proc_fh:
             for line in proc_fh.readlines():
-                # Kernel 4.14 format
+                parts = line.strip().split(':', 2)
+                if len(parts) != 3:
+                    continue
+                # cgroup v2 format
+                # 0::/system.slice/oracle.service
+                if parts[0] == '0':
+                    cgroup_path = parts[2]
+                    return os.path.join('/sys/fs/cgroup', cgroup_path.lstrip('/'), 'cgroup.procs')
+                # cgroup v1 systemd controller format
                 # 1:name=systemd:/system.slice/oracle.service
-                if line.startswith('1:name'):
-                    cgroup_name = line.split(':')[2].strip()
-        return cgroup_name
+                if parts[1] == 'name=systemd':
+                    cgroup_path = parts[2]
+        if cgroup_path is None:
+            raise FileNotFoundError('systemd cgroup entry not found in {}'.format(cgroup_file))
+        return os.path.join('/sys/fs/cgroup/systemd', cgroup_path.lstrip('/'), 'cgroup.procs')
     except PermissionError:
-        log.error('Permission denied reading file %s', ORATAB_LOCATION)
+        log.error('Permission denied reading file %s', cgroup_file)
         raise
     except FileNotFoundError:
-        log.error('File not found %s', ORATAB_LOCATION)
+        log.error('File not found %s', cgroup_file)
         raise
 
 
@@ -340,7 +428,7 @@ def parse_listener():
         try:
             from dotora.parser import OraParameter, DotOraFile
         except:
-            log.warn("Failed to import dotora.parse")
+            log.warning("Failed to import dotora.parse")
         else:
             # iterate over all ORACLE_HOMEs, try to find listener config in newest one
             for oracle_home in sorted(oracle_ns.oracle_home_list, reverse=True):
@@ -352,9 +440,9 @@ def parse_listener():
                         sqlplus_env['ORACLE_HOME'] = oracle_home
                         orabasehome = subprocess.check_output('{}/bin/orabasehome'.format(oracle_home), env=sqlplus_env).decode('utf-8').strip()
                     except subprocess.CalledProcessError as cpe:
-                        log.warning('Cannot determin oraclehome by using %s', cpe.cmd)
+                        log.warning('Cannot determin oracle_home by using %s', cpe.cmd)
                         log.debug('Error: %s', cpe.output)
-                        orabasehome = oraclehome
+                        orabasehome = oracle_home
                     # Parse each listener.ora, try to find listener config name os.environ['LISTENER_NAME']
                     listener_ora = os.path.join(orabasehome, 'network', 'admin', 'listener.ora')
                     log.debug("Scanning OH: %s" % listener_ora)
@@ -371,7 +459,7 @@ def parse_listener():
                             log.debug('listener.ora parse error: %s' % e)
                             pass
                 except BaseException as e:
-                    log.warn("Generic error: %s" % e)
+                    log.warning("Generic error: %s" % e)
                     pass
         log.error('Listener not found: %s' % os.environ['LISTENER_NAME'])
         notify('ERRNO=1')
