@@ -22,12 +22,29 @@
     src: "oracle-systemd-scripts/libexec/{{ oracle_systemd_libexec_source }}"
     dest: /usr/libexec/oracle-systemd-service
     mode: '0755'
+
+- name: copy split oracle-systemd libexec files
+  copy:
+    src: "oracle-systemd-scripts/libexec/{{ item.src }}"
+    dest: "{{ item.dest }}"
+    mode: '0755'
+  with_items:
+    - src: oracle-systemd-db-service.py3
+      dest: /usr/libexec/oracle-systemd-db-service
+    - src: oracle-systemd-listener-service.py3
+      dest: /usr/libexec/oracle-systemd-listener-service
   
 # This only one file has template in it
 - name: /etc/sysconfig/network-reachable
   template:
     src: oracle-systemd-scripts/sysconfig/network-reachable
     dest: /etc/sysconfig/network-reachable
+
+- name: /etc/systemd/system-generators
+  file:
+    path: /etc/systemd/system-generators
+    state: directory
+    mode: '0755'
 
 - name: "copy oracle-systemd files"
   copy:
@@ -42,6 +59,15 @@
       dest: /etc/systemd/system/network-reachable.service      
     - file_name: oracle-systemd-scripts/systemd/oracle.service
       dest: /etc/systemd/system/oracle.service
+    - file_name: oracle-systemd-scripts/systemd/oracle-listener.service
+      dest: /etc/systemd/system/oracle-listener.service
+    - file_name: oracle-systemd-scripts/systemd/oracle-db@.service
+      dest: /etc/systemd/system/oracle-db@.service
+    - file_name: oracle-systemd-scripts/systemd/oracle-databases.target
+      dest: /etc/systemd/system/oracle-databases.target
+    - file_name: oracle-systemd-scripts/system-generators/oracle-db-generator
+      dest: /etc/systemd/system-generators/oracle-db-generator
+      mode: '0755'
 
     # installed via template
     #- file_name: oracle-systemd-scripts/sysconfig/network-reachable
@@ -73,3 +99,25 @@
     name=oracle
     enabled=yes
     daemon_reload=yes
+  when: oracle_systemd_service_layout == 'combined'
+
+- name: systemd oracle combined disabled
+  systemd:
+    name: oracle
+    enabled: no
+    daemon_reload: yes
+  when: oracle_systemd_service_layout == 'split'
+
+- name: systemd oracle listener enabled
+  systemd:
+    name: oracle-listener
+    enabled: yes
+    daemon_reload: yes
+  when: oracle_systemd_service_layout == 'split'
+
+- name: systemd oracle databases target enabled
+  systemd:
+    name: oracle-databases.target
+    enabled: yes
+    daemon_reload: yes
+  when: oracle_systemd_service_layout == 'split'

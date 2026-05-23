@@ -1,0 +1,10 @@
+[Unit]
+Description=Oracle Databases from /etc/oratab
+Documentation=man:systemd.generator(7)
+After=network-online.target remote-fs.target local-fs.target
+Requires=network-online.target remote-fs.target local-fs.target
+Wants=oracle-listener.service
+After=oracle-listener.service
+
+[Install]
+WantedBy=multi-user.target
