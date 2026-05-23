@@ -3,4 +3,4 @@
 
 # combined: use the original all-in-one oracle.service
 # split: use oracle-listener.service plus generated oracle-db@SID.service units
-oracle_systemd_service_layout: combined
+oracle_systemd_service_layout: split
