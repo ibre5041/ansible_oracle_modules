@@ -17,7 +17,7 @@ options:
     required: true
   backup:
     description:
-      - Create a backup file including the timestamp information so you can get the original file back if you somehow clobbered it incorrectly.
+      - Create a backup file iLncluding the timestamp information so you can get the original file back if you somehow clobbered it incorrectly.
     type: bool
     default: no
     required: false
@@ -172,13 +172,18 @@ def main():
     alias = module.params['alias']
     state = module.params['state']
 
-    if module.params["follow"]:
-        while os.path.islink(filename):
-            filename = os.readlink(filename)
+    try:
+        if module.params["follow"]:
+            while os.path.islink(filename):
+                filename = os.readlink(filename)
 
-    with open(filename, "r") as file:
-        old_content = file.read()
-        
+        with open(filename, "r") as file:
+            old_content = file.read()
+    except FileNotFoundError as e:
+        old_content = ''
+        # Try to create an empty tnsnames.ora file
+        open(module.params["path"], 'a').close()
+
     orafile = DotOraFile(filename)
 
     if state == 'present':
