@@ -1,0 +1,24 @@
+[Unit]
+Description=Oracle Database %i
+After=network-online.target remote-fs.target local-fs.target oracle-listener.service
+Requires=network-online.target remote-fs.target local-fs.target
+Wants=oracle-listener.service
+
+[Service]
+EnvironmentFile=/etc/sysconfig/oracle
+Environment=ORACLE_SYSTEMD_UNIT=%n
+Type=notify
+NotifyAccess=main
+Delegate=yes
+SyslogIdentifier=oracle-db-%i
+TimeoutStartSec=10min
+TimeoutStopSec=10min
+LimitNOFILE=16384
+LimitMEMLOCK=128G
+ExecStart=/usr/libexec/oracle-systemd-db-service %i
+ExecReload=/bin/kill -HUP $MAINPID
+KillSignal=SIGUSR2
+KillMode=process
+
+[Install]
+WantedBy=oracle-databases.target
