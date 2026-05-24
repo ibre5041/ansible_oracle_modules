@@ -1,0 +1,108 @@
+#!/usr/bin/env python3
+
+"""Generate systemd dependencies for Oracle databases listed in /etc/oratab.
+
+Configuration constants:
+    ORATAB_LOCATION:
+        Path to the Oracle oratab file. Entries are expected in the standard
+        SID:ORACLE_HOME:FLAG format. Only entries with FLAG "Y" or "S" are
+        generated. Entries with FLAG "N" are ignored.
+
+    TARGET_UNIT:
+        Target that groups generated database units. The generator creates
+        links below TARGET_UNIT.wants, so starting this target starts the
+        discovered database instances.
+
+    TEMPLATE_UNIT:
+        Template service used for each generated database instance. This
+        file must exist as a normal unit, usually under /etc/systemd/system.
+
+systemd generator arguments:
+    argv[1]:
+        The normal generator output directory provided by systemd. Generated
+        symlinks are written below this directory. On a running system this is
+        typically /run/systemd/generator.
+
+    argv[2] and argv[3]:
+        Early and late generator output directories. They are not used by this
+        generator.
+
+Generated output:
+    For each selected oratab SID, the generator creates:
+
+        <argv[1]>/oracle-databases.target.wants/oracle-db@<SID>.service
+            -> /etc/systemd/system/oracle-db@.service
+
+    The generated files are temporary. systemd recreates them during boot and
+    daemon-reload. Do not edit files under /run/systemd/generator manually.
+"""
+
+import os
+import sys
+
+
+ORATAB_LOCATION = '/etc/oratab'
+TARGET_UNIT = 'oracle-databases.target'
+TEMPLATE_UNIT = 'oracle-db@.service'
+
+
+def escape_instance_name(name):
+    '''Escape a systemd instance string without requiring systemd-escape.'''
+    escaped = []
+    for index, char in enumerate(name):
+        if char.isalnum() or char in (':', '_', '.'):
+            escaped.append(char)
+        elif char == '-' and index > 0:
+            escaped.append(char)
+        else:
+            escaped.append('\\x{:02x}'.format(ord(char)))
+    return ''.join(escaped)
+
+
+def iter_oratab_sids(oratab_location):
+    '''Yield SIDs from oratab entries marked for startup.'''
+    try:
+        with open(oratab_location, mode='r', encoding='utf-8') as oratab_fh:
+            for line in oratab_fh:
+                line = line.split('#', 1)[0].strip()
+                if not line:
+                    continue
+
+                parts = line.split(':')
+                if len(parts) < 3:
+                    continue
+
+                oracle_sid = parts[0].strip()
+                oracle_flag = parts[2].strip()
+                if oracle_sid and oracle_flag in ('Y', 'S'):
+                    yield oracle_sid
+    except FileNotFoundError:
+        return
+
+
+def safe_symlink(source, link_name):
+    try:
+        os.symlink(source, link_name)
+    except FileExistsError:
+        return
+
+
+def main():
+    if len(sys.argv) < 2:
+        return 0
+
+    normal_dir = sys.argv[1]
+    target_wants_dir = os.path.join(normal_dir, '{}.wants'.format(TARGET_UNIT))
+    os.makedirs(target_wants_dir, exist_ok=True)
+
+    for oracle_sid in iter_oratab_sids(ORATAB_LOCATION):
+        escaped_sid = escape_instance_name(oracle_sid)
+        instance_unit = 'oracle-db@{}.service'.format(escaped_sid)
+        link_name = os.path.join(target_wants_dir, instance_unit)
+        safe_symlink(os.path.join('/etc/systemd/system', TEMPLATE_UNIT), link_name)
+
+    return 0
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())
