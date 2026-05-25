@@ -377,6 +377,8 @@ def run_dgmgrl(module, commands, output_format='text'):
             oracle_home = os.environ['ORACLE_HOME']
         else:
             module.fail_json(msg='oracle_home is required for broker mode', changed=False)
+    else:
+        os.environ['ORACLE_HOME'] = oracle_home
 
     dgmgrl_bin = os.path.join(oracle_home, 'bin', 'dgmgrl')
     if not os.path.exists(dgmgrl_bin):
@@ -424,7 +426,6 @@ def run_dgmgrl(module, commands, output_format='text'):
     cmd = [dgmgrl_bin, '-silent']
     if output_format == 'json':
         cmd.extend(['-outputformat', 'json'])
-    cmd.append('/nolog')
 
     # Build script: CONNECT first, then the actual commands
     script_lines = ['CONNECT %s' % connect_string]
@@ -432,7 +433,7 @@ def run_dgmgrl(module, commands, output_format='text'):
     script = ';\n'.join(script_lines) + ';\n'
 
     rc, stdout, stderr = module.run_command(cmd, data=script)
-
+    module.warn(script)
     return rc, stdout, stderr
 
 
