@@ -413,6 +413,8 @@ def run_dgmgrl(module, commands, output_format='text'):
             connect_string = '%s/' % dgmgrl_user
         if dgmgrl_as:
             connect_string += ' AS %s' % dgmgrl_as.upper()
+    elif not dgmgrl_user and not dgmgrl_password and dgmgrl_connect_id:
+        connect_string = '/@%s' % (dgmgrl_connect_id)
     else:
         # OS authentication
         connect_string = '/ AS %s' % dgmgrl_as.upper()
