@@ -484,7 +484,6 @@ def dgmgrl_show_configuration(module, output_format):
     rc, stdout, stderr = run_dgmgrl(module, ['SHOW CONFIGURATION VERBOSE'], output_format)
     if 'ORA-16532' in stdout or 'not yet created' in stdout.lower():
         return {'status': 'NOT_CONFIGURED', 'name': '', 'databases': []}
-    module.fail_json(msg='DGMGRL SHOW CONFIGURATION failed: %s %s' % (stdout, stderr), changed=False)
 
     if output_format == 'json':
         try:
