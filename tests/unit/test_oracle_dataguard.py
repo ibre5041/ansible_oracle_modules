@@ -128,6 +128,57 @@ def test_dg_broker_status_not_configured(monkeypatch):
     assert result["configuration"]["status"] == "NOT_CONFIGURED"
 
 
+def test_dg_broker_status_fails_on_dgmgrl_error(monkeypatch):
+    mod = _load()
+
+    class Mod(_DgBrokerModule):
+        params = _dg_params(oracle_home="/fake/oracle")
+        _dgmgrl_responses = {
+            'SHOW CONFIGURATION': (
+                1,
+                '',
+                'DGM-16901: Unable to initialize environment\n'
+                'DGM-17378: You may need to set ORACLE_HOME to your Oracle software directory\n',
+            ),
+        }
+
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "os", _FakeOs("/fake/oracle"))
+
+    with pytest.raises(FailJson) as exc:
+        mod.main()
+    assert "Unable to initialize environment" in exc.value.args[0]["msg"]
+
+
+def test_dg_broker_wallet_connect_identifier_is_not_double_prefixed(monkeypatch):
+    mod = _load()
+
+    class Mod(_DgBrokerModule):
+        params = _dg_params(
+            oracle_home="/fake/oracle",
+            dgmgrl_connect_identifier="/@EMEA_AT_EMEA",
+        )
+        _dgmgrl_responses = {
+            'SHOW CONFIGURATION': (0, SHOW_CONFIG_OUTPUT, ''),
+            'SHOW': (0, '', ''),
+        }
+        _run_command_calls = []
+        _warnings = []
+
+        def warn(self, msg):
+            type(self)._warnings.append(msg)
+
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "os", _FakeOs("/fake/oracle"))
+
+    with pytest.raises(ExitJson):
+        mod.main()
+    scripts = [kwargs.get('data', '') for _args, kwargs in Mod._run_command_calls]
+    assert any('CONNECT /@EMEA_AT_EMEA;' in script for script in scripts)
+    assert not any('CONNECT /@/@EMEA_AT_EMEA;' in script for script in scripts)
+    assert Mod._warnings == []
+
+
 # ===========================================================================
 # Tests: Broker mode - create configuration
 # ===========================================================================

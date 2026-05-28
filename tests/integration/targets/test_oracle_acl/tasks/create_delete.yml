@@ -26,6 +26,21 @@
     state: present
   failed_when: "false"
 
+- name: "setup: remove stale ACL entries"
+  oracle_acl:
+    <<: *con_param
+    host: "{{ item.host }}"
+    principal: "U_ACL_TEST"
+    privilege: "{{ item.priv }}"
+    lower_port: "{{ item.lower_port | default(omit) }}"
+    upper_port: "{{ item.upper_port | default(omit) }}"
+    state: absent
+  loop:
+    - {host: "*.example.com", priv: "connect"}
+    - {host: "mail.example.com", priv: "resolve"}
+    - {host: "smtp.example.com", priv: "connect", lower_port: 25, upper_port: 25}
+  failed_when: "false"
+
 # ── Grant connect ACE ─────────────────────────────────────────────────────────
 
 - name: "check mode: would add ACE?"
@@ -139,10 +154,12 @@
     host: "{{ item.host }}"
     principal: "U_ACL_TEST"
     privilege: "{{ item.priv }}"
+    lower_port: "{{ item.lower_port | default(omit) }}"
+    upper_port: "{{ item.upper_port | default(omit) }}"
     state: absent
   loop:
     - {host: "mail.example.com", priv: "resolve"}
-    - {host: "smtp.example.com", priv: "connect"}
+    - {host: "smtp.example.com", priv: "connect", lower_port: 25, upper_port: 25}
   failed_when: "false"
 
 - name: "cleanup: drop ACL test user"
