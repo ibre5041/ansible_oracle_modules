@@ -44,6 +44,14 @@ def test_oracle_role_auth_conf_is_no_log():
     assert exc.value.args[0]["argument_spec"]["auth_conf"]["no_log"] is True
 
 
+def test_oracle_wallet_change_password_is_not_secret():
+    mod = load_module_from_path(module_path("plugins", "modules", "oracle_wallet.py"), "oracle_wallet_spec")
+    _capture_ansible_spec(mod)
+    with pytest.raises(SpecCaptured) as exc:
+        mod.main()
+    assert exc.value.args[0]["argument_spec"]["change_password"].get("no_log") is False
+
+
 def test_oracle_awr_validation_fails_before_connection():
     mod = load_module_from_path(module_path("plugins", "modules", "oracle_awr.py"), "oracle_awr_validation")
 

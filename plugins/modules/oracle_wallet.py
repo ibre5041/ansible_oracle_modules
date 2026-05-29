@@ -724,7 +724,7 @@ def main():
             new_password=dict(required=False, no_log=True),
             auto_login=dict(default='none',
                            choices=['none', 'auto_login', 'local_auto_login']),
-            change_password=dict(default=False, type='bool'),
+            change_password=dict(default=False, type='bool', no_log=False),
             backup=dict(default=True, type='bool'),
             backup_location=dict(required=False),
             backup_tag=dict(required=False),
