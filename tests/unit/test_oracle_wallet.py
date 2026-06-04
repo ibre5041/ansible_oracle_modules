@@ -141,6 +141,40 @@ def test_wallet_create_when_not_exists(monkeypatch):
     assert "CREATE KEYSTORE" in result["ddls"][0]
 
 
+def test_wallet_create_keystore_already_exists_on_disk_is_idempotent(monkeypatch):
+    """V$ENCRYPTION_WALLET reports NOT_AVAILABLE but a keystore file already exists
+    on disk (e.g. after an instance restart), so CREATE KEYSTORE fails with
+    ORA-46633/ORA-46630. The module must tolerate it instead of failing (issue #45)."""
+    mod = _load()
+
+    class Mod(BaseFakeModule):
+        params = _wallet_params(state="present")
+
+    class _KeystoreExistsConn(_WalletConn):
+        """CREATE KEYSTORE raises ORA-46633 unless the caller ignores it."""
+
+        def execute_ddl(self, request, params=None, no_change=False,
+                        ignore_errors=None, ddls_entry=None):
+            ignore_errors = ignore_errors or []
+            self.ddls.append(ddls_entry if ddls_entry is not None else request)
+            if 'CREATE KEYSTORE' in request.upper():
+                if 46633 not in ignore_errors and 46630 not in ignore_errors:
+                    self.module.fail_json(
+                        msg='ORA-46633: creation of a password-based keystore failed',
+                        code=46633, ddls=self.ddls, changed=self.changed)
+                return  # error ignored → keystore already present, no change
+            if not no_change:
+                self.changed = True
+
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "oracleConnection",
+                        lambda m: _KeystoreExistsConn(m, 'NOT_AVAILABLE'), raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    assert exc.value.args[0]["changed"] is False
+
+
 def test_wallet_create_idempotent_when_exists(monkeypatch):
     mod = _load()
 

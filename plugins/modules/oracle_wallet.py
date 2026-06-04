@@ -496,7 +496,12 @@ def ensure_keystore_present(conn, module):
     sql = "ADMINISTER KEY MANAGEMENT CREATE KEYSTORE '%s' IDENTIFIED BY \"%s\"" % (
         loc_esc, pwd_esc
     )
-    conn.execute_ddl(sql, ddls_entry=_redact_ddl(sql))
+    # V$ENCRYPTION_WALLET can report NOT_AVAILABLE while a keystore file already
+    # exists on disk (e.g. after an instance restart with WALLET_ROOT set), so the
+    # status-based check above misses it. CREATE KEYSTORE then fails with
+    # ORA-46630 (keystore already at location) or ORA-46633 (password-based
+    # keystore creation failed). Tolerate both so the operation stays idempotent.
+    conn.execute_ddl(sql, ddls_entry=_redact_ddl(sql), ignore_errors=[46630, 46633])
     return get_wallet_status(conn, module.params["container"])
 
 
