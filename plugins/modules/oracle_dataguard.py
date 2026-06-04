@@ -487,7 +487,9 @@ def dgmgrl_show_configuration(module, output_format):
     output = '\n'.join([part for part in (stdout, stderr) if part])
     if 'ORA-16532' in output or 'not yet created' in output.lower():
         return {'status': 'NOT_CONFIGURED', 'name': '', 'databases': []}
-    if rc != 0:
+    # DGMGRL may print DGM- errors (e.g. DGM-16901 environment init) while still
+    # exiting rc=0; treat any DGM- code as fatal so the failure is not swallowed.
+    if rc != 0 or re.search(r'\bDGM-\d+', output):
         module.fail_json(
             msg='DGMGRL SHOW CONFIGURATION failed: %s' % output.strip(),
             changed=False,
@@ -1139,7 +1141,11 @@ def _broker_present(module, database_name, output_format):
 
     if database_name and config.get('status') != 'NOT_CONFIGURED':
         existing_dbs = [d['name'] for d in config.get('databases', [])]
-        if database_name.upper() not in [d.upper() for d in existing_dbs]:
+        # Only add the database when connect_identifier is supplied (intent to
+        # add). Without it, fall through to set state / properties on a database
+        # that is already part of the configuration (issue #52).
+        if (database_name.upper() not in [d.upper() for d in existing_dbs]
+                and module.params.get("connect_identifier")):
             dgmgrl_add_database(module)
             changed = True
 
