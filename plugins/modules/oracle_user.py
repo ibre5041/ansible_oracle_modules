@@ -36,6 +36,14 @@ options:
     required: false
     default: password
     choices: ['password', 'external', 'global', 'none']
+  external_name:
+    description:
+      - The external name (e.g. certificate DN or Kerberos principal) for an
+        externally identified user, i.e. C(IDENTIFIED EXTERNALLY AS '<external_name>').
+      - Only valid with I(authentication_type=external). Omit it to use the bare
+        C(IDENTIFIED EXTERNALLY) form (an existing external name is then cleared).
+    required: false
+    default: None
   profile:
     description: The profile for the user
     required: false
@@ -146,6 +154,7 @@ def check_user_exists(conn, schema):
         , temporary_tablespace
         , profile
         , authentication_type
+        , external_name
         , oracle_maintained
     from dba_users
     where username = upper(:schema_name)"""
@@ -180,6 +189,7 @@ def create_user(conn, module):
     default_temp_tablespace = module.params["default_temp_tablespace"]
     profile = module.params["profile"]
     authentication_type = module.params["authentication_type"]
+    external_name = module.params["external_name"]
     container = module.params["container"]
     container_data = module.params["container_data"]
 
@@ -202,6 +212,8 @@ def create_user(conn, module):
         sql = 'create user %s identified globally ' % schema
     elif authentication_type == 'external':
         sql = 'create user %s identified externally ' % schema
+        if external_name:
+            sql += "as '%s' " % external_name
     elif authentication_type == 'none':
         sql = 'create user %s no authentication ' % schema
 
@@ -232,6 +244,19 @@ def create_user(conn, module):
 
     msg = 'The schema %s has been created successfully' % schema
     module.exit_json(msg=msg, changed=conn.changed, ddls=conn.ddls)
+
+
+# Get the current default CONTAINER_DATA attribute for the user
+def get_container_data_all(conn, schema):
+    """Return ALL_CONTAINERS ('Y'/'N') of the user's default container_data attribute."""
+    sql = """
+    select all_containers
+    from cdb_container_data
+    where username = upper(:schema_name)
+      and default_attr = 'Y'
+      and object_name is null"""
+    r = conn.execute_select_to_dict(sql, {"schema_name": schema}, fetchone=True, fail_on_error=False)
+    return r['all_containers'] if r and 'all_containers' in r else None
 
 
 # Get the current password hash for the user
@@ -298,6 +323,7 @@ def modify_user(conn, module, user):
     schema_password = module.params["schema_password"]
     schema_password_hash = module.params["schema_password_hash"]
     authentication_type = module.params["authentication_type"]
+    external_name = module.params["external_name"]
     container = module.params["container"]
     container_data = module.params["container_data"]
 
@@ -322,9 +348,11 @@ def modify_user(conn, module, user):
             wanted_set.add(('password', schema_password))
         wanted_set.add(('authentication_type', 'PASSWORD'))
     elif authentication_type == 'external':
-        wanted_set.add(('authentication_type', 'IDENTIFIED EXTERNALLY'))
+        wanted_set.add(('authentication_type', 'EXTERNAL'))
+        # external_name is None when omitted → wants the bare form (NULL external name)
+        wanted_set.add(('external_name', external_name))
     elif authentication_type == 'global':
-        wanted_set.add(('authentication_type', 'IDENTIFIED GLOBALLY'))
+        wanted_set.add(('authentication_type', 'GLOBAL'))
     elif authentication_type == 'none':
         wanted_set.add(('authentication_type', 'NONE'))
 
@@ -355,6 +383,7 @@ def modify_user(conn, module, user):
     password_status = get_change(changes, 'password_status')
     schema_password = get_change(changes, 'password')
     schema_password_hash = get_change(changes, 'password_hash')
+    external_name_changed = any(a == 'external_name' for (a, _) in changes)
     if authentication_type == 'PASSWORD' \
             or (password_status and password_status == 'UNEXPIRED') \
             or schema_password \
@@ -374,11 +403,11 @@ def modify_user(conn, module, user):
                 sql += ''' identified by "%s" ''' % schema_password
             else:
                 module.fail_json(msg="Can on un-expire password, without providing password(or hash)", changed=conn.changed, ddls=conn.ddls)
-    elif authentication_type == 'IDENTIFIED EXTERNALLY':
-        sql += ''' identified externally '''
-    elif authentication_type == 'IDENTIFIED GLOBALLY':
-        wanted_set.add(('authentication_type', 'IDENTIFIED EXTERNALLY'))
-    elif authentication_type == 'global':
+    elif authentication_type == 'EXTERNAL' or external_name_changed:
+        sql += ' identified externally'
+        if module.params['external_name']:
+            sql += " as '%s'" % module.params['external_name']
+    elif authentication_type == 'GLOBAL':
         sql += ''' identified globally '''
     elif authentication_type == 'NONE':
         sql += ''' no authentication '''
@@ -408,12 +437,16 @@ def modify_user(conn, module, user):
     if changes:
         conn.execute_ddl(sql)
 
+    container_data_changed = False
     if container_data:
-        alter_sql = 'alter user %s set container_data=%s container=current' % (schema, container)
-        conn.execute_ddl(alter_sql)
+        wanted_all = 'Y' if container == 'all' else 'N'
+        if get_container_data_all(conn, schema) != wanted_all:
+            alter_sql = 'alter user %s set container_data=%s container=current' % (schema, container)
+            conn.execute_ddl(alter_sql)
+            container_data_changed = True
 
     # wanted list is subset of current settings, do not do anything
-    if not changes and not container_data:
+    if not changes and not container_data_changed:
         module.exit_json(msg='The schema (%s) is in the intended state' % schema, changed=conn.changed, ddls=conn.ddls)
 
     module.exit_json(msg='Successfully altered the user (%s) / %s' % (schema, str(changes)), changed=conn.changed, ddls=conn.ddls)
@@ -455,6 +488,7 @@ def main():
             default_temp_tablespace = dict(default=None, aliases=['temporary_tablespace']),
             profile       = dict(default=None),
             authentication_type = dict(default=None, choices=['password', 'external', 'global', 'none']),
+            external_name = dict(default=None),
             container     = dict(default=None, choices=["all", "current"]),
             container_data = dict(default=None)
         ),
@@ -467,6 +501,9 @@ def main():
 
     schema = module.params["schema"]
     state = module.params["state"]
+
+    if module.params["external_name"] and module.params["authentication_type"] != 'external':
+        module.fail_json(msg="external_name is only valid with authentication_type=external", changed=False)
 
     oc = oracleConnection(module)
 
