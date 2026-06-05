@@ -4,7 +4,7 @@
 DOCUMENTATION = '''
 ---
 module: oracle_grant
-short_description: Manage users/schemas in an Oracle database
+short_description: Manage grants and privileges in an Oracle database
 description:
   - Manage grant/privileges in an Oracle database
   - Handles role/sys privileges at the moment.
@@ -13,13 +13,19 @@ description:
 version_added: "3.0.0"
 options:
   grantee:
-    description: The schema that should get grant added/removed
-    required: false
+    description:
+      - Schema, user, or role that should receive or lose privileges.
+      - This is the canonical parameter name. C(name), C(schema_name), C(role), and C(role_name) are accepted as aliases.
+    required: true
     default: null
   grants:
-    description: The privileges granted to the new schema. Can be a string or a list
+    description:
+      - System privileges or roles to grant or revoke.
+      - C(privileges) and C(grant) are accepted as aliases.
     required: false
     default: null
+    type: list
+    elements: str
   object_privs:
     description:
       - The privileges granted to specific objects
@@ -29,11 +35,22 @@ options:
       - "select:sys.v_$session"
     required: false
     default: null
+    type: list
+    elements: str
+  directory_privs:
+    description:
+      - Directory object privileges to grant or revoke.
+      - "format: 'priv1,priv2:directory_name'"
+      - "e.g. 'read,write:data_pump_dir'"
+    required: false
+    default: null
+    type: list
+    elements: str
   grant_mode:
     description:
-      - "Should the list of grant be enforced, or just appended to"
-      - "exact: Whatever is in the list of grant will be enforced, i.e grant/privileges will be removed if they are not in the list"
-      - "append: Grant/privileges are just appended, nothing is removed"
+      - "Controls whether the requested privilege list is enforced exactly or appended."
+      - "exact: privileges not listed in C(grants), C(object_privs), or C(directory_privs) are removed."
+      - "append: requested privileges are added and existing privileges are left untouched."
     default: append
     choices: ['exact','append']
   container:
@@ -73,10 +90,10 @@ author:
 
 EXAMPLES = '''
 
-- name: append user privs
+- name: Append system privileges and object privileges to a user
   oracle_grant:
     mode: sysdba
-    schema: u_foo
+    grantee: u_foo
     grants:
       - sysdg
       - select_catalog_role
@@ -86,10 +103,12 @@ EXAMPLES = '''
       - read,write:data_pump_dir
     grant_mode: append
 
- - name: revoke user privs
+- name: Enforce an exact privilege list for a user
   oracle_grant:
     mode: sysdba
-    schema: u_foo
+    grantee: u_foo
+    grants:
+      - create session
     grant_mode: exact
 
 - name: Add grant to the user
@@ -97,7 +116,7 @@ EXAMPLES = '''
     mode: sysdba
     grantee: app_user
     state: present
-    grant:
+    grants:
       - 'create session'
       - 'create any table'
       - connect
@@ -110,7 +129,8 @@ EXAMPLES = '''
     mode: sysdba
     grantee: app_user
     state: absent
-    grant: 'create any table'
+    grants:
+      - 'create any table'
 
 - name: Remove all grant from a user
   oracle_grant:
