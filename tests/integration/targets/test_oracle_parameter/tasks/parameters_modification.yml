@@ -2,10 +2,9 @@
 
 - name: "define pdb connection parameters"
   set_fact:
-    connection_parameters: &pdb_con_param
+    connection_parameters: &con_param
       hostname: "{{ oracle_hostname }}"
-      port: "{{ oracle_port }}"      
-      # service_name: "{{ oracle_pdb_service_name | default(oracle_service_name) }}"
+      port: "{{ oracle_port }}"
       service_name: "{{ (running_on_server|bool) | ternary(omit,oracle_pdb_service_name|default(oracle_service_name)) }}"
       session_container: "{{ (not running_on_server|bool) | ternary(omit,oracle_pdb_service_name|default(oracle_service_name)) }}"
       username: "{{ oracle_pdb_username | default(oracle_username) }}"
@@ -14,7 +13,7 @@
       mode: "{{ mode }}"
       oracle_home: "{{ oracle_home }}"
       
-- name: 'PDB Connection paramters - see or use integration_config.yml.template'
+- name: 'PDB Connection parameters - see or use integration_config.yml.template'
   debug:
     var: connection_parameters
     
@@ -23,16 +22,20 @@
     cdb_connection_parameters: &cdb_con_param
       hostname: "{{ oracle_hostname }}"
       port: "{{ oracle_port }}"
-      service_name: "{{ oracle_cdb_service_name }}"
-      username: "{{ oracle_cdb_username }}"
-      password: "{{ oracle_cdb_password }}"
+      service_name: "{{ oracle_cdb_service_name | default(oracle_service_name) }}"
+      username: "{{ oracle_cdb_username | default(oracle_username) }}"
+      password: "{{ oracle_cdb_password | default(oracle_password) }}"
       dsn: "{{ oracle_dsn }}"
       mode: "{{ mode }}"
       oracle_home: "{{ oracle_home }}"
 
+- name: 'CDB Connection parameters - see or use integration_config.yml.template'
+  debug:
+    var: cdb_connection_parameters
+
 - name: Oracle DB facts - pga_aggregate_target
   oracle_sql:
-    <<: *pdb_con_param
+    <<: *con_param
     sql: |
       select * from v$system_parameter where NAME='pga_aggregate_target'
   register: pga_parameter
@@ -56,7 +59,7 @@
       
 - name: "change open_cursors"
   oracle_parameter:
-    <<: *pdb_con_param
+    <<: *con_param
     name: "open_cursors"
     value: "351"
     state: "present"
@@ -64,7 +67,7 @@
   
 - name: "change open_cursors +1"
   oracle_parameter:
-    <<: *pdb_con_param
+    <<: *con_param
     name: "open_cursors"
     value: "352"
     state: "present"
@@ -75,7 +78,7 @@
   
 - name: "change open_cursors +1(no change)"
   oracle_parameter:
-    <<: *pdb_con_param
+    <<: *con_param
     name: "open_cursors"
     value: "352"
     state: "present"
@@ -86,7 +89,7 @@
   
 - name: "change open_cursors +2"
   oracle_parameter:
-    <<: *pdb_con_param
+    <<: *con_param
     name: "open_cursors"
     value: "353"
     state: "present"
@@ -97,7 +100,7 @@
   
 - name: "change open_cursors +2 (no change)"
   oracle_parameter:
-    <<: *pdb_con_param
+    <<: *con_param
     name: "open_cursors"
     value: "353"
     state: "present"
@@ -108,7 +111,7 @@
 
 - name: "change pga_aggregate_target to {{ (pga_aggregate_target_value|int) - 50 }}M"
   oracle_parameter:
-    <<: *pdb_con_param
+    <<: *con_param
     name: pga_aggregate_target
     value: "{{ (pga_aggregate_target_value|int) - 50 }}M"
     state: "present"
@@ -117,7 +120,7 @@
 
 - name: "change pga_aggregate_target +1 (change)"
   oracle_parameter:
-    <<: *pdb_con_param
+    <<: *con_param
     name: "pga_aggregate_target"
     value: "{{ (pga_aggregate_target_value|int) - 50 + 1}}M"
     state: "present"
@@ -128,7 +131,7 @@
 
 - name: "change pga_aggregate_target 1+(idempotent)"
   oracle_parameter:
-    <<: *pdb_con_param
+    <<: *con_param
     name: "pga_aggregate_target"
     value: "{{ (pga_aggregate_target_value|int) - 50 + 1}}M"
     state: "present"
@@ -139,7 +142,7 @@
 
 - name: "change pga_aggregate_target (change in memory)"
   oracle_parameter:
-    <<: *pdb_con_param
+    <<: *con_param
     name: "pga_aggregate_target"
     value: "{{(pga_aggregate_target_value|int) - 50}}M"
     state: "present"
@@ -150,7 +153,7 @@
 
 - name: "revert back pga_aggregate_target"
   oracle_parameter:
-    <<: *pdb_con_param
+    <<: *con_param
     name: "pga_aggregate_target"
     value: "{{(pga_aggregate_target_value|int)}}M"
     state: "present"
@@ -161,7 +164,7 @@
   
 - name: "change blank_trimming"
   oracle_parameter:
-    <<: *pdb_con_param
+    <<: *con_param
     name: "blank_trimming"
     value: "TRUE"
     state: "present"
@@ -170,7 +173,7 @@
   
 - name: "change nls_language"
   oracle_parameter:
-    <<: *pdb_con_param
+    <<: *con_param
     name: "nls_language"
     value: "GERMAN"
     state: "present"

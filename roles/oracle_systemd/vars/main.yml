@@ -1,10 +1,10 @@
 ---
 # vars file for oracle.systemd
 
-# on RHEL7 we must use Python2 (package python3-systemd is not present here)
+# on RHEL7 we still use the legacy Python2 script, which imports systemd-python.
+# The Python3 script implements sd_notify itself and uses systemd's busctl CLI.
 oracle_systemd_packages: "{{ ['fping'] \
-                         + (['systemd-python']  if ansible_distribution_major_version == '7' else [] ) \
-                         + (['python3-systemd'] if ansible_distribution_major_version >= '8' else [] ) }}"
+                         + (['systemd-python']  if ansible_distribution_major_version == '7' else [] ) }}"
 
 oracle_systemd_libexec_source: "{{ {'7': 'oracle-systemd-service.py2' \
                                   , '8': 'oracle-systemd-service.py3' \

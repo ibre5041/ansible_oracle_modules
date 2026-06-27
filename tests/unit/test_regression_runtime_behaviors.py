@@ -86,3 +86,28 @@ def test_oracle_facts_userenv_is_not_nested_under_sid():
 def test_oracle_user_does_not_pass_module_to_execute_ddl():
     content = module_path("plugins", "modules", "oracle_user.py").read_text(encoding="utf-8", errors="ignore")
     assert "conn.execute_ddl(module, alter_sql)" not in content
+
+
+def test_oracle_sql_app_connections_do_not_inherit_sysdba_mode():
+    task_files = ("ddl.yml", "check_mode.yml")
+    for filename in task_files:
+        content = module_path("tests", "integration", "targets", "test_oracle_sql", "tasks", filename).read_text(
+            encoding="utf-8"
+        )
+        app_block = content.split("app_connection_parameters: &app_con_param", 1)[1].split(
+            "- name: 'PDB Connection parameters", 1
+        )[0]
+        assert "mode: normal" in app_block
+        assert 'mode: "{{ mode }}"' not in app_block
+
+
+def test_oracle_sql_check_mode_app_select_has_credentials():
+    content = module_path(
+        "tests", "integration", "targets", "test_oracle_sql", "tasks", "check_mode.yml"
+    ).read_text(encoding="utf-8")
+    task_block = content.split("- name: check select still works in check_mode", 1)[1].split(
+        "- name: clean test", 1
+    )[0]
+    assert "<<: *app_con_param" in task_block
+    assert "username: foo" in task_block
+    assert "password: Xlfsjflkdjgkrehjg1" in task_block

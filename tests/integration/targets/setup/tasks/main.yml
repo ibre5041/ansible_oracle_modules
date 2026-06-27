@@ -3,7 +3,7 @@
   pip:
     name: "oracledb"
     state: "present"
-  when: false
+  when: "false"
   failed_when: false
 
 - block:
@@ -28,17 +28,16 @@
 
     - name: "run dynamic linker"
       command: "ldconfig"
-  when: ansible_facts['os_family'] == "Debian"
-
+  when: ansible_facts['os_family'] == "Debian" and running_on_server
 
 - block:
     - name: "check InstantClient is installed"
       dnf:
         name: "oracle-instantclient-basic-21.9.0.0.0-1"
       failed_when: false
-        
+
   rescue:
-    - name: "install Instant Client dependencies"    
+    - name: "install Instant Client dependencies"
       dnf:
         name:
           - "libaio1"
@@ -47,9 +46,82 @@
 
     - name: "get Instant Client RPM"
       dnf:
-        name:: "https://yum.oracle.com/repo/OracleLinux/OL8/oracle/instantclient21/x86_64/getPackage/oracle-instantclient-basic-21.9.0.0.0-1.el8.x86_64.rpm"
+        name: "https://yum.oracle.com/repo/OracleLinux/OL8/oracle/instantclient21/x86_64/getPackage/oracle-instantclient-basic-21.9.0.0.0-1.el8.x86_64.rpm"
         state: "present"
+  when: ansible_facts['os_family'] == "RedHat" and running_on_server
 
-  when: ansible_facts['os_family'] == "RedHat"
-  
+- name: create PDB
+  block:
+    - name: "define connection parameters"
+      set_fact:
+        connection_parameters: &con_param
+          hostname: "{{ oracle_hostname }}"
+          port: "{{ oracle_port }}"
+          service_name: "{{ (running_on_server|bool) | ternary(omit,oracle_pdb_service_name|default(oracle_service_name)) }}"
+          #session_container: "{{ (not running_on_server|bool) | ternary(omit,oracle_pdb_service_name|default(oracle_service_name)) }}"
+          username: "{{ oracle_pdb_username | default(oracle_username) }}"
+          password: "{{ oracle_pdb_password | default(oracle_password) }}"
+          dsn: "{{ oracle_dsn }}"
+          mode: "{{ mode }}"
+          oracle_home: "{{ oracle_home }}"
+
+    - debug: var=connection_parameters
+
+    # oracle_facts fails in ansible-test isolation ("oracledb module is required")
+    # even when oracledb is installed, due to import path differences between
+    # ansible-test's virtualenv and the system pip environment.
+    # Use oracle_sql to fetch the same three parameters directly.
+    - name: "query DB name, unique name and service name via SQL"
+      oracle_sql:
+        hostname: "{{ oracle_hostname }}"
+        port: "{{ oracle_port }}"
+        service_name: "{{ oracle_service_name }}"
+        username: "{{ oracle_username }}"
+        password: "{{ oracle_password }}"
+        mode: sysdba
+        oracle_home: "{{ oracle_home | default() }}"
+        sql: >
+          SELECT
+            (SELECT value FROM v$parameter WHERE name = 'db_name')        AS db_name,
+            (SELECT value FROM v$parameter WHERE name = 'db_unique_name') AS db_unique_name,
+            (SELECT value FROM v$parameter WHERE name = 'service_names')  AS service_names
+          FROM dual
+      register: db_params
+
+    - name: "set DB name facts"
+      set_fact:
+        db_name:        "{{ (db_params.data | first)['db_name'] }}"
+        db_unique_name: "{{ (db_params.data | first)['db_unique_name'] }}"
+        service_name:   "{{ (db_params.data | first)['service_names'] | split('.') | first }}"
+
+    - name: 'Connection parameters - see or use integration_config.yml.template'
+      debug:
+        msg: "connection_parameters - db_name: {{ db_name }}, db_unique_name: {{ db_unique_name }}, service_name: {{ service_name }}"
+
+    - name: "create PDB {{ oracle_pdb_service_name }}"
+      oracle_pdb:
+        <<: *con_param
+
+        pdb_name: "{{ oracle_pdb_service_name }}"
+        state: "present"
+        open: true
+        pdb_admin_username: foo
+        pdb_admin_password: bar
+        roles: connect
+
+    - name: "Tablespace users in {{ oracle_pdb_service_name }}"
+      oracle_tablespace:
+        <<: *con_param
+        session_container: "{{ oracle_pdb_service_name }}"
+        tablespace: USERS
+
+  when: |
+    running_on_cdb and 
+    not running_on_xe and
+    oracle_pdb_service_name is defined
+
+  environment:
+    ORACLE_SID: "{{ oracle_sid | default() }}"
+    ORACLE_HOME: "{{ oracle_home | default() }}"
+
 ...

@@ -5,12 +5,17 @@
     connection_parameters: &con_param
       hostname: "{{ oracle_hostname }}"
       port: "{{ oracle_port }}"
-      service_name: "{{ oracle_pdb_service_name | default(oracle_service_name) }}"
+      service_name: "{{ (running_on_server|bool) | ternary(omit,oracle_pdb_service_name|default(oracle_service_name)) }}"
+      session_container: "{{ (not running_on_server|bool) | ternary(omit,oracle_pdb_service_name|default(oracle_service_name)) }}"
       username: "{{ oracle_pdb_username | default(oracle_username) }}"
       password: "{{ oracle_pdb_password | default(oracle_password) }}"
-      dsn: "{{ oracle_dsn | default() }}"
+      dsn: "{{ oracle_dsn }}"
       mode: "{{ mode }}"
-      oracle_home: "{{ oracle_home | default() }}"
+      oracle_home: "{{ oracle_home }}"
+
+- name: 'Connection parameters - see or use integration_config.yml.template'
+  debug:
+    var: connection_parameters
 
 # oracle_facts fails in ansible-test isolation ("oracledb module is required")
 # even when oracledb is installed, due to import path differences between
@@ -39,81 +44,85 @@
     db_unique_name: "{{ (db_params.data | first)['db_unique_name'] }}"
     service_name:   "{{ (db_params.data | first)['service_names'] | split('.') | first }}"
 
-- name: 'Connection paramters - see or use integration_config.yml.template'
+- name: 'Connection parameters - see or use integration_config.yml.template'
   debug:
     msg: "connection_parameters - db_name: {{ db_name }}, db_unique_name: {{ db_unique_name }}, service_name: {{ service_name }}"
 
-- name: database facts
-  set_fact:
-    cdb_name: "{{ service_name | split('.') | first }}"
-    domain_name: ""
-    oracle_cdb_hostname: "{{ lookup('pipe', 'hostname -s') }}"
-    pdb_name: "PDB37"
-    pdbseed_path: "{{ oracle_datadir }}/pdbseed"
+#- name: database facts
+#  set_fact:
+#    cdb_name: "{{ service_name | split('.') | first }}"
+#    domain_name: ""
+#    oracle_cdb_hostname: "{{ lookup('pipe', 'hostname -s') }}"
+#    pdb_name: "PDB37"
+#    pdbseed_path: "{{ oracle_datadir }}/pdbseed"
+#
+#- name: "define CDB root connection parameters"
+#  set_fact:
+#    cdb_connection_parameters: &cdb_con_param
+#      hostname: "{{ oracle_hostname }}"
+#      port: "{{ oracle_port }}"
+#      service_name: "{{ oracle_service_name }}"
+#      username: "{{ oracle_username }}"
+#      password: "{{ oracle_password }}"
+#      dsn: "{{ oracle_dsn | default() }}"
+#      mode: "{{ mode }}"
+#      oracle_home: "{{ oracle_home | default() }}"
+#
+#- name: "define PDB admin connection parameters"
+#  set_fact:
+#    pdb_connection_parameters: &pdb_con_param
+#      hostname: "{{ oracle_cdb_hostname }}"
+#      port: "{{ oracle_port }}"
+#      service_name: "{{ pdb_name }}"
+#      username: pdbadmin
+#      password: pdbpass
+#      dsn: "{{ oracle_dsn | default() }}"
+#      mode: sysdba
+#      oracle_home: "{{ oracle_home | default() }}"
+#
+#- name: drop PDB
+#  oracle_pdb:
+#    <<: *cdb_con_param
+#    pdb_name: "{{ pdb_name }}"
+#    state: "absent"
+#  failed_when: false
+#
+#- set_fact:
+#    file_name_convert: "{{ {pdbseed_path: oracle_datadir ~ '/' ~ pdb_name} }}"
+#  when: running_on_db_fs
+#
+#- name: create PDB
+#  oracle_pdb:
+#    <<: *cdb_con_param
+#    pdb_name: "{{ pdb_name }}"
+#    pdb_admin_username: pdbadmin
+#    pdb_admin_password: pdbpass
+#    state: "present"
+#    open: true
+#    roles: dba
+#    file_name_convert: "{{ file_name_convert | default(omit) }}"
+#  register: _
 
-- name: "define CDB root connection parameters"
-  set_fact:
-    cdb_connection_parameters: &cdb_con_param
-      hostname: "{{ oracle_hostname }}"
-      port: "{{ oracle_port }}"
-      service_name: "{{ oracle_service_name }}"
-      username: "{{ oracle_username }}"
-      password: "{{ oracle_password }}"
-      dsn: "{{ oracle_dsn | default() }}"
-      mode: "{{ mode }}"
-      oracle_home: "{{ oracle_home | default() }}"
-
-- name: "define PDB admin connection parameters"
-  set_fact:
-    pdb_connection_parameters: &pdb_con_param
-      hostname: "{{ oracle_cdb_hostname }}"
-      port: "{{ oracle_port }}"
-      service_name: "{{ pdb_name }}"
-      username: pdbadmin
-      password: pdbpass
-      dsn: "{{ oracle_dsn | default() }}"
-      mode: sysdba
-      oracle_home: "{{ oracle_home | default() }}"
-
-- name: drop PDB
-  oracle_pdb:
-    <<: *cdb_con_param
-    pdb_name: "{{ pdb_name }}"
-    state: "absent"
-  failed_when: false
-
-- name: create PDB
-  oracle_pdb:
-    <<: *cdb_con_param
-    pdb_name: "{{ pdb_name }}"
-    pdb_admin_username: pdbadmin
-    pdb_admin_password: pdbpass
-    state: "present"
-    open: true
-    roles: dba
-    file_name_convert: "{{ {pdbseed_path: oracle_datadir + '/' + pdb_name} }}"
-  register: _
-
-- name: grant sysdba to pdbadmin
-  oracle_grant:
-    <<: *cdb_con_param
-    grantee: pdbadmin
-    privileges:
-      - "create session"
-      - "sysdba"
-    grant_mode: "append"
-    session_container: "{{ pdb_name }}"
-    state: present
-
-- name: create u_foo user
-  oracle_user:
-    <<: *pdb_con_param
-    schema_name: "u_foo"
-    schema_password: "bar"
-
-- name: create r_foo role
-  oracle_role:
-    <<: *pdb_con_param
-    role: "r_foo"
+#- name: grant sysdba to pdbadmin
+#  oracle_grant:
+#    <<: *cdb_con_param
+#    grantee: pdbadmin
+#    privileges:
+#      - "create session"
+#      - "sysdba"
+#    grant_mode: "append"
+#    session_container: "{{ pdb_name }}"
+#    state: present
+#
+#- name: create u_foo user
+#  oracle_user:
+#    <<: *pdb_con_param
+#    schema_name: "u_foo"
+#    schema_password: "bar"
+#
+#- name: create r_foo role
+#  oracle_role:
+#    <<: *pdb_con_param
+#    role: "r_foo"
 
 ...

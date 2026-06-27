@@ -189,21 +189,20 @@ except ImportError:
 else:
     oracledb_exists = True
 
-
 # Ansible code
 def main():
     global lconn, conn, lparam, module
     msg = ['']
     module = AnsibleModule(
         argument_spec = dict(
-            hostname      = dict(default='localhost'),
-            port          = dict(default=1521, type='int'),
-            service_name  = dict(required=False),
-            oracle_home   = dict(required=False, aliases=['oh']),
-            dsn           = dict(required=False, aliases=['datasource_name']),
-            user          = dict(required=False),
-            password      = dict(required=False, no_log=True),
+            user          = dict(required=False, aliases=['un', 'username']),
+            password      = dict(required=False, no_log=True, aliases=['pw']),
             mode          = dict(default='normal', choices=["normal", "sysdba", "sysdg", "sysoper", "sysasm"]),
+            hostname      = dict(required=False, default='localhost', aliases=['host']),
+            port          = dict(required=False, default=1521, type='int'),
+            service_name  = dict(required=False, aliases=['sn']),
+            dsn           = dict(required=False, aliases=['datasource_name']),
+            oracle_home   = dict(required=False, aliases=['oh']),
             session_container = dict(required=False),
             state         = dict(default="present", choices=["present", "absent"]),
             privs         = dict(required=True, type='list', aliases=['priv']),

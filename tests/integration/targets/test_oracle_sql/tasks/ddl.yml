@@ -1,5 +1,6 @@
 ---
-- name: define connection parameters
+
+- name: "define pdb connection parameters"
   set_fact:
     connection_parameters: &con_param
       hostname: "{{ oracle_hostname }}"
@@ -8,23 +9,27 @@
       session_container: "{{ (not running_on_server|bool) | ternary(omit,oracle_pdb_service_name|default(oracle_service_name)) }}"
       username: "{{ oracle_pdb_username | default(oracle_username) }}"
       password: "{{ oracle_pdb_password | default(oracle_password) }}"
-      dsn: "{{ oracle_dsn | default() }}"
+      dsn: "{{ oracle_dsn }}"
       mode: "{{ mode }}"
-      oracle_home: "{{ oracle_home | default() }}"
-      
+      oracle_home: "{{ oracle_home }}"
+
     app_connection_parameters: &app_con_param
-      hostname: "{{ oracle_hostname }}"      
+      hostname: "{{ oracle_hostname }}"
       port: "{{ oracle_port }}"
       service_name: "{{ (running_on_server|bool) | ternary(omit,oracle_pdb_service_name|default(oracle_service_name)) }}"
       session_container: "{{ (not running_on_server|bool) | ternary(omit,oracle_pdb_service_name|default(oracle_service_name)) }}"
-      username: "foo"
-      password: "Xlfsjflkdjgkrehjg1"
-      dsn: "{{ oracle_dsn | default() }}"      
-      mode: "normal"
-      oracle_home: "{{ oracle_home | default() }}"
+      dsn: "{{ oracle_dsn }}"
+      mode: normal
+      oracle_home: "{{ oracle_home }}"
 
-- debug: var=app_connection_parameters      
-      
+- name: 'PDB Connection parameters - see or use integration_config.yml.template'
+  debug:
+    var: connection_parameters
+
+- name: 'PDB App Connection parameters - see or use integration_config.yml.template'
+  debug:
+    var: app_connection_parameters
+
 - name: prepare test
   oracle_sql:
     <<: *con_param
@@ -37,6 +42,8 @@
     sql: "select TABLESPACE_NAME, STATUS, CONTENTS from dba_tablespaces where status='ONLINE' and CONTENTS='PERMANENT' and TABLESPACE_NAME not in('SYSTEM','SYSAUX')"
   register: tablespaces
 
+- debug: var=tablespaces
+
 - name: "Tablespace: {{ tablespaces.data[0].tablespace_name }}"
   set_fact:
     users_tablespace: "{{ tablespaces.data[0].tablespace_name }}"
@@ -45,7 +52,7 @@
   oracle_sql:
     <<: *con_param
     script: |      
-      create user foo identified by "Xlfsjflkdjgkrehjg1";
+      create user foo identified by "Xlfsjflkdjgkrehjg1" default tablespace {{ users_tablespace }}; 
       grant create session to foo;
       alter user foo quota unlimited on {{ users_tablespace }};
       create table foo.t_foo (f1 varchar2(10), f2 varchar2(10));
@@ -53,17 +60,18 @@
 - name: insert statement
   oracle_sql:
     <<: *app_con_param
+    username: foo
+    password: Xlfsjflkdjgkrehjg1
     sql: "{{ item }}"
   register: _
   failed_when: not _.changed
   loop:
-    - "insert into t_foo (f1, f2) values ('ab', 'cd')"
-    - "insert into t_foo (f1, f2) values ('ef', 'gh')"
-
+    - "insert into foo.t_foo (f1, f2) values ('ab', 'cd')"
+    - "insert into foo.t_foo (f1, f2) values ('ef', 'gh')"
 - name: check data
   oracle_sql:
-    <<: *app_con_param
-    sql: "select f1, f2 from t_foo order by f1"
+    <<: *con_param
+    sql: "select f1, f2 from foo.t_foo order by f1"
   register: _
 
 - debug: var=_

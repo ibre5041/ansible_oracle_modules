@@ -9,12 +9,13 @@
     connection_parameters: &con_param
       hostname: "{{ oracle_hostname }}"
       port: "{{ oracle_port }}"
-      service_name: "{{ oracle_pdb_service_name | default(oracle_service_name) }}"
+      service_name: "{{ (running_on_server|bool) | ternary(omit,oracle_pdb_service_name|default(oracle_service_name)) }}"
+      session_container: "{{ (not running_on_server|bool) | ternary(omit,oracle_pdb_service_name|default(oracle_service_name)) }}"
       username: "{{ oracle_pdb_username | default(oracle_username) }}"
       password: "{{ oracle_pdb_password | default(oracle_password) }}"
-      dsn: "{{ oracle_dsn | default() }}"
+      dsn: "{{ oracle_dsn }}"
       mode: "{{ mode }}"
-      oracle_home: "{{ oracle_home | default() }}"
+      oracle_home: "{{ oracle_home }}"
 
 # ── Setup: create test user ───────────────────────────────────────────────────
 
@@ -23,7 +24,22 @@
     <<: *con_param
     schema_name: "U_ACL_TEST"
     state: present
-  failed_when: false
+  failed_when: "false"
+
+- name: "setup: remove stale ACL entries"
+  oracle_acl:
+    <<: *con_param
+    host: "{{ item.host }}"
+    principal: "U_ACL_TEST"
+    privilege: "{{ item.priv }}"
+    lower_port: "{{ item.lower_port | default(omit) }}"
+    upper_port: "{{ item.upper_port | default(omit) }}"
+    state: absent
+  loop:
+    - {host: "*.example.com", priv: "connect"}
+    - {host: "mail.example.com", priv: "resolve"}
+    - {host: "smtp.example.com", priv: "connect", lower_port: 25, upper_port: 25}
+  failed_when: "false"
 
 # ── Grant connect ACE ─────────────────────────────────────────────────────────
 
@@ -138,17 +154,19 @@
     host: "{{ item.host }}"
     principal: "U_ACL_TEST"
     privilege: "{{ item.priv }}"
+    lower_port: "{{ item.lower_port | default(omit) }}"
+    upper_port: "{{ item.upper_port | default(omit) }}"
     state: absent
   loop:
     - {host: "mail.example.com", priv: "resolve"}
-    - {host: "smtp.example.com", priv: "connect"}
-  failed_when: false
+    - {host: "smtp.example.com", priv: "connect", lower_port: 25, upper_port: 25}
+  failed_when: "false"
 
 - name: "cleanup: drop ACL test user"
   oracle_user:
     <<: *con_param
     schema_name: "U_ACL_TEST"
     state: absent
-  failed_when: false
+  failed_when: "false"
 
 ...

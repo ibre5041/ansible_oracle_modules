@@ -23,7 +23,8 @@ options:
     service_name:
         description:
             - The database service name to connect to
-        required: true
+            - Optional. Omit (with no user/password and mode=sysdba) to use local BEQ / OS auth via ORACLE_SID
+        required: false
     user:
         description:
             - The Oracle user name to connect to the database, must have DBA privilege
@@ -48,6 +49,10 @@ options:
             - Oracle Data Source Name (connect string or TNS alias), overrides hostname/port/service_name
         required: false
         aliases: ['datasource_name']
+    session_container:
+        description:
+            - Switch session into this PDB via ALTER SESSION SET CONTAINER after connecting (use when connecting to a CDB)
+        required: false
     state:
         description:
             - If absent then window is dropped, if enabled or disabled then window is created at the requested state
@@ -148,15 +153,16 @@ def main():
     msg = ['']
     module = AnsibleModule(
         argument_spec = dict(
-            hostname      = dict(default='localhost'),
-            port          = dict(default=1521, type='int'),
-            service_name  = dict(required=True),
-            user          = dict(required=False),
-            password      = dict(required=False, no_log=True),
+            user          = dict(required=False, aliases=['un', 'username']),
+            password      = dict(required=False, no_log=True, aliases=['pw']),
             mode          = dict(default='normal', choices=["normal", "sysdba", "sysdg", "sysoper", "sysasm"]),
-            oracle_home   = dict(required=False, aliases=['oh']),
+            hostname      = dict(required=False, default='localhost', aliases=['host']),
+            port          = dict(required=False, default=1521, type='int'),
+            service_name  = dict(required=False, aliases=['sn']),
             dsn           = dict(required=False, aliases=['datasource_name']),
+            oracle_home   = dict(required=False, aliases=['oh']),
             session_container = dict(required=False),
+
             state         = dict(default="enabled", choices=["absent","enabled","disabled"]),
             name          = dict(required=True, aliases=["window_name"]),
             resource_plan = dict(required=False),

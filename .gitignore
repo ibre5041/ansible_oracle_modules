@@ -5,3 +5,4 @@ tests/integration/integration_config.yml
 .coverage
 .DS_Store
 .claude/
+.idea/

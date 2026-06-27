@@ -377,6 +377,8 @@ def run_dgmgrl(module, commands, output_format='text'):
             oracle_home = os.environ['ORACLE_HOME']
         else:
             module.fail_json(msg='oracle_home is required for broker mode', changed=False)
+    else:
+        os.environ['ORACLE_HOME'] = oracle_home
 
     dgmgrl_bin = os.path.join(oracle_home, 'bin', 'dgmgrl')
     if not os.path.exists(dgmgrl_bin):
@@ -413,6 +415,11 @@ def run_dgmgrl(module, commands, output_format='text'):
             connect_string = '%s/' % dgmgrl_user
         if dgmgrl_as:
             connect_string += ' AS %s' % dgmgrl_as.upper()
+    elif not dgmgrl_user and not dgmgrl_password and dgmgrl_connect_id:
+        if dgmgrl_connect_id.startswith('/'):
+            connect_string = dgmgrl_connect_id
+        else:
+            connect_string = '/@%s' % dgmgrl_connect_id
     else:
         # OS authentication
         connect_string = '/ AS %s' % dgmgrl_as.upper()
@@ -422,7 +429,6 @@ def run_dgmgrl(module, commands, output_format='text'):
     cmd = [dgmgrl_bin, '-silent']
     if output_format == 'json':
         cmd.extend(['-outputformat', 'json'])
-    cmd.append('/nolog')
 
     # Build script: CONNECT first, then the actual commands
     script_lines = ['CONNECT %s' % connect_string]
@@ -430,7 +436,6 @@ def run_dgmgrl(module, commands, output_format='text'):
     script = ';\n'.join(script_lines) + ';\n'
 
     rc, stdout, stderr = module.run_command(cmd, data=script)
-
     return rc, stdout, stderr
 
 
@@ -479,10 +484,16 @@ def parse_show_configuration(stdout):
 def dgmgrl_show_configuration(module, output_format):
     """Run SHOW CONFIGURATION and return parsed result."""
     rc, stdout, stderr = run_dgmgrl(module, ['SHOW CONFIGURATION VERBOSE'], output_format)
-    if rc != 0:
-        if 'ORA-16532' in stdout or 'not yet created' in stdout.lower():
-            return {'status': 'NOT_CONFIGURED', 'name': '', 'databases': []}
-        module.fail_json(msg='DGMGRL SHOW CONFIGURATION failed: %s %s' % (stdout, stderr), changed=False)
+    output = '\n'.join([part for part in (stdout, stderr) if part])
+    if 'ORA-16532' in output or 'not yet created' in output.lower():
+        return {'status': 'NOT_CONFIGURED', 'name': '', 'databases': []}
+    # DGMGRL may print DGM- errors (e.g. DGM-16901 environment init) while still
+    # exiting rc=0; treat any DGM- code as fatal so the failure is not swallowed.
+    if rc != 0 or re.search(r'\bDGM-\d+', output):
+        module.fail_json(
+            msg='DGMGRL SHOW CONFIGURATION failed: %s' % output.strip(),
+            changed=False,
+        )
 
     if output_format == 'json':
         try:
@@ -1130,7 +1141,11 @@ def _broker_present(module, database_name, output_format):
 
     if database_name and config.get('status') != 'NOT_CONFIGURED':
         existing_dbs = [d['name'] for d in config.get('databases', [])]
-        if database_name.upper() not in [d.upper() for d in existing_dbs]:
+        # Only add the database when connect_identifier is supplied (intent to
+        # add). Without it, fall through to set state / properties on a database
+        # that is already part of the configuration (issue #52).
+        if (database_name.upper() not in [d.upper() for d in existing_dbs]
+                and module.params.get("connect_identifier")):
             dgmgrl_add_database(module)
             changed = True
 

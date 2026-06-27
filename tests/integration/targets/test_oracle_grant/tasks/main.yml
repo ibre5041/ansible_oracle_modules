@@ -2,6 +2,28 @@
 
 - name: Role tasks with env
   block:
+
+    - name: "query ASM datadir from Oracle (db_create_file_dest / db_unique_name)"
+      oracle_sql:
+        hostname: "{{ oracle_hostname }}"
+        port: "{{ oracle_port }}"
+        service_name: "{{ oracle_service_name }}"
+        username: "{{ oracle_username }}"
+        password: "{{ oracle_password }}"
+        mode: "sysdba"
+        oracle_home: "{{ oracle_home | default(omit) }}"
+        sql: >-
+          SELECT p.value || '/' || d.db_unique_name AS datadir
+          FROM v$parameter p, v$database d
+          WHERE p.name = 'db_create_file_dest'
+      register: _asm_datadir
+      when: running_on_db_asm | default(false) and running_on_cdb | default(false)
+
+    - name: "set oracle_datadir from Oracle (ASM)"
+      set_fact:
+        oracle_datadir: "{{ _asm_datadir.data[0]['datadir'] }}"
+      when: running_on_db_asm | default(false) and running_on_cdb | default(false)
+
     - include_tasks: "set_up.yml"
       when: running_on_cdb
   
@@ -32,9 +54,6 @@
     - include_tasks: "check_mode.yml"
       when: running_on_cdb  
 
-    - include_tasks: "tear_down.yml"
-      when: running_on_cdb
-
     - include_tasks: adb_checks_object.yml
       when: running_on_adb
 
@@ -46,7 +65,10 @@
       
     - include_tasks: "issue6.yml"
       when: running_on_cdb  
-      
+
+    - include_tasks: "tear_down.yml"
+      when: running_on_cdb
+
   environment:
     ORACLE_SID: "{{ oracle_sid | default() }}"
     ORACLE_HOME: "{{ oracle_home | default() }}"

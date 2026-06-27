@@ -1,4 +1,6 @@
 ---
-service_name: "{{ oracle_pdb_service_name }}"
-sys_password: "password"
+
+#service_name: "{{ oracle_pdb_service_name }}"
+#sys_password: "password"
+
 ...

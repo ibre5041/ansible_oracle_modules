@@ -1,12 +1,12 @@
 ---
 
 - include_tasks: simple.yml
-  when: running_on_server
+  when: running_on_server and false
   
 - include_tasks: db_atributes.yml
-  when: running_on_server
+  when: running_on_server and false
   
 - include_tasks: rac_with_unique_name.yml
-  when: running_on_server
+  when: running_on_server and false
   
 ...

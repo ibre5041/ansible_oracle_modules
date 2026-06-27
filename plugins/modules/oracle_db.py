@@ -529,7 +529,6 @@ def remove_db(module, ohomes):
         module.warn(stdout)
         module.warn(stdout)
     if rc <= 6:
-        msg = 'STDOUT: %s,  COMMAND: %s' % (stdout, command)
         msg = 'Successfully removed database %s' % db_name
         module.exit_json(msg=msg, changed=True, stdout=stdout, stderr=stderr)
     else:

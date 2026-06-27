@@ -34,6 +34,7 @@ def _user_params(**overrides):
         "authentication_type": "password",
         "container": None,
         "container_data": None,
+        "external_name": None,
     }
     base.update(overrides)
     return base
@@ -65,6 +66,15 @@ def _default_user_row():
         "authentication_type": "PASSWORD",
         "oracle_maintained": "N",
         "password_status": "UNEXPIRED",
+        "external_name": None,
+    }
+
+
+def _external_user_row(external_name=None):
+    return {
+        **_default_user_row(),
+        "authentication_type": "EXTERNAL",
+        "external_name": external_name,
     }
 
 
@@ -799,6 +809,23 @@ def test_pdb_creates_new(monkeypatch):
     assert any("create pluggable database" in d.lower() for d in payload["ddls"])
 
 
+def test_pdb_create_redacts_admin_password_from_ddls(monkeypatch):
+    mod = _load("oracle_pdb")
+
+    class Mod(BaseFakeModule):
+        params = _pdb_params(pdb_admin_password='Pdb"AdminSecret123')
+
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "oracleConnection", lambda m: _PdbConn(m, None), raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+
+    rendered = repr(exc.value.args[0])
+    assert 'Pdb""AdminSecret123' not in rendered
+    assert 'identified by "********"' in rendered.lower()
+
+
 def test_pdb_creates_with_nocopy(monkeypatch):
     """plug_file + nocopy=True → DDL contains NOCOPY clause."""
     mod = _load("oracle_pdb")
@@ -1510,6 +1537,193 @@ def test_user_modify_container_data_existing(monkeypatch):
         mod.main()
     ddls = exc.value.args[0]["ddls"]
     assert any("set container_data" in d.lower() for d in ddls)
+
+
+def test_user_modify_container_data_idempotent(monkeypatch):
+    """Existing user already has container_data=ALL → no DDL, changed=False."""
+    mod = _load("oracle_user")
+
+    class Mod(BaseFakeModule):
+        params = _user_params(
+            schema_password=None,
+            container="all",
+            container_data="objecttype",
+        )
+
+    row = _default_user_row()
+
+    class _ContainerDataConn(_UserConn):
+        def execute_select_to_dict(self, sql, params=None, fetchone=False, fail_on_error=True):
+            if "container_data" in sql.lower():
+                return {"all_containers": "Y"}
+            return super().execute_select_to_dict(sql, params, fetchone, fail_on_error)
+
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "oracleConnection", lambda m: _ContainerDataConn(m, row), raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    payload = exc.value.args[0]
+    assert payload["changed"] is False
+    assert not any("set container_data" in d.lower() for d in payload["ddls"])
+
+
+# ---------------------------------------------------------------------------
+# oracle_user - IDENTIFIED EXTERNALLY [AS 'name']
+# ---------------------------------------------------------------------------
+
+def test_user_creates_external_with_name(monkeypatch):
+    """Create external user with external_name → identified externally as 'name'."""
+    mod = _load("oracle_user")
+
+    class Mod(BaseFakeModule):
+        params = _user_params(
+            schema_password=None,
+            authentication_type="external",
+            external_name="CN=app,OU=eng,O=acme",
+        )
+
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "oracleConnection", lambda m: _UserConn(m, None), raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    ddls = exc.value.args[0]["ddls"]
+    assert any("identified externally as 'cn=app,ou=eng,o=acme'" in d.lower() for d in ddls)
+
+
+def test_user_external_name_requires_external_auth(monkeypatch):
+    """external_name with authentication_type != external → fail_json."""
+    mod = _load("oracle_user")
+
+    class Mod(BaseFakeModule):
+        params = _user_params(authentication_type="password", external_name="CN=x")
+
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "oracleConnection", lambda m: _UserConn(m, None), raising=False)
+
+    with pytest.raises(FailJson) as exc:
+        mod.main()
+    assert "external" in exc.value.args[0]["msg"].lower()
+
+
+def test_user_modify_external_add_name(monkeypatch):
+    """Existing bare-external user, add external_name → alter identified externally as 'name'."""
+    mod = _load("oracle_user")
+
+    class Mod(BaseFakeModule):
+        params = _user_params(
+            schema_password=None,
+            authentication_type="external",
+            external_name="CN=x",
+        )
+
+    row = _external_user_row(external_name=None)
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "oracleConnection", lambda m: _UserConn(m, row), raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    payload = exc.value.args[0]
+    assert payload["changed"] is True
+    assert any("identified externally as 'cn=x'" in d.lower() for d in payload["ddls"])
+
+
+def test_user_modify_external_name_idempotent(monkeypatch):
+    """Existing external AS 'CN=x', set same → no DDL, changed=False."""
+    mod = _load("oracle_user")
+
+    class Mod(BaseFakeModule):
+        params = _user_params(
+            schema_password=None,
+            authentication_type="external",
+            external_name="CN=x",
+        )
+
+    row = _external_user_row(external_name="CN=x")
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "oracleConnection", lambda m: _UserConn(m, row), raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    payload = exc.value.args[0]
+    assert payload["changed"] is False
+    assert not any("identified externally" in d.lower() for d in payload["ddls"])
+
+
+def test_user_modify_external_change_name(monkeypatch):
+    """Existing external AS 'CN=x', set 'CN=y' → alter to new name."""
+    mod = _load("oracle_user")
+
+    class Mod(BaseFakeModule):
+        params = _user_params(
+            schema_password=None,
+            authentication_type="external",
+            external_name="CN=y",
+        )
+
+    row = _external_user_row(external_name="CN=x")
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "oracleConnection", lambda m: _UserConn(m, row), raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    payload = exc.value.args[0]
+    assert payload["changed"] is True
+    assert any("identified externally as 'cn=y'" in d.lower() for d in payload["ddls"])
+
+
+def test_user_modify_external_downgrade_to_bare(monkeypatch):
+    """Existing external AS 'CN=x', omit external_name → downgrade to bare identified externally."""
+    mod = _load("oracle_user")
+
+    class Mod(BaseFakeModule):
+        params = _user_params(schema_password=None, authentication_type="external")
+
+    row = _external_user_row(external_name="CN=x")
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "oracleConnection", lambda m: _UserConn(m, row), raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    payload = exc.value.args[0]
+    assert payload["changed"] is True
+    ddls = [d.lower() for d in payload["ddls"]]
+    assert any("identified externally" in d for d in ddls)
+    assert not any(" as '" in d for d in ddls)
+
+
+def test_user_modify_external_bare_idempotent(monkeypatch):
+    """Existing bare-external user, auth=external no name → no DDL, changed=False."""
+    mod = _load("oracle_user")
+
+    class Mod(BaseFakeModule):
+        params = _user_params(schema_password=None, authentication_type="external")
+
+    row = _external_user_row(external_name=None)
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "oracleConnection", lambda m: _UserConn(m, row), raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    payload = exc.value.args[0]
+    assert payload["changed"] is False
+
+
+def test_user_modify_global_idempotent(monkeypatch):
+    """Existing GLOBAL user, auth=global → no DDL, changed=False."""
+    mod = _load("oracle_user")
+
+    class Mod(BaseFakeModule):
+        params = _user_params(schema_password=None, authentication_type="global")
+
+    row = {**_default_user_row(), "authentication_type": "GLOBAL"}
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "oracleConnection", lambda m: _UserConn(m, row), raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    assert exc.value.args[0]["changed"] is False
 
 
 # ===========================================================================

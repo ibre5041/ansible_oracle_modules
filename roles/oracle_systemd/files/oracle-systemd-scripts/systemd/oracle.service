@@ -9,6 +9,8 @@ Requires=network-online.target remote-fs.target local-fs.target
 [Service]
 EnvironmentFile=/etc/sysconfig/oracle
 Type=notify
+NotifyAccess=main
+Delegate=yes
 SyslogIdentifier=oracle-service
 TimeoutStartSec=5min
 TimeoutStopSec=5min

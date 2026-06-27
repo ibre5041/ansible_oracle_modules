@@ -2,9 +2,9 @@
 
 - name: "define pdb connection parameters"
   set_fact:
-    connection_parameters: &pdb_con_param
+    connection_parameters: &con_param
       hostname: "{{ oracle_hostname }}"
-      port: "{{ oracle_port }}"      
+      port: "{{ oracle_port }}"
       service_name: "{{ (running_on_server|bool) | ternary(omit,oracle_pdb_service_name|default(oracle_service_name)) }}"
       session_container: "{{ (not running_on_server|bool) | ternary(omit,oracle_pdb_service_name|default(oracle_service_name)) }}"
       username: "{{ oracle_pdb_username | default(oracle_username) }}"
@@ -13,33 +13,43 @@
       mode: "{{ mode }}"
       oracle_home: "{{ oracle_home }}"
 
+- name: 'PDB Connection parameters - see or use integration_config.yml.template'
+  debug:
+    var: connection_parameters
+
 - name: "define cdb connection parameters"
   set_fact:
     cdb_connection_parameters: &cdb_con_param
-      service_name: "{{ oracle_cdb_service_name }}"
-      username: "{{ oracle_cdb_username }}"
-      password: "{{ oracle_cdb_password }}"
-      mode: "sysdba"
+      hostname: "{{ oracle_hostname }}"
       port: "{{ oracle_port }}"
-      host: "{{ oracle_hostname }}"
+      service_name: "{{ oracle_cdb_service_name | default(oracle_service_name) }}"
+      username: "{{ oracle_cdb_username | default(oracle_username) }}"
+      password: "{{ oracle_cdb_password | default(oracle_password) }}"
+      dsn: "{{ oracle_dsn }}"
+      mode: "{{ mode }}"
+      oracle_home: "{{ oracle_home }}"
+
+- name: 'CDB Connection parameters - see or use integration_config.yml.template'
+  debug:
+    var: cdb_connection_parameters
       
 - name: "reset open_cursors"
   oracle_parameter:
-    <<: *pdb_con_param
+    <<: *con_param
     name: "open_cursors"
     state: "reset"
     scope: "both"
 
 - name: "reset blank_trimming"
   oracle_parameter:
-    <<: *pdb_con_param
+    <<: *con_param
     name: "blank_trimming"
     state: "reset"
     scope: "spfile"
 
 - name: "reset nls_language"
   oracle_parameter:
-    <<: *pdb_con_param
+    <<: *con_param
     name: "nls_language"
     state: "reset"
     scope: "spfile"
