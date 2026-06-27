@@ -52,9 +52,39 @@ releases:
       - Fix for profile names having special characters in it
     release_date: '2026-02-03'
   3.3.0:
-    release_date: '2026-02-07'
     changes:
       breaking_changes:
-        - does not depend on cx_Oracle anymore, use oracledb
+      - does not depend on cx_Oracle anymore, use oracledb
       minor_changes:
-        - fixes for oracle_grant, oracle_profile, oracle_user
+      - fixes for oracle_grant, oracle_profile, oracle_user
+    release_date: '2026-02-07'
+  3.4.0:
+    modules:
+    - description: Manage Oracle network Access Control Lists
+      name: oracle_acl
+      namespace: ''
+    - description: Manage Oracle Unified Auditing policies
+      name: oracle_audit
+      namespace: ''
+    - description: Manage Oracle Data Guard configurations
+      name: oracle_dataguard
+      namespace: ''
+    - description: Manage Oracle database links
+      name: oracle_dblink
+      namespace: ''
+    - description: Manage Oracle restore points and flashback database
+      name: oracle_flashback
+      namespace: ''
+    - description: Manage Oracle PKI wallets, certificates, and credentials via orapki
+      name: oracle_orapki
+      namespace: ''
+    - description: Manage Oracle Resource Manager plans
+      name: oracle_rsrc_plan
+      namespace: ''
+    - description: Manage Oracle Transparent Data Encryption (TDE)
+      name: oracle_tde
+      namespace: ''
+    - description: Manage Oracle TDE keystores (wallets)
+      name: oracle_wallet
+      namespace: ''
+    release_date: '2026-06-27'

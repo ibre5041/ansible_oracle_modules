@@ -4,13 +4,34 @@ Ibre5041.Ansible\_Oracle\_Modules Release Notes
 
 .. contents:: Topics
 
+v3.4.0
+======
+
+New Modules
+-----------
+
+- ibre5041.ansible_oracle_modules.oracle_acl - Manage Oracle network Access Control Lists
+- ibre5041.ansible_oracle_modules.oracle_audit - Manage Oracle Unified Auditing policies
+- ibre5041.ansible_oracle_modules.oracle_dataguard - Manage Oracle Data Guard configurations
+- ibre5041.ansible_oracle_modules.oracle_dblink - Manage Oracle database links
+- ibre5041.ansible_oracle_modules.oracle_flashback - Manage Oracle restore points and flashback database
+- ibre5041.ansible_oracle_modules.oracle_orapki - Manage Oracle PKI wallets, certificates, and credentials via orapki
+- ibre5041.ansible_oracle_modules.oracle_rsrc_plan - Manage Oracle Resource Manager plans
+- ibre5041.ansible_oracle_modules.oracle_tde - Manage Oracle Transparent Data Encryption (TDE)
+- ibre5041.ansible_oracle_modules.oracle_wallet - Manage Oracle TDE keystores (wallets)
+
 v3.3.0
 ======
+
+Minor Changes
+-------------
+
+- fixes for oracle_grant, oracle_profile, oracle_user
 
 Breaking Changes / Porting Guide
 --------------------------------
 
-- use oracledb instead of cx_Oracle
+- does not depend on cx_Oracle anymore, use oracledb
 
 v3.2.5
 ======

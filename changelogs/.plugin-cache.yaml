@@ -16,6 +16,11 @@ plugins:
       name: oracle_acfs
       namespace: ''
       version_added: 2.1.0.0
+    oracle_acl:
+      description: Manage Oracle network Access Control Lists
+      name: oracle_acl
+      namespace: ''
+      version_added: 3.4.0
     oracle_asmdg:
       description: Manage diskgroups in an Oracle database
       name: oracle_asmdg
@@ -26,6 +31,11 @@ plugins:
       name: oracle_asmvol
       namespace: ''
       version_added: 2.1.0.0
+    oracle_audit:
+      description: Manage Oracle Unified Auditing policies
+      name: oracle_audit
+      namespace: ''
+      version_added: 3.4.0
     oracle_awr:
       description: Manage AWR configuration
       name: oracle_awr
@@ -51,6 +61,11 @@ plugins:
       name: oracle_crs_service
       namespace: ''
       version_added: 3.1.7.0
+    oracle_dataguard:
+      description: Manage Oracle Data Guard configurations
+      name: oracle_dataguard
+      namespace: ''
+      version_added: 3.4.0
     oracle_datapatch:
       description: Manage datapatch functionality
       name: oracle_datapatch
@@ -61,6 +76,11 @@ plugins:
       name: oracle_db
       namespace: ''
       version_added: 3.0.0
+    oracle_dblink:
+      description: Manage Oracle database links
+      name: oracle_dblink
+      namespace: ''
+      version_added: 3.4.0
     oracle_directory:
       description: Create/drop DIRECTORY in an Oracle database
       name: oracle_directory
@@ -71,13 +91,18 @@ plugins:
       name: oracle_facts
       namespace: ''
       version_added: 3.0.0
+    oracle_flashback:
+      description: Manage Oracle restore points and flashback database
+      name: oracle_flashback
+      namespace: ''
+      version_added: 3.4.0
     oracle_gi_facts:
       description: Returns some facts about Grid Infrastructure environment
       name: oracle_gi_facts
       namespace: ''
       version_added: '2.4'
     oracle_grant:
-      description: Manage users/schemas in an Oracle database
+      description: Manage grants and privileges in an Oracle database
       name: oracle_grant
       namespace: ''
       version_added: 3.0.0
@@ -112,6 +137,11 @@ plugins:
       name: oracle_opatch
       namespace: ''
       version_added: 3.0.1
+    oracle_orapki:
+      description: Manage Oracle PKI wallets, certificates, and credentials via orapki
+      name: oracle_orapki
+      namespace: ''
+      version_added: 3.4.0
     oracle_oratab:
       description: Reads oratab to ansible_facts
       name: oracle_oratab
@@ -157,6 +187,11 @@ plugins:
       name: oracle_rsrc_consgroup
       namespace: ''
       version_added: 2.2.1
+    oracle_rsrc_plan:
+      description: Manage Oracle Resource Manager plans
+      name: oracle_rsrc_plan
+      namespace: ''
+      version_added: 3.4.0
     oracle_services:
       description: Manage services in an Oracle database
       name: oracle_services
@@ -182,6 +217,11 @@ plugins:
       name: oracle_tablespace
       namespace: ''
       version_added: 1.9.1
+    oracle_tde:
+      description: Manage Oracle Transparent Data Encryption (TDE)
+      name: oracle_tde
+      namespace: ''
+      version_added: 3.4.0
     oracle_tnsnames:
       description: Manipulate Oracles tnsnames.ora and other .ora files
       name: oracle_tnsnames
@@ -192,9 +232,14 @@ plugins:
       name: oracle_user
       namespace: ''
       version_added: 3.0.0
+    oracle_wallet:
+      description: Manage Oracle TDE keystores (wallets)
+      name: oracle_wallet
+      namespace: ''
+      version_added: 3.4.0
   netconf: {}
   shell: {}
   strategy: {}
   test: {}
   vars: {}
-version: 3.3.0
+version: 3.4.0
