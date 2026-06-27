@@ -14,7 +14,6 @@ options:
     description:  The name of the profile (should be in uppercase)
     required: true
     type: str 
-    required: true
     default: None
     aliases: ['profile']
   state:
