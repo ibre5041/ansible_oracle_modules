@@ -41,6 +41,7 @@ The default behaviour for the modules using `oracledb` is this:
 | [oracle_asmdg](../content/module/oracle_asmdg/)	    | Manage diskgroups in an Oracle database |
 | [oracle_asmvol](../content/module/oracle_asmvol/)	    | Manage Oracle ASMCMD Volumes |
 | [oracle_awr](../content/module/oracle_awr/)		    | Manage AWR configuration |
+| [oracle_dataguard](../content/module/oracle_dataguard/)   | Manage Oracle Data Guard configurations |
 | [oracle_datapatch](../content/module/oracle_datapatch/)   | Manage datapatch functionality |
 | [oracle_db](../content/module/oracle_db/)		    | Create/delete a database using dbca |
 | [oracle_dblink](../content/module/oracle_dblink/)         | Manage Oracle database links |
@@ -59,10 +60,11 @@ The default behaviour for the modules using `oracledb` is this:
 | [oracle_jobwindow](../content/module/oracle_jobwindow/)   | |
 | [oracle_ldapuser](../content/module/oracle_ldapuser/)	    | |
 | [oracle_opatch](../content/module/oracle_opatch/)	    | Manage patches in an Oracle environment |
-| [oracle_oratab](../content/module/oracle_oratab/)	    | Reads oratab to ansible_facts |
+| [oracle_oratab](../content/module/oracle_oratab/)	    | Reads oratab to ansible_facts, get list of databases on server |
+| [oracle_orapki](../content/module/oracle_orapki/)	    | Manage Oracle PKI wallets, certificates, and credentials via orapki |
 | [oracle_parameter](../content/module/oracle_parameter/)   | Manage parameters in an Oracle database |
 | [oracle_pdb](../content/module/oracle_pdb/)		    | Manage pluggable databases in Oracle |
-| [oracle_privs](../content/module/oracle_privs/)	    | 
+| [oracle_privs](../content/module/oracle_privs/)	    | |
 | [oracle_profile](../content/module/oracle_profile/)	    | Manage profiles in an Oracle database |
 | [oracle_redo](../content/module/oracle_redo/)		    | Manage Oracle redo related things |
 | [oracle_role](../content/module/oracle_role/)		    | Manage users/roles in an Oracle database |
@@ -72,9 +74,11 @@ The default behaviour for the modules using `oracledb` is this:
 | [oracle_sqldba](../content/module/oracle_sqldba/)	    | Execute sql (scripts) using sqlplus (BEQ) or catcon.pl |
 | [oracle_sql](../content/module/oracle_sql/)		    | Execute arbitrary sql |
 | [oracle_stats_prefs](../content/module/oracle_stats_prefs/)| Manage DBMS_STAT |
-| [oracle_tablespace](../content/module/oracle_tablespace/) | Manage tablespaces in an Oracle database
-| [oracle_tnsnames](../content/module/oracle_tnsnames/)	    | Manipulate Oracle's tnsnames.ora and other .ora files
-| [oracle_user](../content/module/oracle_user/)		    | Manage users/schemas in an Oracle database
+| [oracle_tablespace](../content/module/oracle_tablespace/) | Manage tablespaces in an Oracle database |
+| [oracle_tde](../content/module/oracle_tde/) | Manage Oracle Transparent Data Encryption (TDE) |
+| [oracle_tnsnames](../content/module/oracle_tnsnames/)	    | Manipulate Oracle's tnsnames.ora and other .ora files |
+| [oracle_user](../content/module/oracle_user/)		    | Manage users/schemas in an Oracle database |
+| [oracle_wallet](../content/module/oracle_wallet/)         | Manage Oracle TDE keystores (wallets) |
 
 # Filters
 
