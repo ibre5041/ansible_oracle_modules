@@ -8,7 +8,7 @@ namespace: ibre5041
 name: ansible_oracle_modules
 
 # The version of the collection. Must be compatible with semantic versioning
-version: 3.4.0
+version: 3.4.1
 
 # The path to the Markdown (.md) readme file. This path is relative to the root of the collection
 readme: README.md
@@ -19,6 +19,7 @@ authors:
   - "Mikael Sandström"
   - "Ari Stark"
   - "Ivan Brezina"
+  - "Cyrille Modiano"
 
 ### OPTIONAL but strongly recommended
 # A short summary description of the collection
@@ -60,7 +61,19 @@ issues: https://github.com/ibre5041/ansible_oracle_modules/issues
 # artifact. A pattern is matched from the relative path of the file or directory of the collection directory. This
 # uses 'fnmatch' to match the files or directories. Some directories and files like 'galaxy.yml', '*.pyc', '*.retry',
 # and '.git' are always filtered. Mutually exclusive with 'manifest'
-build_ignore: []
+build_ignore:
+  - "*.yml"
+  - .coveragerc
+  - .git
+  - .github
+  - .gitignore
+  - .idea
+  - .pylintrc
+  - .pytest_cache
+  - Makefile
+  - TODO.md
+  - inventory
+  - tests
 
 # A dict controlling use of manifest directives used in building the collection artifact. The key 'directives' is a
 # list of MANIFEST.in style
