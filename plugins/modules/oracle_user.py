@@ -162,20 +162,20 @@ def check_user_exists(conn, schema):
     r = conn.execute_select_to_dict(sql, {"schema_name": schema}, fetchone=True)
     if r:
         acs = r['account_status']
-        if acs == 'EXPIRED & LOCKED':
-            r['account_status'] = 'LOCKED'
-            r['password_status'] = 'EXPIRED'
-        elif acs == 'EXPIRED':
-            r['account_status'] = 'OPEN'
-            r['password_status'] = 'EXPIRED'
-        elif acs == 'LOCKED':
-            r['account_status'] = 'LOCKED'
-            r['password_status'] = 'UNEXPIRED'
-        elif acs == 'OPEN':
-            r['account_status'] = 'OPEN'
-            r['password_status'] = 'UNEXPIRED'
-        else:
-            conn.fail_json(msg="Unsupported account state %s" % acs, ddls=conn.ddls, changed=conn.changed)
+        account_status = 'OPEN'
+        password_status = 'UNEXPIRED'
+        # account_status is a '&'-joined list of states, e.g. 'EXPIRED(GRACE) & LOCKED(TIMED)'.
+        # EXPIRED(GRACE) still allows a login, and IN ROLLOVER (19c) is orthogonal to both.
+        for state in acs.split('&'):
+            state = state.strip()
+            if state == 'EXPIRED':
+                password_status = 'EXPIRED'
+            elif state in ('LOCKED', 'LOCKED(TIMED)'):
+                account_status = 'LOCKED'
+            elif state not in ('OPEN', 'EXPIRED(GRACE)', 'IN ROLLOVER'):
+                conn.module.fail_json(msg="Unsupported account state %s" % acs, ddls=conn.ddls, changed=conn.changed)
+        r['account_status'] = account_status
+        r['password_status'] = password_status
 
     return set(r.items())
 
@@ -496,7 +496,9 @@ def main():
         mutually_exclusive=[['schema_password', 'schema_password_hash']],
         supports_check_mode=True,
     )
-    sanitize_string_params(module.params)
+    # Secrets keep their leading/trailing whitespace: trimming them would make the
+    # value stop matching the one no_log registered, so it would no longer be scrubbed.
+    sanitize_string_params(module.params, no_trim=['schema_password', 'schema_password_hash', 'password'])
 
 
     schema = module.params["schema"]
