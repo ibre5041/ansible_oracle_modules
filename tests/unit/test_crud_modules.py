@@ -1727,6 +1727,128 @@ def test_user_modify_global_idempotent(monkeypatch):
 
 
 # ===========================================================================
+# oracle_user - ACCOUNT_STATUS parsing and secret redaction
+# ===========================================================================
+
+class _NoFailJsonUserConn(_UserConn):
+    """Mirrors the real oracleConnection, which has no fail_json method."""
+
+    def __getattribute__(self, name):
+        if name == "fail_json":
+            raise AttributeError(
+                "'oracleConnection' object has no attribute 'fail_json'"
+            )
+        return super().__getattribute__(name)
+
+
+def _dba_users_row(account_status):
+    """Row as returned by the dba_users query in check_user_exists()."""
+    return {
+        "username": "TESTUSER",
+        "account_status": account_status,
+        "default_tablespace": "USERS",
+        "temporary_tablespace": "TEMP",
+        "profile": "DEFAULT",
+        "authentication_type": "PASSWORD",
+        "external_name": None,
+        "oracle_maintained": "N",
+    }
+
+
+# (ACCOUNT_STATUS, expected account_status, expected password_status).
+# EXPIRED(GRACE) keeps the password usable, so it maps to UNEXPIRED.
+ACCOUNT_STATUS_CASES = [
+    ("OPEN", "OPEN", "UNEXPIRED"),
+    ("EXPIRED", "OPEN", "EXPIRED"),
+    ("EXPIRED(GRACE)", "OPEN", "UNEXPIRED"),
+    ("LOCKED", "LOCKED", "UNEXPIRED"),
+    ("LOCKED(TIMED)", "LOCKED", "UNEXPIRED"),
+    ("EXPIRED & LOCKED", "LOCKED", "EXPIRED"),
+    ("EXPIRED & LOCKED(TIMED)", "LOCKED", "EXPIRED"),
+    ("EXPIRED(GRACE) & LOCKED", "LOCKED", "UNEXPIRED"),
+    ("EXPIRED(GRACE) & LOCKED(TIMED)", "LOCKED", "UNEXPIRED"),
+    ("OPEN & IN ROLLOVER", "OPEN", "UNEXPIRED"),
+    ("EXPIRED & IN ROLLOVER", "OPEN", "EXPIRED"),
+    ("EXPIRED(GRACE) & IN ROLLOVER", "OPEN", "UNEXPIRED"),
+]
+
+
+@pytest.mark.parametrize("acs,account_status,password_status", ACCOUNT_STATUS_CASES)
+def test_user_account_status_parsing(acs, account_status, password_status):
+    """Every dba_users.account_status combination is decoded, not just four of them."""
+    mod = _load("oracle_user")
+    conn = _NoFailJsonUserConn(BaseFakeModule(), _dba_users_row(acs))
+
+    user = dict(mod.check_user_exists(conn, "TESTUSER"))
+
+    assert user["account_status"] == account_status
+    assert user["password_status"] == password_status
+
+
+def test_user_unsupported_account_status_fails_via_module():
+    """An unknown account_status fails through module.fail_json, not conn.fail_json."""
+    mod = _load("oracle_user")
+    conn = _NoFailJsonUserConn(BaseFakeModule(), _dba_users_row("SOMETHING NEW"))
+
+    with pytest.raises(FailJson) as exc:
+        mod.check_user_exists(conn, "TESTUSER")
+    assert "SOMETHING NEW" in exc.value.args[0]["msg"]
+
+
+def test_user_grace_period_password_not_reset(monkeypatch):
+    """EXPIRED(GRACE) + expired=false → no password reset, no change."""
+    mod = _load("oracle_user")
+
+    class Mod(BaseFakeModule):
+        params = _user_params(schema_password=None, expired=False)
+
+    row = {**_default_user_row(), "account_status": "EXPIRED(GRACE)"}
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "oracleConnection", lambda m: _UserConn(m, row), raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    assert exc.value.args[0]["changed"] is False
+
+
+def test_user_modify_unlock_from_locked_timed(monkeypatch):
+    """LOCKED(TIMED) + locked=false → account unlock."""
+    mod = _load("oracle_user")
+
+    class Mod(BaseFakeModule):
+        params = _user_params(schema_password=None, locked=False)
+
+    row = {**_default_user_row(), "account_status": "LOCKED(TIMED)"}
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "oracleConnection", lambda m: _UserConn(m, row), raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    assert any("account unlock" in d.lower() for d in exc.value.args[0]["ddls"])
+
+
+def test_user_does_not_trim_secrets(monkeypatch):
+    """Secrets are exempt from whitespace trimming, so no_log still matches them."""
+    mod = _load("oracle_user")
+
+    class Mod(BaseFakeModule):
+        params = _user_params()
+
+    captured = {}
+
+    def spy(module_params, no_trim=None):
+        captured["no_trim"] = set(no_trim or ())
+
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "sanitize_string_params", spy)
+    monkeypatch.setattr(mod, "oracleConnection", lambda m: _UserConn(m, None), raising=False)
+
+    with pytest.raises(ExitJson):
+        mod.main()
+    assert {"schema_password", "schema_password_hash", "password"} <= captured["no_trim"]
+
+
+# ===========================================================================
 # oracle_tablespace - additional coverage tests
 # ===========================================================================
 
