@@ -1,5 +1,10 @@
 ancestor: null
 releases:
+  3.4.3:
+    changes:
+      minor_changes:
+      - oracle_user handles all Oracle ACCOUNT_STATUS values while keeping secrets scrubbable.
+    release_date: '2026-10-05'
   3.1.10:
     changes:
       minor_changes:

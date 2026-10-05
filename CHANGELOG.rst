@@ -4,6 +4,14 @@ Ibre5041.Ansible\_Oracle\_Modules Release Notes
 
 .. contents:: Topics
 
+v3.4.3
+======
+
+Minor Changes
+-------------
+
+- oracle_user handles all Oracle ACCOUNT_STATUS values while keeping secrets scrubbable.
+
 v3.4.2
 ======
 
@@ -15,7 +23,6 @@ Minor Changes
 
 v3.4.1
 ======
-
 
 v3.4.0
 ======
