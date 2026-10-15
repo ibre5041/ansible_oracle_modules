@@ -1,0 +1,177 @@
+---
+
+- name: "define connection parameters"
+  set_fact:
+    connection_parameters: &con_param
+      hostname: "{{ oracle_hostname }}"
+      port: "{{ oracle_port }}"
+      service_name: "{{ (running_on_server|bool) | ternary(omit,oracle_pdb_service_name|default(oracle_service_name)) }}"
+      session_container: "{{ (not running_on_server|bool) | ternary(omit,oracle_pdb_service_name|default(oracle_service_name)) }}"
+      username: "{{ oracle_pdb_username | default(oracle_username) }}"
+      password: "{{ oracle_pdb_password | default(oracle_password) }}"
+      dsn: "{{ oracle_dsn }}"
+      mode: "{{ mode }}"
+      oracle_home: "{{ oracle_home }}"
+
+- name: drop u_grant_opt user left by a previous run
+  oracle_user:
+    <<: *con_param
+    schema_name: "u_grant_opt"
+    state: "absent"
+
+- name: create u_grant_opt user
+  oracle_user:
+    <<: *con_param
+    schema_name: "u_grant_opt"
+    schema_password: "bar"
+
+- name: create directory
+  oracle_directory:
+    <<: *con_param
+    directory_name: "IMPEXP_OPT"
+    directory_path: "/tmp"
+
+# System privileges / roles: WITH ADMIN OPTION
+
+- name: grant system privileges, one with admin option
+  oracle_grant:
+    <<: *con_param
+    grantee: "u_grant_opt"
+    grants:
+      - create session
+      - create table with admin option
+  register: _
+  failed_when: >-
+    _.failed or not _.changed
+    or 'grant create session to u_grant_opt' not in _.ddls
+    or 'grant create table to u_grant_opt with admin option' not in _.ddls
+
+- name: grant system privileges, one with admin option (idempotency, exact mode)
+  oracle_grant:
+    <<: *con_param
+    grantee: "u_grant_opt"
+    grants:
+      - create session
+      - create table with admin option
+    grant_mode: "exact"
+  register: _
+  failed_when: _.failed or _.changed
+
+- name: append plain privilege, add admin option to it afterwards
+  oracle_grant:
+    <<: *con_param
+    grantee: "u_grant_opt"
+    grants:
+      - create view
+  register: _
+  failed_when: _.failed or not _.changed
+
+- name: add admin option to an existing privilege
+  oracle_grant:
+    <<: *con_param
+    grantee: "u_grant_opt"
+    grants:
+      - create view with admin option
+  register: _
+  failed_when: _.failed or not _.changed or _.ddls != ['grant create view to u_grant_opt with admin option']
+
+- name: check admin option in dba_sys_privs
+  oracle_sql:
+    <<: *con_param
+    sql: >-
+      select count(*) as cnt from dba_sys_privs
+      where grantee = 'U_GRANT_OPT' and admin_option = 'YES'
+      and privilege in ('CREATE TABLE', 'CREATE VIEW')
+  register: _
+  failed_when: _.failed or (_.data | first)['cnt'] | int != 2
+
+# Object privileges: WITH GRANT OPTION
+
+- name: grant object privileges, one entry with grant option
+  oracle_grant:
+    <<: *con_param
+    grantee: "u_grant_opt"
+    object_privs:
+      - select:sys.dba_users with grant option
+      - select:sys.dba_tablespaces
+  register: _
+  failed_when: >-
+    _.failed or not _.changed
+    or 'grant select on sys.dba_users to u_grant_opt with grant option' not in _.ddls
+    or 'grant select on sys.dba_tablespaces to u_grant_opt' not in _.ddls
+
+- name: add grant option to an existing object privilege
+  oracle_grant:
+    <<: *con_param
+    grantee: "u_grant_opt"
+    object_privs:
+      - select:sys.dba_users with grant option
+      - select:sys.dba_tablespaces with grant option
+  register: _
+  failed_when: _.failed or not _.changed or _.ddls != ['grant select on sys.dba_tablespaces to u_grant_opt with grant option']
+
+- name: add grant option to an existing object privilege (idempotency)
+  oracle_grant:
+    <<: *con_param
+    grantee: "u_grant_opt"
+    object_privs:
+      - select:sys.dba_users with grant option
+      - select:sys.dba_tablespaces with grant option
+  register: _
+  failed_when: _.failed or _.changed
+
+# Directory privileges: WITH GRANT OPTION
+
+- name: grant directory privileges with grant option
+  oracle_grant:
+    <<: *con_param
+    grantee: "u_grant_opt"
+    directory_privs:
+      - read,write:impexp_opt with grant option
+  register: _
+  failed_when: _.failed or not _.changed or 'with grant option' not in _.ddls[0]
+
+- name: grant directory privileges with grant option (idempotency)
+  oracle_grant:
+    <<: *con_param
+    grantee: "u_grant_opt"
+    directory_privs:
+      - read,write:impexp_opt with grant option
+  register: _
+  failed_when: _.failed or _.changed
+
+# Invalid suffix
+
+- name: admin option on object privilege is rejected
+  oracle_grant:
+    <<: *con_param
+    grantee: "u_grant_opt"
+    object_privs:
+      - select:sys.dba_users with admin option
+  register: _
+  failed_when: not _.failed or 'object_privs' not in _.msg
+
+# Revoke strips the suffix
+
+- name: revoke privilege granted with admin option
+  oracle_grant:
+    <<: *con_param
+    grantee: "u_grant_opt"
+    grants:
+      - create table with admin option
+    state: "absent"
+  register: _
+  failed_when: _.failed or not _.changed or _.ddls != ['revoke create table from u_grant_opt']
+
+- name: drop directory
+  oracle_directory:
+    <<: *con_param
+    directory_name: "IMPEXP_OPT"
+    state: "absent"
+
+- name: drop u_grant_opt user
+  oracle_user:
+    <<: *con_param
+    schema_name: "u_grant_opt"
+    state: "absent"
+...

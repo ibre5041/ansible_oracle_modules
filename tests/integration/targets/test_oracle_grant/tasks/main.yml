@@ -50,7 +50,10 @@
   
     - include_tasks: "append_remove_directory_privileges.yml"
       when: running_on_cdb
-  
+
+    - include_tasks: "admin_grant_option.yml"
+      when: running_on_cdb
+
     - include_tasks: "check_mode.yml"
       when: running_on_cdb  
 

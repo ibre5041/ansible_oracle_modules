@@ -22,6 +22,9 @@ options:
     description:
       - System privileges or roles to grant or revoke.
       - C(privileges) and C(grant) are accepted as aliases.
+      - "Append ' with admin option' to an entry to grant it WITH ADMIN OPTION, e.g. 'create table with admin option'.
+        A privilege already held without the option is granted again with it.
+        Without the suffix the admin option is not managed: it is neither added nor removed."
     required: false
     default: null
     type: list
@@ -33,6 +36,8 @@ options:
       - "e.g."
       - "select,update,insert,delete:sys.dba_tablespaces"
       - "select:sys.v_$session"
+      - "Append ' with grant option' to an entry to grant its privileges WITH GRANT OPTION,
+        e.g. 'select,update:hr.employees with grant option'. Behaves like ' with admin option' in C(grants)."
     required: false
     default: null
     type: list
@@ -42,6 +47,8 @@ options:
       - Directory object privileges to grant or revoke.
       - "format: 'priv1,priv2:directory_name'"
       - "e.g. 'read,write:data_pump_dir'"
+      - "Append ' with grant option' to an entry to grant its privileges WITH GRANT OPTION,
+        e.g. 'read,write:data_pump_dir with grant option'."
     required: false
     default: null
     type: list
@@ -137,7 +144,55 @@ EXAMPLES = '''
     mode: sysdba
     grantee: app_user
     state: REMOVEALL
+
+- name: Grant privileges with admin/grant option
+  oracle_grant:
+    mode: sysdba
+    grantee: app_user
+    grants:
+      - create session
+      - create table with admin option
+    object_privs:
+      - select,update:hr.employees with grant option
+      - insert:hr.employees
+    directory_privs:
+      - read:data_pump_dir with grant option
 '''
+
+import re
+
+_OPTION_RE = re.compile(r'^(.*?)\s+with\s+(admin|grant)\s+option$', re.IGNORECASE)
+
+
+def parse_option(module, param, entries, allowed):
+    """Split the trailing 'with admin option' / 'with grant option' off each entry.
+
+    Returns a list of (entry, has_option) tuples. Fails when the suffix is not
+    the one Oracle accepts for this kind of privilege (allowed: 'admin' or 'grant').
+    """
+    parsed = []
+    for entry in entries:
+        m = _OPTION_RE.match(entry.strip())
+        if not m:
+            parsed.append((entry, False))
+            continue
+        if m.group(2).lower() != allowed:
+            module.fail_json(msg="'with %s option' is not valid in %s, use 'with %s option': %s"
+                                 % (m.group(2).lower(), param, allowed, entry), changed=False)
+        parsed.append((m.group(1), True))
+    return parsed
+
+
+def _grant_sql(privs, target, schema, with_option):
+    """Return the GRANT statements for privs on target; privs in with_option get WITH GRANT OPTION."""
+    total_sql = []
+    plain = privs.difference(with_option)
+    if plain:
+        total_sql.append('grant %s on %s to %s' % (','.join(plain), target, schema))
+    optioned = privs.intersection(with_option)
+    if optioned:
+        total_sql.append('grant %s on %s to %s with grant option' % (','.join(optioned), target, schema))
+    return total_sql
 
 
 def get_dir_privs(conn, schema, directory_privs, grant_mode):
@@ -145,12 +200,16 @@ def get_dir_privs(conn, schema, directory_privs, grant_mode):
     grant_list_dir = []
     revoke_list_dir = []
 
-    # Directory Privs
-    wanted_dirprivs_list = directory_privs
-    w_object_name_l = [w.split(':')[1].lower() for w in wanted_dirprivs_list]
-    w_object_priv_l = [w.split(':')[0].lower() for w in wanted_dirprivs_list]
-    w_object_priv_l = [set(w.split(',')) for w in w_object_priv_l]
-    wanted_privs_d = dict(zip(w_object_name_l, w_object_priv_l))
+    # Directory Privs; entries for the same directory are merged
+    wanted_privs_d = {}
+    wanted_option_d = {}  # privileges wanted WITH GRANT OPTION
+    for entry, option in directory_privs:
+        directory = entry.split(':')[1].lower()
+        privs = set(entry.split(':')[0].lower().split(','))
+        wanted_privs_d.setdefault(directory, set()).update(privs)
+        if option:
+            wanted_option_d.setdefault(directory, set()).update(privs)
+    w_object_name_l = list(wanted_privs_d)
 
     currdsql_all = """
     select listagg(p.privilege, ',') within group (order by p.privilege), p.table_name
@@ -168,6 +227,20 @@ def get_dir_privs(conn, schema, directory_privs, grant_mode):
     c_dir_priv_l = [set(o[0].lower().split(',')) for o in result]
     current_dir_privs_d = dict(zip(c_dir_name_l, c_dir_priv_l))
 
+    current_option_d = {}  # privileges currently held WITH GRANT OPTION
+    if wanted_option_d:
+        currdsql_option = """
+        select p.privilege, p.table_name
+        from dba_tab_privs p, dba_objects o
+        where p.grantee = upper(:grantee)
+        and p.grantable = 'YES'
+        and p.table_name = o.object_name
+        and p.owner = o.owner
+        and o.object_type = 'DIRECTORY'
+        """
+        for privilege, directory in conn.execute_select(currdsql_option, params={'grantee': schema}, fetchone=False):
+            current_option_d.setdefault(directory.lower(), set()).add(privilege.lower())
+
     remove_completely_dir = set(c_dir_name_l).difference(w_object_name_l)
     for remove in remove_completely_dir:
         rdsql = 'revoke all on directory %s from %s' % (remove, schema)
@@ -177,18 +250,20 @@ def get_dir_privs(conn, schema, directory_privs, grant_mode):
     if newstuff:
         for directory in newstuff:
             grants = wanted_privs_d[directory]
-            nsql = "grant %s on directory %s to %s" % (','.join(grants), directory, schema)
-            grant_list_dir.append(nsql)
+            grant_list_dir.extend(_grant_sql(grants, 'directory %s' % directory, schema,
+                                             wanted_option_d.get(directory, set())))
 
     changedstuff = set(w_object_name_l).intersection(c_dir_name_l)
     for directory in changedstuff:
         wanted_grants = wanted_privs_d[directory]
         current_grants = current_dir_privs_d[directory]
+        wanted_option = wanted_option_d.get(directory, set())
         new_grants = wanted_grants.difference(current_grants)
+        # Held without the requested WITH GRANT OPTION: grant again with it
+        new_grants |= wanted_option.difference(current_option_d.get(directory, set()))
         old_grants = current_grants.difference(wanted_grants)
         if new_grants:
-            adsql = "grant %s on directory %s to %s" % (','.join(new_grants), directory, schema)
-            grant_list_dir.append(adsql)
+            grant_list_dir.extend(_grant_sql(new_grants, 'directory %s' % directory, schema, wanted_option))
         if old_grants:
             rdsql = "revoke %s on directory %s from %s" % (','.join(old_grants), directory, schema)
             revoke_list_dir.append(rdsql)
@@ -206,23 +281,24 @@ def get_obj_privs(conn, schema, wanted_privs_list, grant_mode):
     grant_list = []
     revoke_list = []
 
-    # OBJECT PRIVS
-    w_object_name_l = [] # wanted object names in privilege list
-    w_object_priv_l = [] # wanted privileges in privilege list
-    for priv in wanted_privs_list:
+    # OBJECT PRIVS; entries for the same object are merged
+    wanted_privs_d = {}
+    wanted_option_d = {}  # privileges wanted WITH GRANT OPTION
+    for priv, option in wanted_privs_list:
         object_name = priv.split(':')[1].lower().strip()
         object_priv = priv.split(':')[0].lower().strip()
         object_priv = set(object_priv.split(','))
         if '.' not in object_name:
             r = conn.resolve_object_name(object_name).lower()
             object_name = r if r else object_name
-        w_object_name_l.extend([object_name])
-        w_object_priv_l.extend([object_priv])
+        wanted_privs_d.setdefault(object_name, set()).update(object_priv)
+        if option:
+            wanted_option_d.setdefault(object_name, set()).update(object_priv)
 
     #w_object_name_l = [w.split(':')[1].lower().strip() for w in wanted_privs_list]
     #w_object_priv_l = [w.split(':')[0].lower().strip() for w in wanted_privs_list]
     #w_object_priv_l = [set(w.split(',')) for w in w_object_priv_l]
-    wanted_privs_d = dict(zip(w_object_name_l, w_object_priv_l))
+    w_object_name_l = list(wanted_privs_d)
 
     currsql_all = """
     select listagg(distinct p.privilege,',') within group (order by p.privilege)
@@ -240,6 +316,20 @@ def get_obj_privs(conn, schema, wanted_privs_list, grant_mode):
     c_object_priv_l = [set(o[0].lower().split(',')) for o in result]
     current_privs_d = dict(zip(c_object_name_l, c_object_priv_l))
 
+    current_option_d = {}  # privileges currently held WITH GRANT OPTION
+    if wanted_option_d:
+        currsql_option = """
+        select p.privilege, p.OWNER ||'.'|| p.table_name
+        from dba_tab_privs p, dba_objects o
+        where p.grantee = upper(:schema)
+        and p.grantable = 'YES'
+        and p.table_name = o.object_name
+        and p.owner = o.owner
+        and o.object_type not in ('DIRECTORY','TABLE PARTITION','TABLE SUBPARTITION')
+        """
+        for privilege, obj in conn.execute_select(currsql_option, {'schema': schema}, fetchone=False):
+            current_option_d.setdefault(obj.lower(), set()).add(privilege.lower())
+
     remove_completely = set(c_object_name_l).difference(w_object_name_l)
     for remove in remove_completely:
         rsql = 'revoke all on %s from %s' % (remove, schema)
@@ -248,18 +338,19 @@ def get_obj_privs(conn, schema, wanted_privs_list, grant_mode):
     newstuff = set(w_object_name_l).difference(c_object_name_l)
     for obj in newstuff:
         grants = wanted_privs_d[obj]
-        nsql = "grant %s on %s to %s" % (','.join(grants), obj, schema)
-        grant_list.append(nsql)
+        grant_list.extend(_grant_sql(grants, obj, schema, wanted_option_d.get(obj, set())))
 
     changedstuff = set(w_object_name_l).intersection(c_object_name_l)
     for obj in changedstuff:
         wanted_grants = wanted_privs_d[obj]
         current_grants = current_privs_d[obj]
+        wanted_option = wanted_option_d.get(obj, set())
         new_grants = wanted_grants.difference(current_grants)
+        # Held without the requested WITH GRANT OPTION: grant again with it
+        new_grants |= wanted_option.difference(current_option_d.get(obj, set()))
         old_grants = current_grants.difference(wanted_grants)
         if new_grants:
-            asql = "grant %s on %s to %s" % (','.join(new_grants), obj, schema)
-            grant_list.append(asql)
+            grant_list.extend(_grant_sql(new_grants, obj, schema, wanted_option))
         if old_grants:
             rsql = "revoke %s on %s from %s" % (','.join(old_grants), obj, schema)
             revoke_list.append(rsql)
@@ -317,7 +408,8 @@ def ensure_grant(module, conn, schema, wanted_grant_list, object_privs, director
     dir_privs = get_dir_privs(conn, schema, directory_privs, grant_mode)
     total_sql.extend(dir_privs)
 
-    wanted_grant_list = [x.lower() for x in wanted_grant_list]
+    wanted_admin = set(x.lower() for x, option in wanted_grant_list if option)
+    wanted_grant_list = [x.lower() for x, option in wanted_grant_list]
 
     # Get the current role grant for the schema. If any are present, add them to the total
     curr_role_grant = get_current_role_grant(conn, schema)
@@ -330,6 +422,10 @@ def ensure_grant(module, conn, schema, wanted_grant_list, object_privs, director
     # Get the difference between current grant and wanted grant
     grant_to_add = set(wanted_grant_list).difference(total_current)
     grant_to_remove = set(total_current).difference(wanted_grant_list)
+
+    if wanted_admin:
+        # Held without the requested WITH ADMIN OPTION: grant again with it
+        grant_to_add.update(wanted_admin.difference(get_current_admin_grant(conn, schema)))
 
     # Special case: If DBA is granted to a user, unlimited tablespace is also implicitly
     # granted -> on the next run, unlimited tablespace is removed from the user
@@ -347,11 +443,13 @@ def ensure_grant(module, conn, schema, wanted_grant_list, object_privs, director
         remove_sql += container_clause
         total_sql.append(remove_sql)
 
-    if any(grant_to_add):
-        grant_to_add = ','.join(grant_to_add)
-        add_sql = 'grant %s to %s' % (grant_to_add, schema)
-        add_sql += container_clause
-        total_sql.append(add_sql)
+    plain_to_add = [x for x in grant_to_add if x not in wanted_admin]
+    admin_to_add = [x for x in grant_to_add if x in wanted_admin]
+    for to_add, option in ((plain_to_add, ''), (admin_to_add, ' with admin option')):
+        if to_add:
+            add_sql = 'grant %s to %s%s' % (','.join(to_add), schema, option)
+            add_sql += container_clause
+            total_sql.append(add_sql)
 
     if total_sql:
         for sql in total_sql:
@@ -427,6 +525,17 @@ def get_current_sys_grant(conn, schema):
     return curr_sys_grant
 
 
+# Get the role/sys grant held WITH ADMIN OPTION
+def get_current_admin_grant(conn, schema):
+    sql = """
+    select granted_role from dba_role_privs where grantee = upper(:schema) and admin_option = 'YES'
+    union
+    select privilege from dba_sys_privs where grantee = upper(:schema) and admin_option = 'YES'
+    """
+    result = conn.execute_select(sql, {'schema': schema}, fetchone=False)
+    return set(item[0].lower() for item in result)
+
+
 def main():
     module = AnsibleModule(
         argument_spec = dict(
@@ -456,9 +565,9 @@ def main():
 
 
     grantee = module.params["grantee"]
-    grants = module.params["grants"] or []
-    object_privs = module.params["object_privs"] or []
-    directory_privs = module.params["directory_privs"] or []
+    grants = parse_option(module, 'grants', module.params["grants"] or [], 'admin')
+    object_privs = parse_option(module, 'object_privs', module.params["object_privs"] or [], 'grant')
+    directory_privs = parse_option(module, 'directory_privs', module.params["directory_privs"] or [], 'grant')
     grant_mode = module.params["grant_mode"]
     container = module.params["container"]
     session_container = module.params["session_container"]
@@ -492,7 +601,9 @@ def main():
     if state == 'REMOVEALL':
         ensure_grant(module, oc, grantee, [], [], [], grant_mode='exact', container_clause=container_clause)
     elif state in ['absent']:
-        remove_grant(module, oc, grantee, grants, object_privs, directory_privs, container_clause)
+        # A REVOKE removes the privilege together with its admin/grant option
+        remove_grant(module, oc, grantee, [x for x, _ in grants], [x for x, _ in object_privs],
+                     [x for x, _ in directory_privs], container_clause)
 
     module.fail_json(msg='Unknown object', changed=False)
 
