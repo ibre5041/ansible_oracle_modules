@@ -78,9 +78,11 @@ class _OrapkiModule(BaseFakeModule):
         # warnings about mutable class defaults on the base class).
         self._orapki_responses = getattr(type(self), '_orapki_responses', {})
         self._commands_run = getattr(type(self), '_commands_run', [])
+        self._stdin = getattr(type(self), '_stdin', [])
 
     def run_command(self, command, **kwargs):
         self._commands_run.append(command)
+        self._stdin.append(kwargs.get('data'))
         # Match on subcommand keywords in the command list
         cmd_str = ' '.join(command) if isinstance(command, list) else command
         for key, response in self._orapki_responses.items():
@@ -107,7 +109,7 @@ class _FakeOs:
 
         @classmethod
         def exists(cls, path_str):
-            if 'orapki' in path_str:
+            if 'orapki' in path_str or 'mkstore' in path_str:
                 return cls._orapki_exists
             return cls._wallet_exists
 
@@ -852,3 +854,206 @@ def test_parse_list_entries_empty():
     mod = _load()
     result = mod._parse_list_entries('')
     assert result == []
+
+
+# ===========================================================================
+# Tests: Oracle 19c (no orapki secretstore) -> mkstore
+# ===========================================================================
+
+ORAPKI_19C_BANNER = """Oracle PKI Tool Release 19.0.0.0.0 - Production
+Version 19.3.0.0.0
+Copyright (c) 2004, 2019, Oracle and/or its affiliates. All rights reserved.
+
+orapki [crl|wallet|cert|help] <-nologo>
+"""
+
+ORAPKI_23_BANNER = ORAPKI_19C_BANNER.replace('19.0.0.0.0', '23.0.0.0.0').replace('19.3.0.0.0', '23.4.0.24.5')
+
+MKSTORE_LIST_CREDENTIAL = """Oracle Secret Store Tool Release 19.0.0.0.0 - Production
+Version 19.3.0.0.0
+Copyright (c) 2004, 2019, Oracle and/or its affiliates. All rights reserved.
+
+Enter wallet password:
+List credential (index: connect_string username)
+1: PROD sys
+"""
+
+MKSTORE_LIST = """Oracle Secret Store Tool Release 19.0.0.0.0 - Production
+Version 19.3.0.0.0
+Copyright (c) 2004, 2019, Oracle and/or its affiliates. All rights reserved.
+
+Enter wallet password:
+Oracle Secret Store entries:
+oracle.security.client.connect_string1
+oracle.security.client.password1
+oracle.security.client.username1
+api_key
+"""
+
+MKSTORE = '/fake/oracle/bin/mkstore'
+WALLET = '/opt/oracle/wallets/test'
+
+
+def _run_19c(monkeypatch, responses, **params):
+    """Run the module with a 19c orapki banner; returns (Mod, ExitJson payload)."""
+    mod = _load()
+
+    class Mod(_OrapkiModule):
+        pass
+
+    Mod.params = _orapki_params(**params)
+    # Specific mkstore keys first: the fake returns the first key found in the command.
+    Mod._orapki_responses = {**responses, '/bin/orapki': (0, ORAPKI_19C_BANNER, '')}
+    Mod._commands_run = []
+    Mod._stdin = []
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "os", _make_fake_os(orapki_exists=True))
+    return mod, Mod
+
+
+def test_orapki_19c_create_credential_uses_mkstore(monkeypatch):
+    mod, Mod = _run_19c(monkeypatch, {'-listCredential': (0, MKSTORE_LIST_CREDENTIAL.replace('1: PROD sys\n', ''), '')},
+                        credential_state="present", credential_db="STDBY",
+                        credential_user="sys", credential_password="SysPass123")
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    assert exc.value.args[0]["changed"] is True
+    assert not any('secretstore' in c for c in Mod._commands_run)
+    assert Mod._commands_run[-1] == [MKSTORE, '-wrl', WALLET, '-createCredential', 'STDBY', 'sys', 'SysPass123']
+    assert Mod._stdin[-1] == 'TestPass123', "wallet password goes on stdin"
+
+
+def test_orapki_19c_modify_credential_uses_mkstore(monkeypatch):
+    mod, Mod = _run_19c(monkeypatch, {'-listCredential': (0, MKSTORE_LIST_CREDENTIAL, '')},
+                        credential_state="present", credential_db="PROD",
+                        credential_user="newsys", credential_password="NewPass123")
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    assert exc.value.args[0]["changed"] is True
+    assert Mod._commands_run[-1] == [MKSTORE, '-wrl', WALLET, '-modifyCredential', 'PROD', 'newsys', 'NewPass123']
+
+
+def test_orapki_19c_modify_credential_requires_user_and_password(monkeypatch):
+    mod, Mod = _run_19c(monkeypatch, {'-listCredential': (0, MKSTORE_LIST_CREDENTIAL, '')},
+                        credential_state="present", credential_db="PROD", credential_password="NewPass123")
+
+    with pytest.raises(FailJson) as exc:
+        mod.main()
+    assert "credential_user" in exc.value.args[0]["msg"]
+    assert not any('-modifyCredential' in c for c in Mod._commands_run)
+
+
+def test_orapki_19c_delete_credential_uses_mkstore(monkeypatch):
+    mod, Mod = _run_19c(monkeypatch, {'-listCredential': (0, MKSTORE_LIST_CREDENTIAL, '')},
+                        credential_state="absent", credential_db="PROD")
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    assert exc.value.args[0]["changed"] is True
+    assert Mod._commands_run[-1] == [MKSTORE, '-wrl', WALLET, '-deleteCredential', 'PROD']
+
+
+def test_orapki_19c_create_entry_uses_mkstore(monkeypatch):
+    mod, Mod = _run_19c(monkeypatch, {'-list': (0, MKSTORE_LIST, '')},
+                        credential_state="present", credential_type="entry",
+                        credential_alias="db_key", credential_secret="s3cret")
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    assert exc.value.args[0]["changed"] is True
+    assert Mod._commands_run[-1] == [MKSTORE, '-wrl', WALLET, '-createEntry', 'db_key', 's3cret']
+
+
+def test_orapki_19c_modify_and_delete_entry_use_mkstore(monkeypatch):
+    for state, expected in (("present", ['-modifyEntry', 'api_key', 's3cret']),
+                            ("absent", ['-deleteEntry', 'api_key'])):
+        mod, Mod = _run_19c(monkeypatch, {'-list': (0, MKSTORE_LIST, '')},
+                            credential_state=state, credential_type="entry",
+                            credential_alias="api_key", credential_secret="s3cret")
+
+        with pytest.raises(ExitJson) as exc:
+            mod.main()
+        assert exc.value.args[0]["changed"] is True
+        assert Mod._commands_run[-1] == [MKSTORE, '-wrl', WALLET] + expected
+
+
+def test_orapki_19c_mkstore_failure_scrubs_secrets(monkeypatch):
+    mod, Mod = _run_19c(monkeypatch,
+                        {'-listCredential': (0, '', ''),
+                         '-createCredential': (1, '', 'Secret Store error: bad SysPass123 TestPass123')},
+                        credential_state="present", credential_db="PROD",
+                        credential_user="sys", credential_password="SysPass123")
+
+    with pytest.raises(FailJson) as exc:
+        mod.main()
+    result = exc.value.args[0]
+    assert "mkstore failed" in result["msg"]
+    assert "SysPass123" not in result["msg"] + result["cmd"]
+    assert "TestPass123" not in result["msg"] + result["cmd"]
+
+
+def test_orapki_23_banner_keeps_secretstore(monkeypatch):
+    mod, Mod = _run_19c(monkeypatch, {'list_credentials': (0, '', '')},
+                        credential_state="present", credential_db="PROD",
+                        credential_user="sys", credential_password="SysPass123")
+    Mod._orapki_responses['/bin/orapki'] = (0, ORAPKI_23_BANNER, '')
+
+    with pytest.raises(ExitJson):
+        mod.main()
+    assert Mod._commands_run[-1][1:3] == ['secretstore', 'create_credential']
+    assert not any(MKSTORE in c for c in Mod._commands_run)
+
+
+def test_parse_mkstore_list_skips_password_prompt():
+    mod = _load()
+    assert mod._parse_list_entries(MKSTORE_LIST) == [
+        'oracle.security.client.connect_string1',
+        'oracle.security.client.password1',
+        'oracle.security.client.username1',
+        'api_key',
+    ]
+    assert mod._parse_list_credentials(MKSTORE_LIST_CREDENTIAL) == ['PROD']
+
+
+def test_orapki_19c_mkstore_requires_wallet_password(monkeypatch):
+    mod, Mod = _run_19c(monkeypatch, {}, wallet_password=None,
+                        credential_state="present", credential_db="PROD",
+                        credential_user="sys", credential_password="SysPass123")
+
+    with pytest.raises(FailJson) as exc:
+        mod.main()
+    assert "wallet_password" in exc.value.args[0]["msg"]
+    assert not any(MKSTORE in c for c in Mod._commands_run)
+
+
+def test_orapki_19c_wallet_absent_removes_files(monkeypatch):
+    """orapki 19c has no 'wallet delete': the wallet files are removed directly."""
+    mod, Mod = _run_19c(monkeypatch, {}, state="absent")
+    fake_os = _make_fake_os(orapki_exists=True, wallet_exists=True)
+    removed = []
+    fake_os.path.lexists = classmethod(lambda cls, p: 'ewallet.p12' in p or 'cwallet.sso' in p)
+    fake_os.remove = removed.append
+    monkeypatch.setattr(mod, "os", fake_os)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    assert exc.value.args[0]["changed"] is True
+    assert not any('delete' in c for c in Mod._commands_run)
+    assert sorted(removed) == sorted(WALLET + '/' + f for f in
+                                     ('ewallet.p12', 'ewallet.p12.lck', 'cwallet.sso', 'cwallet.sso.lck'))
+
+
+def test_orapki_19c_wallet_absent_check_mode(monkeypatch):
+    mod, Mod = _run_19c(monkeypatch, {}, state="absent")
+    Mod.check_mode = True
+    fake_os = _make_fake_os(orapki_exists=True, wallet_exists=True)
+    removed = []
+    fake_os.remove = removed.append
+    monkeypatch.setattr(mod, "os", fake_os)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    assert exc.value.args[0]["changed"] is True
+    assert removed == []

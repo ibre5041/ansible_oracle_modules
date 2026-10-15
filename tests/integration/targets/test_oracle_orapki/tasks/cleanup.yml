@@ -6,7 +6,13 @@
     state: absent
     wallet_location: "{{ wallet_location }}"
   register: _
-  failed_when: false
+  failed_when: _.failed or not _.changed
+
+- name: "check wallet files are gone"
+  stat:
+    path: "{{ wallet_location }}/ewallet.p12"
+  register: _p12
+  failed_when: _p12.stat.exists
 
 - name: "remove exported cert file"
   file:

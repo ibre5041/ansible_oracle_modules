@@ -14,6 +14,8 @@ description:
   - Does NOT manage TDE keystores (use oracle_wallet for that)
   - Compatible with Oracle 19c, 23ai, and 26ai
   - In Oracle 26ai, mkstore is deprecated - use orapki secretstore instead
+  - orapki secretstore exists from Oracle 23ai. With an older orapki (e.g. 19c), credentials
+    and entries are managed with mkstore from the same ORACLE_HOME instead
 version_added: "3.4.0"
 options:
   oracle_home:
@@ -108,6 +110,10 @@ notes:
   - Does not require a database connection (pure CLI tool)
   - For TDE keystore management, use oracle_wallet instead
   - In Oracle 26ai, mkstore is deprecated - this module uses orapki secretstore
+  - Before Oracle 23ai, which has no orapki wallet delete, state=absent removes the wallet files
+    (ewallet.p12, cwallet.sso and their .lck files) directly
+  - Before Oracle 23ai, mkstore is used for credential_state; it requires wallet_password, and
+    modifying an existing credential requires both credential_user and credential_password
   - Wallet passwords are never logged (no_log=True)
 requirements: []
 author:
@@ -309,6 +315,49 @@ def _run_orapki(module, args):
     return stdout, stderr
 
 
+def _orapki_release(module):
+    """Return the orapki major release from its banner (e.g. 19, 23), or None if not found."""
+    _rc, stdout, stderr = module.run_command([_get_orapki_bin(module)])
+    m = re.search(r'Release\s+(\d+)', (stdout or '') + (stderr or ''))
+    return int(m.group(1)) if m else None
+
+
+def _orapki_before_23(module):
+    """True for an orapki older than 23ai, which has no 'secretstore' nor 'wallet delete' command."""
+    release = _orapki_release(module)
+    return release is not None and release < 23
+
+
+def _run_mkstore(module, args, secrets):
+    """Execute mkstore on the wallet and return stdout.
+
+    mkstore has no -pwd option: the wallet password is fed on stdin.
+    secrets -- values (besides the wallet password) to scrub from the error output.
+    """
+    wallet_location = module.params["wallet_location"]
+    wallet_password = module.params["wallet_password"]
+    mkstore_bin = os.path.join(module.params["oracle_home"], 'bin', 'mkstore')
+    if not os.path.exists(mkstore_bin):
+        module.fail_json(msg='mkstore not found at %s' % mkstore_bin, changed=False)
+
+    cmd = [mkstore_bin, '-wrl', wallet_location, *args]
+    rc, stdout, stderr = module.run_command(cmd, data=wallet_password)
+    if rc != 0:
+        output = (stderr or stdout).strip()
+        safe_cmd = list(cmd)
+        for val in [wallet_password, *secrets]:
+            if val:
+                output = output.replace(val, '********')
+                safe_cmd = ['********' if a == val else a for a in safe_cmd]
+        module.fail_json(
+            msg='mkstore failed: %s' % output,
+            rc=rc,
+            cmd=' '.join(safe_cmd),
+            changed=False,
+        )
+    return stdout
+
+
 # ============================================================================
 # Output parsing
 # ============================================================================
@@ -382,7 +431,7 @@ def _parse_secretstore_list(stdout):
 
     # Fall back to plain-text format (Oracle 23ai):
     # skip banner/header lines, collect remaining non-empty lines.
-    skip_prefixes = ('Oracle PKI Tool', 'Version ', 'Copyright ')
+    skip_prefixes = ('Oracle PKI Tool', 'Version ', 'Copyright ', 'Enter wallet password')
     for line in stdout.split('\n'):
         line = line.strip()
         if not line:
@@ -496,6 +545,14 @@ def _ensure_wallet_absent(module):
         return False
 
     if module.check_mode:
+        return True
+
+    if _orapki_before_23(module):
+        # orapki wallet delete exists from 23ai: remove the wallet files directly
+        for name in ('ewallet.p12', 'ewallet.p12.lck', 'cwallet.sso', 'cwallet.sso.lck'):
+            path = os.path.join(wallet_location, name)
+            if os.path.lexists(path):
+                os.remove(path)
         return True
 
     sso_only = _is_sso_only_wallet(wallet_location)
@@ -752,18 +809,21 @@ def _remove_cert(module):
 # Credential / secret store management
 # ============================================================================
 
-def _credential_exists(module, alias, credential_type='credential'):
+def _credential_exists(module, alias, credential_type='credential', use_mkstore=False):
     """Check if a credential or entry alias exists in the wallet."""
     wallet_location = module.params["wallet_location"]
     wallet_password = module.params["wallet_password"]
 
-    subcmd = 'list_entries' if credential_type == 'entry' else 'list_credentials'
-    args = ['secretstore', subcmd,
-            '-wallet', wallet_location]
-    if wallet_password:
-        args.extend(['-pwd', wallet_password])
+    if use_mkstore:
+        stdout = _run_mkstore(module, ['-list' if credential_type == 'entry' else '-listCredential'], [])
+    else:
+        subcmd = 'list_entries' if credential_type == 'entry' else 'list_credentials'
+        args = ['secretstore', subcmd,
+                '-wallet', wallet_location]
+        if wallet_password:
+            args.extend(['-pwd', wallet_password])
 
-    stdout, _stderr = _run_orapki(module, args)
+        stdout, _stderr = _run_orapki(module, args)
 
     if credential_type == 'entry':
         aliases = _parse_list_entries(stdout)
@@ -798,15 +858,27 @@ def _manage_credential(module):
                 changed=False,
             )
         lookup_key = credential_alias
-    exists = _credential_exists(module, lookup_key, credential_type)
+    use_mkstore = _orapki_before_23(module)
+    if use_mkstore and not wallet_password:
+        module.fail_json(
+            msg='wallet_password is required to manage credentials with mkstore (orapki older than 23ai)',
+            changed=False,
+        )
+    exists = _credential_exists(module, lookup_key, credential_type, use_mkstore)
 
     if credential_state == 'present':
-        return _upsert_credential(module, exists, lookup_key)
+        return _upsert_credential(module, exists, lookup_key, use_mkstore)
 
     if credential_state == 'absent':
         if not exists:
             return False
         if module.check_mode:
+            return True
+        if use_mkstore:
+            if credential_type == 'credential':
+                _run_mkstore(module, ['-deleteCredential', lookup_key], [])
+            else:
+                _run_mkstore(module, ['-deleteEntry', credential_alias], [])
             return True
         if credential_type == 'credential':
             args = ['secretstore', 'delete_credential',
@@ -824,11 +896,12 @@ def _manage_credential(module):
     return False
 
 
-def _upsert_credential(module, exists, connect_key):
+def _upsert_credential(module, exists, connect_key, use_mkstore=False):
     """Create or modify a credential/entry.
 
     connect_key is the resolved identifier (credential_db or credential_alias
     fallback) used as the -connect_string for credential operations.
+    use_mkstore -- manage the secret store with mkstore (orapki older than 23ai).
     """
     credential_type = module.params["credential_type"]
     credential_alias = module.params["credential_alias"]
@@ -851,7 +924,21 @@ def _upsert_credential(module, exists, connect_key):
         if exists and not credential_user and not credential_password:
             return False
 
+        # mkstore -modifyCredential takes both the user and the password
+        if use_mkstore and exists and (not credential_user or not credential_password):
+            module.fail_json(
+                msg='credential_user and credential_password are both required to modify '
+                    'a credential with mkstore (orapki older than 23ai)',
+                changed=False,
+            )
+
         if module.check_mode:
+            return True
+
+        if use_mkstore:
+            subcmd = '-modifyCredential' if exists else '-createCredential'
+            _run_mkstore(module, [subcmd, connect_key, credential_user, credential_password],
+                         [credential_password])
             return True
 
         if exists:
@@ -884,6 +971,11 @@ def _upsert_credential(module, exists, connect_key):
             )
 
         if module.check_mode:
+            return True
+
+        if use_mkstore:
+            subcmd = '-modifyEntry' if exists else '-createEntry'
+            _run_mkstore(module, [subcmd, credential_alias, credential_secret], [credential_secret])
             return True
 
         if exists:
