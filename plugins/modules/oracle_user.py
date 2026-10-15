@@ -434,6 +434,9 @@ def modify_user(conn, module, user):
     if profile:
         sql += ' profile "%s" ' % profile
 
+    if container:
+        sql += ' container=%s' % container
+
     if changes:
         conn.execute_ddl(sql)
 

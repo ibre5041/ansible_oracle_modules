@@ -169,6 +169,41 @@ def test_user_modify_lock_existing(monkeypatch):
     assert any("account lock" in d.lower() for d in payload["ddls"])
 
 
+@pytest.mark.parametrize("container", ["all", "current"])
+def test_user_modify_appends_container_clause(monkeypatch, container):
+    """ALTER USER carries the requested CONTAINER= clause, like CREATE USER does."""
+    mod = _load("oracle_user")
+
+    class Mod(BaseFakeModule):
+        params = _user_params(schema="C##TESTUSER", schema_password=None, locked=True, container=container)
+
+    row = _default_user_row()  # currently OPEN
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "oracleConnection", lambda m: _UserConn(m, row), raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    alter = [d for d in exc.value.args[0]["ddls"] if d.lower().startswith("alter user")]
+    assert len(alter) == 1
+    assert "account lock" in alter[0].lower()
+    assert alter[0].lower().rstrip().endswith("container=%s" % container)
+
+
+def test_user_modify_without_container_omits_clause(monkeypatch):
+    mod = _load("oracle_user")
+
+    class Mod(BaseFakeModule):
+        params = _user_params(schema_password=None, locked=True)
+
+    row = _default_user_row()
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "oracleConnection", lambda m: _UserConn(m, row), raising=False)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    assert not any("container=" in d.lower() for d in exc.value.args[0]["ddls"])
+
+
 def test_user_drops_existing(monkeypatch):
     mod = _load("oracle_user")
 
