@@ -15,6 +15,7 @@
     - include_tasks: "wallet_create.yml"
     - include_tasks: "certificates.yml"
     - include_tasks: "secrets.yml"
+    - include_tasks: "wallet_delete.yml"
     - include_tasks: "cleanup.yml"
 
   environment:
