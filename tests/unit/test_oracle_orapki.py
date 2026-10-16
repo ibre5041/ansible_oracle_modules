@@ -1057,3 +1057,32 @@ def test_orapki_19c_wallet_absent_check_mode(monkeypatch):
         mod.main()
     assert exc.value.args[0]["changed"] is True
     assert removed == []
+
+
+def test_orapki_wallet_absent_also_deletes_auto_login(monkeypatch):
+    """orapki wallet delete -pwd removes only ewallet.p12; cwallet.sso is deleted in the same run."""
+    mod = _load()
+    fake_os = _make_fake_os(orapki_exists=True, wallet_exists=True)
+
+    class Mod(_OrapkiModule):
+        params = _orapki_params(state="absent")
+        _commands_run = []
+
+        def run_command(self, command, **kwargs):
+            # Mimic orapki 23ai+: -pwd deletes the PKCS#12 wallet, -sso the auto-login one
+            if '-pwd' in command:
+                fake_os.path._p12_exists = False
+            if '-sso' in command:
+                fake_os.path._sso_exists = False
+            return super().run_command(command, **kwargs)
+
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "os", fake_os)
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    assert exc.value.args[0]["changed"] is True
+    deletes = [c for c in Mod._commands_run if 'delete' in c]
+    assert len(deletes) == 2
+    assert '-pwd' in deletes[0] and '-sso' in deletes[1]
+    assert not fake_os.path._sso_exists

@@ -562,6 +562,9 @@ def _ensure_wallet_absent(module):
     elif wallet_password:
         args.extend(['-pwd', wallet_password])
     _run_orapki(module, args)
+    # wallet delete without -sso removes only ewallet.p12: delete the auto-login wallet too
+    if not sso_only and _is_sso_only_wallet(wallet_location):
+        _run_orapki(module, ['wallet', 'delete', '-wallet', wallet_location, '-sso'])
     return True
 
 
