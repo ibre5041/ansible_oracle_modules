@@ -771,6 +771,160 @@ def test_grant_container_all_with_session_container_fails(monkeypatch):
     assert "mutually exclusive" in exc.value.args[0]["msg"].lower()
 
 
+class _OptionConn(_GrantConn):
+    """Fake conn that also answers the WITH ADMIN/GRANT OPTION state queries."""
+
+    def __init__(self, module, current_roles=None, current_sys=None, admin=None,
+                 obj=None, obj_grantable=None, dirs=None, dir_grantable=None):
+        super().__init__(module, current_roles=current_roles, current_sys=current_sys)
+        self._admin = admin or []                  # privileges/roles held with admin option
+        self._obj = obj or []                      # (privs, owner.object) rows
+        self._obj_grantable = obj_grantable or []  # (privilege, owner.object) rows
+        self._dirs = dirs or []                    # (privs, directory) rows
+        self._dir_grantable = dir_grantable or []  # (privilege, directory) rows
+
+    def execute_select(self, sql, params=None, fetchone=False):
+        sql_l = sql.lower()
+        if "admin_option" in sql_l:
+            return [(p,) for p in self._admin]
+        if "dba_tab_privs" in sql_l:
+            is_dir = "object_type = 'directory'" in sql_l
+            if "grantable" in sql_l:
+                return self._dir_grantable if is_dir else self._obj_grantable
+            return self._dirs if is_dir else self._obj
+        return super().execute_select(sql, params, fetchone)
+
+
+def _run_grant(monkeypatch, conn_factory, **params):
+    mod = _load("oracle_grant")
+
+    class Mod(BaseFakeModule):
+        pass
+
+    Mod.params = _grant_params(**params)
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod, "oracleConnection", conn_factory, raising=False)
+    return mod
+
+
+def test_grant_admin_option_split_from_plain_grants(monkeypatch):
+    mod = _run_grant(monkeypatch, lambda m: _OptionConn(m),
+                     grants=["create session", "CREATE TABLE With  Admin Option"])
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    ddls = [d.lower() for d in exc.value.args[0]["ddls"]]
+    assert "grant create session to appuser" in ddls
+    assert "grant create table to appuser with admin option" in ddls
+
+
+def test_grant_admin_option_upgrades_existing_grant(monkeypatch):
+    mod = _run_grant(monkeypatch, lambda m: _OptionConn(m, current_sys=["create table"]),
+                     grants=["create table with admin option"])
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    assert [d.lower() for d in exc.value.args[0]["ddls"]] == ["grant create table to appuser with admin option"]
+
+
+def test_grant_admin_option_already_held_no_change_in_exact_mode(monkeypatch):
+    mod = _run_grant(monkeypatch,
+                     lambda m: _OptionConn(m, current_roles=["dba"], current_sys=["create table"],
+                                           admin=["create table"]),
+                     grants=["create table with admin option", "dba"], grant_mode="exact")
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    assert exc.value.args[0]["changed"] is False
+
+
+def test_grant_admin_option_precedes_container_clause(monkeypatch):
+    class _Conn(_OptionConn):
+        def execute_select_to_dict(self, sql, params=None, fetchone=False, fail_on_error=True):
+            if "v$database" in sql.lower():
+                return {"cdb": "YES", "con_id": "1"}
+            return {} if fetchone else []
+
+    mod = _run_grant(monkeypatch, _Conn, grants=["create table with admin option"], container="all")
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    assert [d.lower() for d in exc.value.args[0]["ddls"]] == [
+        "grant create table to appuser with admin option container=all"]
+
+
+@pytest.mark.parametrize("param, entry", [
+    ("grants", "create table with grant option"),
+    ("object_privs", "select:sys.dual with admin option"),
+    ("directory_privs", "read:data_dir with admin option"),
+])
+def test_grant_wrong_option_for_privilege_kind_fails(monkeypatch, param, entry):
+    mod = _run_grant(monkeypatch, lambda m: _OptionConn(m), **{"grants": [], param: [entry]})
+
+    with pytest.raises(FailJson) as exc:
+        mod.main()
+    assert param in exc.value.args[0]["msg"]
+
+
+def test_grant_object_grant_option_merges_entries_for_same_object(monkeypatch):
+    mod = _run_grant(monkeypatch, lambda m: _OptionConn(m), grants=[],
+                     object_privs=["select,update:sys.dual with grant option", "insert:sys.dual"])
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    ddls = [d.lower() for d in exc.value.args[0]["ddls"]]
+    assert "grant insert on sys.dual to appuser" in ddls
+    with_option = [d for d in ddls if d.endswith(" with grant option")]
+    assert len(with_option) == 1 and len(ddls) == 2
+    assert set(with_option[0].split()[1].split(",")) == {"select", "update"}
+
+
+def test_grant_object_grant_option_upgrades_existing_grant(monkeypatch):
+    mod = _run_grant(monkeypatch, lambda m: _OptionConn(m, obj=[("select", "sys.dual")]), grants=[],
+                     object_privs=["select:sys.dual with grant option"], grant_mode="exact")
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    assert [d.lower() for d in exc.value.args[0]["ddls"]] == ["grant select on sys.dual to appuser with grant option"]
+
+
+def test_grant_object_grant_option_already_held_no_change(monkeypatch):
+    mod = _run_grant(monkeypatch,
+                     lambda m: _OptionConn(m, obj=[("select", "sys.dual")],
+                                           obj_grantable=[("SELECT", "SYS.DUAL")]),
+                     grants=[], object_privs=["select:sys.dual with grant option"])
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    assert exc.value.args[0]["changed"] is False
+
+
+def test_grant_directory_grant_option(monkeypatch):
+    mod = _run_grant(monkeypatch, lambda m: _OptionConn(m, dirs=[("read", "data_dir")]), grants=[],
+                     directory_privs=["read,write:data_dir with grant option"])
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    ddls = [d.lower() for d in exc.value.args[0]["ddls"]]
+    assert len(ddls) == 1 and ddls[0].endswith(" on directory data_dir to appuser with grant option")
+    assert set(ddls[0].split()[1].split(",")) == {"read", "write"}
+
+
+def test_grant_absent_strips_option_suffix(monkeypatch):
+    mod = _run_grant(monkeypatch, lambda m: _OptionConn(m), state="absent",
+                     grants=["create table with admin option"],
+                     object_privs=["select:sys.dual with grant option"],
+                     directory_privs=["read:data_dir with grant option"])
+
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    assert [d.lower() for d in exc.value.args[0]["ddls"]] == [
+        "revoke create table from appuser",
+        "revoke select on sys.dual from appuser",
+        "revoke read on directory data_dir from appuser",
+    ]
+
+
 # ===========================================================================
 # oracle_pdb
 # ===========================================================================
