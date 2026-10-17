@@ -1,5 +1,14 @@
 ancestor: null
 releases:
+  3.4.4:
+    changes:
+      minor_changes:
+      - oracle_grant supports WITH ADMIN OPTION and WITH GRANT OPTION.
+      bugfixes:
+      - oracle_user passes the CONTAINER clause to ALTER USER.
+      - oracle_orapki supports Oracle 19c without secretstore or wallet delete commands.
+      - oracle_orapki deletes auto-login wallets during the same state=absent run.
+    release_date: '2026-10-17'
   3.4.3:
     changes:
       minor_changes:

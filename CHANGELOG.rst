@@ -4,6 +4,21 @@ Ibre5041.Ansible\_Oracle\_Modules Release Notes
 
 .. contents:: Topics
 
+v3.4.4
+======
+
+Minor Changes
+-------------
+
+- oracle_grant supports WITH ADMIN OPTION and WITH GRANT OPTION.
+
+Bugfixes
+--------
+
+- oracle_orapki deletes auto-login wallets during the same state=absent run.
+- oracle_orapki supports Oracle 19c without secretstore or wallet delete commands.
+- oracle_user passes the CONTAINER clause to ALTER USER.
+
 v3.4.3
 ======
 
