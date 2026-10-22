@@ -1123,21 +1123,44 @@ def test_opatch_opatchauto_needs_patch_version(monkeypatch):
 
 
 def test_opatch_get_version_fails(monkeypatch):
-    """sqlplus -V returns rc!=0 → fail_json from get_version."""
+    """opatchauto=True, sqlplus -V returns rc!=0 → fail_json from get_version."""
     mod = _load("oracle_opatch")
-    Mod = _make_opatch_mod(_opatch_params(), responses=[(1, "", "not found")])
+    Mod = _make_opatch_mod(_opatch_params(opatchauto=True, patch_version="19.3.0.0.190416"),
+                           responses=[(1, "", "not found")])
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
     monkeypatch.setattr(mod.os.path, "exists", lambda p: True)
     with pytest.raises(FailJson) as exc:
         mod.main()
-    assert "Error" in exc.value.args[0]["msg"]
+    assert "sqlplus -V" in exc.value.args[0]["msg"]
+
+
+def test_opatch_no_opatchauto_does_not_need_sqlplus(monkeypatch):
+    """opatchauto=False (e.g. OEM agent home without sqlplus) → sqlplus never called."""
+    mod = _load("oracle_opatch")
+    calls = []
+
+    class Mod(BaseFakeModule):
+        _resp = [_OP_OPV_OK, _OP_PATCH_ABSENT, _OP_APPLY_OK]
+
+        def run_command(self, cmd, **kw):
+            calls.append(cmd)
+            return self._resp.pop(0)
+
+    Mod.params = _opatch_params(conflict_check=False)
+    Mod.check_mode = False
+    monkeypatch.setattr(mod, "AnsibleModule", Mod)
+    monkeypatch.setattr(mod.os.path, "exists", lambda p: True)
+    with pytest.raises(ExitJson) as exc:
+        mod.main()
+    assert exc.value.args[0]["changed"] is True
+    assert not any("sqlplus" in c for c in calls)
 
 
 def test_opatch_state_opatchversion(monkeypatch):
     """state=opatchversion → exit_json with opatch version string."""
     mod = _load("oracle_opatch")
     Mod = _make_opatch_mod(_opatch_params(state="opatchversion"),
-                           responses=[_OP_VER_OK, _OP_OPV_OK])
+                           responses=[_OP_OPV_OK])
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
     monkeypatch.setattr(mod.os.path, "exists", lambda p: True)
     with pytest.raises(ExitJson) as exc:
@@ -1151,7 +1174,7 @@ def test_opatch_state_lspatches(monkeypatch):
     mod = _load("oracle_opatch")
     lsout = "12345678;Description of patch\n99999999;Another patch\nOPatch succeeded.\n"
     Mod = _make_opatch_mod(_opatch_params(state="lspatches"),
-                           responses=[_OP_VER_OK, _OP_OPV_OK, (0, lsout, "")])
+                           responses=[_OP_OPV_OK, (0, lsout, "")])
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
     monkeypatch.setattr(mod.os.path, "exists", lambda p: True)
     with pytest.raises(ExitJson) as exc:
@@ -1166,7 +1189,7 @@ def test_opatch_present_already_applied(monkeypatch):
     """state=present, patch already applied → exit changed=False."""
     mod = _load("oracle_opatch")
     Mod = _make_opatch_mod(_opatch_params(),
-                           responses=[_OP_VER_OK, _OP_OPV_OK, _OP_PATCH_PRESENT])
+                           responses=[_OP_OPV_OK, _OP_PATCH_PRESENT])
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
     monkeypatch.setattr(mod.os.path, "exists", lambda p: True)
     with pytest.raises(ExitJson) as exc:
@@ -1180,7 +1203,7 @@ def test_opatch_present_not_applied_no_conflict(monkeypatch):
     mod = _load("oracle_opatch")
     Mod = _make_opatch_mod(
         _opatch_params(conflict_check=False),
-        responses=[_OP_VER_OK, _OP_OPV_OK, _OP_PATCH_ABSENT, _OP_APPLY_OK],
+        responses=[_OP_OPV_OK, _OP_PATCH_ABSENT, _OP_APPLY_OK],
     )
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
     monkeypatch.setattr(mod.os.path, "exists", lambda p: True)
@@ -1194,7 +1217,7 @@ def test_opatch_present_not_applied_with_conflict_check(monkeypatch):
     mod = _load("oracle_opatch")
     Mod = _make_opatch_mod(
         _opatch_params(conflict_check=True, patch_base="/patches/12345678"),
-        responses=[_OP_VER_OK, _OP_OPV_OK, _OP_PATCH_ABSENT,
+        responses=[_OP_OPV_OK, _OP_PATCH_ABSENT,
                    _OP_PREREQ_OK, _OP_PREREQ_OK, _OP_APPLY_OK],
     )
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
@@ -1209,7 +1232,7 @@ def test_opatch_prereq_conflict_fails(monkeypatch):
     mod = _load("oracle_opatch")
     Mod = _make_opatch_mod(
         _opatch_params(conflict_check=True, patch_base="/patches/12345678"),
-        responses=[_OP_VER_OK, _OP_OPV_OK, _OP_PATCH_ABSENT,
+        responses=[_OP_OPV_OK, _OP_PATCH_ABSENT,
                    (0, "failed: conflicts exist", "")],
     )
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
@@ -1224,7 +1247,7 @@ def test_opatch_absent_applied_removes(monkeypatch):
     mod = _load("oracle_opatch")
     Mod = _make_opatch_mod(
         _opatch_params(state="absent"),
-        responses=[_OP_VER_OK, _OP_OPV_OK, _OP_PATCH_PRESENT, _OP_ROLLBACK_OK],
+        responses=[_OP_OPV_OK, _OP_PATCH_PRESENT, _OP_ROLLBACK_OK],
     )
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
     monkeypatch.setattr(mod.os.path, "exists", lambda p: True)
@@ -1238,7 +1261,7 @@ def test_opatch_absent_not_applied(monkeypatch):
     mod = _load("oracle_opatch")
     Mod = _make_opatch_mod(
         _opatch_params(state="absent"),
-        responses=[_OP_VER_OK, _OP_OPV_OK, _OP_PATCH_ABSENT],
+        responses=[_OP_OPV_OK, _OP_PATCH_ABSENT],
     )
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
     monkeypatch.setattr(mod.os.path, "exists", lambda p: True)
@@ -1253,7 +1276,7 @@ def test_opatch_check_mode_present_not_applied(monkeypatch):
     mod = _load("oracle_opatch")
     Mod = _make_opatch_mod(
         _opatch_params(state="present"),
-        responses=[_OP_VER_OK, _OP_OPV_OK, _OP_PATCH_ABSENT],
+        responses=[_OP_OPV_OK, _OP_PATCH_ABSENT],
         check_mode=True,
     )
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
@@ -1269,7 +1292,7 @@ def test_opatch_check_mode_present_already_applied(monkeypatch):
     mod = _load("oracle_opatch")
     Mod = _make_opatch_mod(
         _opatch_params(state="present"),
-        responses=[_OP_VER_OK, _OP_OPV_OK, _OP_PATCH_PRESENT],
+        responses=[_OP_OPV_OK, _OP_PATCH_PRESENT],
         check_mode=True,
     )
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
@@ -1284,7 +1307,7 @@ def test_opatch_check_mode_absent_applied(monkeypatch):
     mod = _load("oracle_opatch")
     Mod = _make_opatch_mod(
         _opatch_params(state="absent"),
-        responses=[_OP_VER_OK, _OP_OPV_OK, _OP_PATCH_PRESENT],
+        responses=[_OP_OPV_OK, _OP_PATCH_PRESENT],
         check_mode=True,
     )
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
@@ -1299,7 +1322,7 @@ def test_opatch_check_mode_absent_not_applied(monkeypatch):
     mod = _load("oracle_opatch")
     Mod = _make_opatch_mod(
         _opatch_params(state="absent"),
-        responses=[_OP_VER_OK, _OP_OPV_OK, _OP_PATCH_ABSENT],
+        responses=[_OP_OPV_OK, _OP_PATCH_ABSENT],
         check_mode=True,
     )
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
@@ -1314,7 +1337,7 @@ def test_opatch_minversion_too_old(monkeypatch):
     mod = _load("oracle_opatch")
     Mod = _make_opatch_mod(
         _opatch_params(opatch_minversion="13.0.0.0.0", state="opatchversion"),
-        responses=[_OP_VER_OK, _OP_OPV_OK],
+        responses=[_OP_OPV_OK],
     )
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
     monkeypatch.setattr(mod.os.path, "exists", lambda p: True)
@@ -1329,7 +1352,7 @@ def test_opatch_old_opatch_needs_ocm(monkeypatch):
     old_opv = (0, "OPatch Version: 12.2.0.1.4\n", "")
     Mod = _make_opatch_mod(
         _opatch_params(state="present", ocm_response_file=None),
-        responses=[_OP_VER_OK, old_opv],
+        responses=[old_opv],
     )
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
     monkeypatch.setattr(mod.os.path, "exists", lambda p: True)
@@ -1343,7 +1366,7 @@ def test_opatch_apply_command_fails(monkeypatch):
     mod = _load("oracle_opatch")
     Mod = _make_opatch_mod(
         _opatch_params(conflict_check=False),
-        responses=[_OP_VER_OK, _OP_OPV_OK, _OP_PATCH_ABSENT, (1, "ERROR applying", "")],
+        responses=[_OP_OPV_OK, _OP_PATCH_ABSENT, (1, "ERROR applying", "")],
     )
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
     monkeypatch.setattr(mod.os.path, "exists", lambda p: True)
@@ -1357,7 +1380,7 @@ def test_opatch_apply_no_success_keyword(monkeypatch):
     mod = _load("oracle_opatch")
     Mod = _make_opatch_mod(
         _opatch_params(conflict_check=False),
-        responses=[_OP_VER_OK, _OP_OPV_OK, _OP_PATCH_ABSENT, (0, "Hmm no keyword here", "")],
+        responses=[_OP_OPV_OK, _OP_PATCH_ABSENT, (0, "Hmm no keyword here", "")],
     )
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
     monkeypatch.setattr(mod.os.path, "exists", lambda p: True)
@@ -1371,7 +1394,7 @@ def test_opatch_apply_verbose_output(monkeypatch):
     mod = _load("oracle_opatch")
     Mod = _make_opatch_mod(
         _opatch_params(conflict_check=False, output="verbose"),
-        responses=[_OP_VER_OK, _OP_OPV_OK, _OP_PATCH_ABSENT, _OP_APPLY_OK],
+        responses=[_OP_OPV_OK, _OP_PATCH_ABSENT, _OP_APPLY_OK],
     )
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
     monkeypatch.setattr(mod.os.path, "exists", lambda p: True)
@@ -1386,7 +1409,7 @@ def test_opatch_rollback_no_success_keyword(monkeypatch):
     mod = _load("oracle_opatch")
     Mod = _make_opatch_mod(
         _opatch_params(state="absent"),
-        responses=[_OP_VER_OK, _OP_OPV_OK, _OP_PATCH_PRESENT, (0, "No keyword here", "")],
+        responses=[_OP_OPV_OK, _OP_PATCH_PRESENT, (0, "No keyword here", "")],
     )
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
     monkeypatch.setattr(mod.os.path, "exists", lambda p: True)
@@ -1400,7 +1423,7 @@ def test_opatch_rollback_verbose_output(monkeypatch):
     mod = _load("oracle_opatch")
     Mod = _make_opatch_mod(
         _opatch_params(state="absent", output="verbose"),
-        responses=[_OP_VER_OK, _OP_OPV_OK, _OP_PATCH_PRESENT, _OP_ROLLBACK_OK],
+        responses=[_OP_OPV_OK, _OP_PATCH_PRESENT, _OP_ROLLBACK_OK],
     )
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
     monkeypatch.setattr(mod.os.path, "exists", lambda p: True)
@@ -1467,7 +1490,7 @@ def test_opatch_oracle_home_from_env(monkeypatch):
     try:
         Mod = _make_opatch_mod(
             _opatch_params(oracle_home=None, state="opatchversion"),
-            responses=[_OP_VER_OK, _OP_OPV_OK],
+            responses=[_OP_OPV_OK],
         )
         monkeypatch.setattr(mod, "AnsibleModule", Mod)
         monkeypatch.setattr(mod.os.path, "exists", lambda p: True)
@@ -2969,7 +2992,7 @@ def test_opatch_present_patch_base_no_id_calls_get_patch_id(monkeypatch):
     monkeypatch.setattr(mod, "get_patch_id", _stub_get_patch_id)
     Mod = _make_opatch_mod(
         _opatch_params(patch_base="/patches/12345678", patch_id=None),
-        responses=[_OP_VER_OK, _OP_OPV_OK, _OP_PATCH_PRESENT],
+        responses=[_OP_OPV_OK, _OP_PATCH_PRESENT],
     )
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
     monkeypatch.setattr(mod.os.path, "exists", lambda p: True)
@@ -2985,7 +3008,7 @@ def test_opatch_present_with_patch_version_already_applied(monkeypatch):
     stdout = "12.2.0.1.180417 (12345678) some info\nOPatch succeeded.\n"
     Mod = _make_opatch_mod(
         _opatch_params(patch_version="12.2.0.1.180417"),
-        responses=[_OP_VER_OK, _OP_OPV_OK, (0, stdout, "")],
+        responses=[_OP_OPV_OK, (0, stdout, "")],
     )
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
     monkeypatch.setattr(mod.os.path, "exists", lambda p: True)
@@ -3002,7 +3025,7 @@ def test_opatch_present_applied_returns_version_msg(monkeypatch):
     # apply_patch returns True for short output; need patch to NOT be applied first
     Mod = _make_opatch_mod(
         _opatch_params(conflict_check=False, patch_version="12.2.0.1.180417"),
-        responses=[_OP_VER_OK, _OP_OPV_OK, _OP_PATCH_ABSENT, _OP_APPLY_OK],
+        responses=[_OP_OPV_OK, _OP_PATCH_ABSENT, _OP_APPLY_OK],
     )
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
     monkeypatch.setattr(mod.os.path, "exists", lambda p: True)
@@ -3019,7 +3042,7 @@ def test_opatch_absent_applied_with_patch_version(monkeypatch):
     stdout = "12.2.0.1.180417 (12345678) some info\nOPatch succeeded.\n"
     Mod = _make_opatch_mod(
         _opatch_params(state="absent", patch_version="12.2.0.1.180417"),
-        responses=[_OP_VER_OK, _OP_OPV_OK, (0, stdout, ""), _OP_ROLLBACK_OK],
+        responses=[_OP_OPV_OK, (0, stdout, ""), _OP_ROLLBACK_OK],
     )
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
     monkeypatch.setattr(mod.os.path, "exists", lambda p: True)
@@ -3035,7 +3058,7 @@ def test_opatch_absent_not_applied_with_patch_version(monkeypatch):
     mod = _load("oracle_opatch")
     Mod = _make_opatch_mod(
         _opatch_params(state="absent", patch_version="12.2.0.1.180417"),
-        responses=[_OP_VER_OK, _OP_OPV_OK, _OP_PATCH_ABSENT],
+        responses=[_OP_OPV_OK, _OP_PATCH_ABSENT],
     )
     monkeypatch.setattr(mod, "AnsibleModule", Mod)
     monkeypatch.setattr(mod.os.path, "exists", lambda p: True)
