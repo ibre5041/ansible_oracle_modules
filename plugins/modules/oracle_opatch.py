@@ -494,7 +494,9 @@ def main():
             module.fail_json(msg=msg, changed=False)
 
     # Get the Oracle % Opatch version
-    major_version = get_version(module, oracle_home)
+    # The DB version (via sqlplus) only selects the opatchauto command flavour;
+    # non-DB homes (e.g. OEM agent) have no sqlplus, so skip it otherwise.
+    major_version = get_version(module, oracle_home) if opatchauto else None
     opatch_version = get_opatch_version(module, oracle_home)
     opatch_version_noocm = '12.2.0.1.5'
 
