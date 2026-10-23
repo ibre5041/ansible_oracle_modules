@@ -1,5 +1,10 @@
 ancestor: null
 releases:
+  3.4.5:
+    changes:
+      bugfixes:
+      - oracle_opatch requires sqlplus only when opatchauto is used.
+    release_date: '2026-10-17'
   3.4.4:
     changes:
       minor_changes:

@@ -4,6 +4,14 @@ Ibre5041.Ansible\_Oracle\_Modules Release Notes
 
 .. contents:: Topics
 
+v3.4.5
+======
+
+Bugfixes
+--------
+
+- oracle_opatch requires sqlplus only when opatchauto is used.
+
 v3.4.4
 ======
 
