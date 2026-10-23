@@ -2,7 +2,7 @@ tests/integration/integration_config.yml
 **/*~
 **/__pycache__/
 *.pyc
-.coverage
+.coverage*
 .DS_Store
 .claude/
 .idea/

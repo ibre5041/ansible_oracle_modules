@@ -63,6 +63,7 @@ issues: https://github.com/ibre5041/ansible_oracle_modules/issues
 # uses 'fnmatch' to match the files or directories. Some directories and files like 'galaxy.yml', '*.pyc', '*.retry',
 # and '.git' are always filtered. Mutually exclusive with 'manifest'
 build_ignore:
+  - .coverage*
   - .coveragerc
   - .git
   - .github
