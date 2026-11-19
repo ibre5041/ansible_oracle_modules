@@ -59,6 +59,13 @@ options:
       Use clone_from as a more explicit alias.
     required: false
     aliases: ['db', 'container', 'cdb', 'clone_from']
+  keystore_password:
+    description:
+      - Password of the open CDB root software keystore for a same-CDB clone of a united-mode PDB.
+      - Use with O(sourcedb). Oracle uses it to make the source PDB's TDE keys available to the clone.
+      - The connecting user needs read access to C(V$ENCRYPTION_WALLET) in CDB root.
+    type: str
+    required: false
   snapshot_copy:
     description: Use SNAPSHOT COPY when cloning from another PDB (requires compatible storage)
     required: false
@@ -190,6 +197,14 @@ EXAMPLES = '''
     file_name_convert:
       "/opt/oracle/oradata/XE/xepdb2": "/opt/oracle/oradata/XE/xepdb2_clone"
 
+- name: Clone a TDE-enabled PDB within the same CDB
+  oracle_pdb:
+    mode: sysdba
+    pdb_name: sales_clone
+    clone_from: sales
+    keystore_password: "{{ tde_keystore_password }}"
+    open: true
+
 - name: Remove a pdb
   oracle_pdb:
     mode: sysdba
@@ -273,6 +288,7 @@ def create_pdb(conn, module):
     plug_file = module.params['plug_file'] # clone from XML
     sourcedb = module.params['sourcedb'] # clone from DB
     snapshot_copy = module.params['snapshot_copy'] # clone from DB
+    keystore_password = module.params.get('keystore_password')
     pdb_admin_username = module.params['pdb_admin_username'] # clone form seed
     pdb_admin_password = module.params['pdb_admin_password']
     roles = module.params['roles']
@@ -280,7 +296,6 @@ def create_pdb(conn, module):
     datafile_dest = module.params['datafile_dest']
     file_name_convert = module.params['file_name_convert']
     service_name_convert = module.params['service_name_convert']
-    run_sql = []
 
     createsql = 'create pluggable database %s' % pdb_name
     #opensql = 'alter pluggable database %s open instances=all' % pdb_name
@@ -317,8 +332,7 @@ def create_pdb(conn, module):
     if datafile_dest:
         createsql += " create_file_dest = '%s'" % datafile_dest
 
-    run_sql.append(createsql)
-
+    ddl_options = {}
     ddls_entry = createsql
     if pdb_admin_username and not plug_file and not sourcedb:
         escaped_password = pdb_admin_password.replace('"', '""')
@@ -327,8 +341,22 @@ def create_pdb(conn, module):
             'identified by "********"'
         )
 
-    for sql in run_sql:
-        conn.execute_ddl(sql, ignore_errors=[65012], ddls_entry=ddls_entry)
+    if keystore_password is not None:
+        wallet_sql = """
+            select 1 as supported
+            from v$encryption_wallet w join v$pdbs p on p.con_id = w.con_id
+            where upper(p.name) = upper(:source)
+            group by p.con_id
+            having count(*) = count(case when w.keystore_mode = 'UNITED' and w.wrl_type = 'FILE' then 1 end)
+        """
+        if not conn.execute_select_to_dict(wallet_sql, {"source": sourcedb.strip('"')}, fetchone=True):
+            module.fail_json(msg="TDE cloning requires the source PDB to use a united-mode software keystore",
+                             changed=False)
+        createsql += ' keystore identified by "%s"' % keystore_password
+        ddls_entry += ' keystore identified by "********"'
+        ddl_options['error_message'] = 'Oracle failed to clone the PDB using the TDE keystore'
+
+    conn.execute_ddl(createsql, ignore_errors=[65012], ddls_entry=ddls_entry, **ddl_options)
 
     return set({'name': pdb_name.upper(), 'open_mode': 'MOUNTED'}.items())
 
@@ -503,6 +531,7 @@ def main():
 
             sourcedb               = dict(required=False, aliases=['db', 'container', 'cdb', 'clone_from']),
             snapshot_copy          = dict(type='bool', default=False),
+            keystore_password      = dict(type='str', no_log=True),
             plug_file              = dict(required=False, aliases=['plug_file_xml']),
             pdb_admin_username     = dict(required=False, default='pdb_admin', aliases=['pdbadmun']),
             pdb_admin_password     = dict(required=False, no_log=True, default='pdb_admin', aliases=['pdbadmpw']),
@@ -527,7 +556,7 @@ def main():
         mutually_exclusive=[['sourcedb', 'plug_file']],
         supports_check_mode=True
     )
-    sanitize_string_params(module.params)
+    sanitize_string_params(module.params, no_trim={'keystore_password'})
 
 
     pdb_name = module.params["pdb_name"]
@@ -546,6 +575,16 @@ def main():
 
     if state in ['closed', 'read_only', 'read_write'] and (open_pdb is not None or restricted):
         module.fail_json(msg="open/restricted cannot be combined with state=%s" % state, changed=False)
+
+    keystore_password = module.params.get('keystore_password')
+    if keystore_password is not None:
+        source = module.params['sourcedb']
+        if not source or '@' in source or state in ['absent', 'status', 'unplugged']:
+            module.fail_json(msg="keystore_password requires a same-CDB clone_from and a creation state",
+                             changed=False)
+        if not keystore_password or any(char in keystore_password for char in '"\r\n\0'):
+            module.fail_json(msg="keystore_password must be non-empty and contain no double quotes, line breaks or NUL",
+                             changed=False)
 
     oc = oracleConnection(module)
     pdb = check_pdb_exists(oc, pdb_name)

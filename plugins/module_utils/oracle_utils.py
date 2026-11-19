@@ -346,13 +346,15 @@ class oracleConnection:
                 self.module.warn(error.message)
 
 
-    def execute_ddl(self, request, params=None, no_change=False, ignore_errors=None, ddls_entry=None):
+    def execute_ddl(self, request, params=None, no_change=False, ignore_errors=None, ddls_entry=None,
+                    error_message=None):
         """Execute a DDL request and keep trace it in ddls attribute.
         request -- SQL or anonymous PL/SQL block; optional bind parameters via params.
         In check mode, query is not executed.
         ddls_entry -- If set, this string is recorded in ``ddls`` and shown for ``-vvv``
             instead of ``request`` after success. Use to avoid returning secrets in the
             module result while still executing ``request`` on the database.
+        error_message -- Optional safe substitute for a database error that might echo the SQL.
         """
         if ignore_errors is None:
             ignore_errors = []
@@ -371,7 +373,8 @@ class oracleConnection:
         except oracledb.DatabaseError as e:
             error = e.args[0]
             if error.code not in ignore_errors:
-                self.module.fail_json(msg=error.message, code=error.code, ddls=self.ddls, changed=self.changed)
+                self.module.fail_json(msg=error_message or error.message, code=error.code,
+                                      ddls=self.ddls, changed=self.changed)
             else:
                 pass
 
