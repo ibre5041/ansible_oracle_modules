@@ -8,7 +8,7 @@ namespace: ibre5041
 name: ansible_oracle_modules
 
 # The version of the collection. Must be compatible with semantic versioning
-version: 3.4.5
+version: 3.4.6
 
 # The path to the Markdown (.md) readme file. This path is relative to the root of the collection
 readme: README.md
@@ -63,6 +63,7 @@ issues: https://github.com/ibre5041/ansible_oracle_modules/issues
 # uses 'fnmatch' to match the files or directories. Some directories and files like 'galaxy.yml', '*.pyc', '*.retry',
 # and '.git' are always filtered. Mutually exclusive with 'manifest'
 build_ignore:
+  - .ansible
   - .coverage*
   - .coveragerc
   - .git
@@ -71,9 +72,12 @@ build_ignore:
   - .idea
   - .pylintrc
   - .pytest_cache
+  - importer_result.json
   - Makefile
   - TODO.md
   - inventory
+  - roles/oracle_crs_os_setup/files/keys/id_rsa
+  - roles/oracle_crs_os_setup/files/keys/id_rsa.pub
   - "**/__pycache__"
   - install_oracle_crs_19c.yml
   - install_oracle_crs_26ai.yml

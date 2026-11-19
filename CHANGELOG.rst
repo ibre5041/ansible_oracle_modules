@@ -4,6 +4,14 @@ Ibre5041.Ansible\_Oracle\_Modules Release Notes
 
 .. contents:: Topics
 
+v3.4.6
+======
+
+Minor Changes
+-------------
+
+- oracle_pdb supports cloning a PDB with a TDE keystore while redacting keystore passwords from output and errors.
+
 v3.4.5
 ======
 

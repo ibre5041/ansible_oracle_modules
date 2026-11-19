@@ -1,5 +1,10 @@
 ancestor: null
 releases:
+  3.4.6:
+    changes:
+      minor_changes:
+      - oracle_pdb supports cloning a PDB with a TDE keystore while redacting keystore passwords from output and errors.
+    release_date: '2026-11-19'
   3.4.5:
     changes:
       bugfixes:
