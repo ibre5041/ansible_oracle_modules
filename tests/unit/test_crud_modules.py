@@ -1,4 +1,7 @@
 """Unit tests for CRUD-style Oracle modules: user, grant, pdb, tablespace."""
+from types import SimpleNamespace
+from unittest.mock import MagicMock
+
 import pytest
 
 from conftest import ExitJson, FailJson, load_module_from_path, module_path
@@ -1125,7 +1128,121 @@ def test_pdb_create_from_source(monkeypatch):
 
     with pytest.raises(ExitJson) as exc:
         mod.main()
-    assert any("from cdb1" in d.lower() for d in exc.value.args[0]["ddls"])
+    assert exc.value.args[0]["ddls"] == ["create pluggable database TESTPDB from CDB1"]
+
+
+@pytest.fixture
+def pdb_clone(monkeypatch):
+    mod = _load("oracle_pdb")
+    utils = load_module_from_path(
+        module_path("plugins", "module_utils", "oracle_utils.py"), "pdb_clone_oracle_utils"
+    )
+    cursor = MagicMock()
+    database = MagicMock()
+    database.cursor.return_value.__enter__.return_value = cursor
+
+    def run(*, existing=False, check_mode=False, error_code=None, united_file_wallet=True, **overrides):
+        conn = utils.oracleConnection.__new__(utils.oracleConnection)
+        conn.conn = database
+        conn.ddls = []
+        conn.changed = False
+        def select(sql, params=None, fetchone=False):
+            if "v$encryption_wallet" in sql:
+                assert params == {"source": "SOURCE"}
+                return {"supported": 1} if united_file_wallet else {}
+            if "v$pdbs" in sql:
+                return {"name": "TESTPDB", "open_mode": "READ WRITE", "restricted": "NO"} if existing else {}
+            return {}
+
+        conn.execute_select_to_dict = select
+        conn.execute_select = MagicMock(return_value=[])
+        conn.set_container = MagicMock()
+
+        class Module(BaseFakeModule):
+            def __init__(self, argument_spec, **kwargs):
+                super().__init__(**kwargs)
+                self.params = _pdb_params(**{"sourcedb": "SOURCE", **overrides})
+                self.check_mode = check_mode
+                self._verbosity = 3
+                assert argument_spec["keystore_password"]["no_log"] is True
+                conn.module = self
+
+        if error_code is not None:
+            cursor.execute.side_effect = utils.oracledb.DatabaseError(
+                SimpleNamespace(code=error_code, message="Oracle echoed " + overrides["keystore_password"])
+            )
+
+        monkeypatch.setattr(mod, "AnsibleModule", Module)
+        monkeypatch.setattr(mod, "oracleConnection", lambda m: conn)
+
+        with pytest.raises((ExitJson, FailJson)) as exc:
+            mod.main()
+        return exc.value, conn.module._warnings
+
+    return run, cursor
+
+
+@pytest.mark.parametrize("check_mode", [False, True])
+def test_pdb_tde_clone_redacts_password(pdb_clone, check_mode):
+    run, cursor = pdb_clone
+    password = " Vault's Pass#1 "
+    result, warnings = run(
+        check_mode=check_mode, datafile_dest="/clone", keystore_password=password
+    )
+    sql = "create pluggable database TESTPDB from SOURCE create_file_dest = '/clone'"
+    redacted = sql + ' keystore identified by "********"'
+    assert isinstance(result, ExitJson)
+    assert result.args[0]["changed"] is True
+    assert result.args[0]["ddls"] == [("--" if check_mode else "") + redacted]
+    assert warnings == ["SQL: --" + redacted]
+    if check_mode:
+        cursor.execute.assert_not_called()
+    else:
+        cursor.execute.assert_called_once_with(sql + ' keystore identified by "%s"' % password, None)
+
+
+@pytest.mark.parametrize("code", [28353, 28365])
+def test_pdb_tde_clone_redacts_database_errors(pdb_clone, code):
+    run, _ = pdb_clone
+    password = "VaultPass#1"
+    result, warnings = run(error_code=code, keystore_password=password)
+    assert isinstance(result, FailJson)
+    assert result.args[0]["code"] == code
+    assert result.args[0]["changed"] is False
+    assert password not in repr((result.args, warnings))
+
+
+def test_pdb_tde_clone_existing_is_unchanged(pdb_clone):
+    run, cursor = pdb_clone
+    result, _ = run(existing=True, open=True, united_file_wallet=False, keystore_password="VaultPass#1")
+    assert isinstance(result, ExitJson)
+    assert result.args[0]["changed"] is False
+    cursor.execute.assert_not_called()
+
+
+def test_pdb_tde_clone_requires_united_software_wallet(pdb_clone):
+    run, cursor = pdb_clone
+    result, _ = run(united_file_wallet=False, keystore_password="VaultPass#1")
+    assert isinstance(result, FailJson)
+    assert "united-mode software keystore" in result.args[0]["msg"]
+    assert result.args[0]["changed"] is False
+    cursor.execute.assert_not_called()
+
+
+@pytest.mark.parametrize("params", [
+    {"sourcedb": None},
+    {"sourcedb": None, "plug_file": "/tmp/pdb.xml"},
+    {"sourcedb": "SOURCE@REMOTE"},
+    {"state": "unplugged", "plug_file": "/tmp/pdb.xml"},
+    {"keystore_password": ""},
+    {"keystore_password": 'invalid"password'},
+])
+def test_pdb_tde_clone_rejects_invalid_options(pdb_clone, params):
+    run, cursor = pdb_clone
+    result, _ = run(**{"keystore_password": "VaultPass#1", **params})
+    assert isinstance(result, FailJson)
+    assert "keystore_password" in result.args[0]["msg"]
+    cursor.execute.assert_not_called()
 
 
 # ===========================================================================
